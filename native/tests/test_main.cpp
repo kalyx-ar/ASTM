@@ -204,6 +204,31 @@ void test_config() {
     CHECK(error.find("baudrate") != std::string::npos);
     error.clear();
     CHECK(!parse_config(R"({"schemaVersion":"atsm-agent/1",)", error));
+
+    error.clear();
+    auto tls = parse_config(R"({"schemaVersion":"atsm-agent/1","agentId":"a1","listen":{"port":0,"tls":{"mode":"Tls","certificate":"s.pem","privateKey":"s.key","clientCa":"ca.pem","minimumVersion":"1.3"}},
+        "ports":[{"portId":"p","instrumentId":"i","device":{"kind":"tcp","host":"h","port":1},
+        "ownership":{"controllers":[{"id":"edc","certificateSha256":"AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"}]}}]})", error);
+    CHECK(tls && tls->tls == TlsMode::Tls && tls->tls_settings.minimum_tls13 && tls->tls_settings.require_client_certificate);
+    CHECK(tls && tls->ports[0].controller_certificates.at("edc") == "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899");
+
+    error.clear();
+    CHECK(!parse_config(R"({"schemaVersion":"atsm-agent/1","agentId":"a1","listen":{"port":0,"tls":{"mode":"Tls","certificate":"s.pem","privateKey":"s.key"}},"ports":[{"portId":"p","instrumentId":"i","device":{"kind":"tcp","host":"h","port":1}}]})", error));
+    CHECK(error.find("clientCa") != std::string::npos);
+}
+
+void test_tls_refuses_to_start_without_valid_files() {
+    AgentConfig config;
+    config.agent_id = "tls";
+    config.listen_host = "127.0.0.1";
+    config.tls = TlsMode::Tls;
+    config.tls_settings.certificate_file = "missing-certificate.pem";
+    config.tls_settings.private_key_file = "missing-key.pem";
+    config.tls_settings.client_ca_file = "missing-ca.pem";
+    Agent agent(config, [](LogLevel, const std::string&) {});
+    std::string error;
+    CHECK(!agent.start(error));
+    CHECK(!error.empty());
 }
 
 /// Fake instrument: a TCP server that the agent uses as its "serial" device.
@@ -373,6 +398,7 @@ int main(int argc, char** argv) {
     test_vectors_file();
     test_arbiter();
     test_config();
+    test_tls_refuses_to_start_without_valid_files();
     test_agent_end_to_end();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;

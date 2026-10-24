@@ -72,7 +72,7 @@ public static class TcpNativeChannel
     private static ChannelDescriptor Describe(string channelId, TcpEndpointOptions options, string? instrumentId) =>
         new(channelId, ChannelKind.TcpNative, $"{(options.Mode == TlsMode.Tls ? "tls" : "tcp")}://{options.Host}:{options.Port}", instrumentId);
 
-    private static async Task<Stream> SecureAsync(NetworkStream network, TcpEndpointOptions options, bool asServer, CancellationToken cancellationToken)
+    internal static async Task<Stream> SecureAsync(NetworkStream network, TcpEndpointOptions options, bool asServer, CancellationToken cancellationToken)
     {
         if (options.Mode == TlsMode.Plain)
             return network;

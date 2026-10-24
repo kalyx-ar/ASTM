@@ -1,5 +1,7 @@
 #include "atsm/config.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <set>
 
@@ -112,10 +114,17 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
             for (std::size_t i = 0; i < controllers->array.size(); ++i) {
                 const auto cp = p + ".controllers[" + std::to_string(i) + "]";
                 const Value& c = controllers->array[i];
-                if (!r.only(c, cp, {"id", "priority"})) return false;
+                if (!r.only(c, cp, {"id", "priority", "certificateSha256"})) return false;
                 const auto id = r.text(c, cp, "id", true);
                 const auto priority = static_cast<int>(r.number(c, cp, "priority", 0, 0, 1000000));
                 if (!port.controllers.emplace(id, priority).second) return r.fail(cp + ".id", "duplicate controller");
+                if (c.find("certificateSha256")) {
+                    auto fingerprint = r.text(c, cp, "certificateSha256", true);
+                    for (auto& ch : fingerprint) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+                    fingerprint.erase(std::remove(fingerprint.begin(), fingerprint.end(), ':'), fingerprint.end());
+                    if (fingerprint.size() != 64) return r.fail(cp + ".certificateSha256", "expected 64 hex digits");
+                    port.controller_certificates[id] = fingerprint;
+                }
             }
         }
     }
@@ -157,10 +166,30 @@ std::optional<AgentConfig> parse_config(const std::string& text, std::string& er
     config.listen_host = r.text(*listen, "$.listen", "host", false, "0.0.0.0");
     if (!listen->find("port")) r.fail("$.listen.port", "required (0 selects an ephemeral port)");
     config.listen_port = static_cast<std::uint16_t>(r.number(*listen, "$.listen", "port", 0, 0, 65535));
-    const auto tls = r.text(*listen, "$.listen", "tls", false, "Plain");
-    if (tls == "Plain") config.tls = TlsMode::Plain;
-    else if (tls == "Tls") config.tls = TlsMode::Tls;
-    else r.fail("$.listen.tls", "expected Plain or Tls");
+    const Value* tls = listen->find("tls");
+    if (!tls || (tls->kind == Value::Kind::String && tls->string == "Plain")) {
+        config.tls = TlsMode::Plain;
+    } else if (tls->kind == Value::Kind::Object) {
+        const std::string p = "$.listen.tls";
+        if (!r.only(*tls, p, {"mode", "certificate", "privateKey", "privateKeyPassword", "clientCa", "requireClientCertificate", "minimumVersion"})) return std::nullopt;
+        if (r.text(*tls, p, "mode", true) != "Tls") r.fail(p + ".mode", "expected Tls (use \"tls\": \"Plain\" for plain text)");
+        config.tls = TlsMode::Tls;
+        auto& s = config.tls_settings;
+        s.certificate_file = r.text(*tls, p, "certificate", true);
+        s.private_key_file = r.text(*tls, p, "privateKey", true);
+        s.private_key_password = r.text(*tls, p, "privateKeyPassword", false);
+        s.client_ca_file = r.text(*tls, p, "clientCa", false);
+        if (const Value* require = tls->find("requireClientCertificate")) {
+            if (require->kind != Value::Kind::Bool) r.fail(p + ".requireClientCertificate", "expected a boolean");
+            s.require_client_certificate = require->boolean;
+        }
+        const auto minimum = r.text(*tls, p, "minimumVersion", false, "1.2");
+        if (minimum == "1.3") s.minimum_tls13 = true;
+        else if (minimum != "1.2") r.fail(p + ".minimumVersion", "expected 1.2 or 1.3");
+        if (s.require_client_certificate && s.client_ca_file.empty()) r.fail(p + ".clientCa", "required when requireClientCertificate is true");
+    } else {
+        r.fail("$.listen.tls", "expected \"Plain\" or a TLS object");
+    }
 
     const Value* ports = document->find("ports");
     if (!ports || ports->kind != Value::Kind::Array || ports->array.empty()) {

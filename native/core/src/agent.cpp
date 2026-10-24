@@ -45,11 +45,13 @@ Agent::~Agent() { shutdown(); }
 bool Agent::start(std::string& error) {
     if (config_.tls == TlsMode::Tls) {
         // Never fall back to plain text when TLS was requested.
-        error = "TLS endpoints require the TLS backend, which is not built in this version (see spec/link-v1.md)";
-        return false;
+        tls_ = TlsServer::create(config_.tls_settings, error);
+        if (!tls_) return false;
     }
     if (!listener_.open(config_.listen_host, config_.listen_port, error)) return false;
-    log(LogLevel::Info, "listening on " + config_.listen_host + ":" + std::to_string(listener_.port()) + " (plain TCP: use only on trusted networks)");
+    log(LogLevel::Info, "listening on " + config_.listen_host + ":" + std::to_string(listener_.port()) +
+                            (tls_ ? (config_.tls_settings.require_client_certificate ? " (TLS, client certificates required)" : " (TLS)")
+                                  : " (plain TCP: use only on trusted networks)"));
     for (auto& port : ports_) {
         Port* p = port.get();
         p->reader = std::thread([this, p] { port_loop(*p); });
@@ -106,7 +108,7 @@ void Agent::shutdown() {
     }
     for (auto& connection : all) {
         connection->alive = false;
-        connection->socket.shutdown();
+        connection->transport->shutdown();
     }
     // Connection threads are detached; wait until every one has left its loop.
     while (active_connections_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -120,22 +122,55 @@ void Agent::accept_loop() {
     while (!stopping_) {
         auto socket = listener_.accept(kPollMs * 2);
         if (!socket.valid()) continue;
-        auto connection = std::make_shared<Connection>();
-        connection->socket = std::move(socket);
-        connection->last_rx_ms = now_ms();
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            connection->id = next_connection_++;
-            connections_[connection->id] = connection;
-        }
-        log(LogLevel::Info, "connection " + std::to_string(connection->id) + " from " + connection->socket.peer());
-        send_hello(connection);
+        // The TLS handshake runs on the connection thread so a slow client never blocks new connections.
         ++active_connections_;
-        std::thread([this, connection] {
-            connection_loop(connection);
+        std::thread([this](platform::Socket accepted) {
+            serve(std::move(accepted));
             --active_connections_;
-        }).detach();
+        }, std::move(socket)).detach();
     }
+}
+
+void Agent::serve(platform::Socket socket) {
+    const std::string peer = socket.peer();
+    auto connection = std::make_shared<Connection>();
+    if (tls_) {
+        std::string error;
+        connection->transport = tls_->accept(std::move(socket), 10000, error);
+        if (!connection->transport) {
+            log(LogLevel::Warning, "TLS connection from " + peer + " rejected: " + error);
+            return;
+        }
+    } else {
+        connection->transport = std::make_unique<PlainTransport>(std::move(socket));
+    }
+    connection->last_rx_ms = now_ms();
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        connection->id = next_connection_++;
+        connections_[connection->id] = connection;
+    }
+    log(LogLevel::Info, "connection " + std::to_string(connection->id) + " from " + peer +
+                            (connection->transport->authenticated() ? " certificate CN=" + connection->transport->peer_common_name() : std::string()));
+    send_hello(connection);
+    connection_loop(connection);
+}
+
+bool Agent::authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const {
+    if (!tls_) return true;  // plain mode: the id is a declaration, see spec/link-v1.md § Security
+    const auto& transport = *connection->transport;
+    if (!transport.authenticated()) {
+        if (!config_.tls_settings.require_client_certificate) return true;
+        reason = "no verified client certificate";
+        return false;
+    }
+    if (transport.peer_common_name() == controller_id) return true;
+    for (const auto& port : config_.ports) {
+        auto it = port.controller_certificates.find(controller_id);
+        if (it != port.controller_certificates.end() && it->second == transport.peer_certificate_sha256()) return true;
+    }
+    reason = "certificate CN=" + transport.peer_common_name() + " does not identify controller " + controller_id;
+    return false;
 }
 
 void Agent::connection_loop(std::shared_ptr<Connection> connection) {
@@ -143,7 +178,7 @@ void Agent::connection_loop(std::shared_ptr<Connection> connection) {
     std::vector<std::uint8_t> buffer(16 * 1024);
     std::vector<link::Unit> units;
     while (connection->alive && !stopping_) {
-        const int n = connection->socket.receive(buffer.data(), buffer.size(), kPollMs * 2);
+        const int n = connection->transport->receive(buffer.data(), buffer.size(), kPollMs * 2);
         if (n == -2) continue;
         if (n <= 0) break;
         connection->last_rx_ms = now_ms();
@@ -191,10 +226,17 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
             connection->alive = false;
             return;
         }
+        std::string reason;
+        if (!authorize(connection, *text, reason)) {
+            log(LogLevel::Warning, "connection " + std::to_string(connection->id) + " refused as " + *text + ": " + reason);
+            send_error(connection, "ATSM-AG-IDENTITY-MISMATCH", 0, reason);
+            connection->alive = false;
+            return;
+        }
         std::lock_guard<std::mutex> lock(mutex_);
         connection->controller_id = *text;
         connection->hello = true;
-        log(LogLevel::Info, "connection " + std::to_string(connection->id) + " identifies as " + *text + " (unauthenticated in plain mode)");
+        log(LogLevel::Info, "connection " + std::to_string(connection->id) + " identifies as " + *text + (tls_ ? " (certificate verified)" : " (unauthenticated in plain mode)"));
         return;
     }
     if (unit.type == link::Type::Heartbeat || unit.type == link::Type::Error) return;
@@ -385,14 +427,14 @@ void Agent::drop(const std::shared_ptr<Connection>& connection, const std::strin
         }
     }
     connection->alive = false;
-    connection->socket.shutdown();
+    connection->transport->shutdown();
     log(LogLevel::Info, "connection " + std::to_string(connection->id) + " dropped: " + reason);
 }
 
 void Agent::send(const std::shared_ptr<Connection>& connection, const link::Unit& unit) {
     const auto bytes = link::encode(unit);
     std::lock_guard<std::mutex> lock(connection->send_mutex);
-    if (connection->alive && !connection->socket.send_all(bytes.data(), bytes.size())) connection->alive = false;
+    if (connection->alive && !connection->transport->send_all(bytes.data(), bytes.size())) connection->alive = false;
 }
 
 void Agent::send_error(const std::shared_ptr<Connection>& connection, const std::string& code, std::uint64_t request_id, const std::string& detail) {

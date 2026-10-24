@@ -14,6 +14,7 @@
 #include "atsm/config.hpp"
 #include "atsm/link.hpp"
 #include "atsm/platform.hpp"
+#include "atsm/transport.hpp"
 
 namespace atsm {
 
@@ -40,7 +41,7 @@ public:
 private:
     struct Connection {
         ConnectionId id = 0;
-        platform::Socket socket;
+        std::unique_ptr<Transport> transport;
         std::mutex send_mutex;
         std::string controller_id;
         bool hello = false;
@@ -63,6 +64,8 @@ private:
     };
 
     void accept_loop();
+    void serve(platform::Socket socket);
+    bool authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const;
     void connection_loop(std::shared_ptr<Connection> connection);
     void port_loop(Port& port);
     void handle(const std::shared_ptr<Connection>& connection, const link::Unit& unit);
@@ -91,6 +94,7 @@ private:
     std::vector<std::unique_ptr<Port>> ports_;
     ConnectionId next_connection_ = 1;
     std::atomic<int> active_connections_{0};
+    std::unique_ptr<TlsServer> tls_;
 };
 
 }  // namespace atsm

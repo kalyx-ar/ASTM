@@ -46,6 +46,8 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
     private long _writeSequence;
     private Grant? _grant;
     private ulong _connection;
+    private volatile bool _closed;
+    private string? _closeReason;
 
     private SerialTunnelChannel(Stream stream, IDisposable owner, SerialTunnelOptions options, ushort port, Guid agentEpoch, ChannelDescriptor descriptor, ChannelCapabilities capabilities)
     {
@@ -67,15 +69,14 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
 
     public static async Task<SerialTunnelChannel> ConnectAsync(string channelId, TcpEndpointOptions endpoint, SerialTunnelOptions options, CancellationToken cancellationToken)
     {
-        if (endpoint.Mode == TlsMode.Tls)
-            throw new NotSupportedException("The native agent of this version accepts only plain endpoints; TLS is pending its backend.");
         var client = new TcpClient { NoDelay = true };
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(options.HandshakeTimeout);
             await client.ConnectAsync(endpoint.Host, endpoint.Port, timeout.Token).ConfigureAwait(false);
-            var stream = client.GetStream();
+            // TLS is decided by the endpoint and never downgraded; the agent verifies the client certificate (mTLS).
+            var stream = await TcpNativeChannel.SecureAsync(client.GetStream(), endpoint, asServer: false, timeout.Token).ConfigureAwait(false);
             var decoder = new LinkDecoder(options.MaxUnitBytes);
             var units = new List<LinkUnit>();
 
@@ -253,10 +254,11 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
         }
         finally
         {
+            _closed = true;
             _received.Writer.TryComplete();
             Publish(ChannelEventKind.Closed, null, "agent connection closed");
             foreach (var reply in _controlReplies.Values.Concat(_writeReplies.Values))
-                reply.TrySetException(new IOException("Agent connection closed."));
+                reply.TrySetException(new IOException(_closeReason ?? "Agent connection closed."));
         }
     }
 
@@ -296,6 +298,7 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
                 Publish(ChannelEventKind.Faulted, map.GetValueOrDefault(1UL) as string, map.GetValueOrDefault(2UL) as string);
                 break;
             case LinkType.Error:
+                _closeReason = $"Agent error {map.GetValueOrDefault(0UL)}: {map.GetValueOrDefault(2UL)}";
                 Publish(ChannelEventKind.Faulted, map.GetValueOrDefault(0UL) as string, map.GetValueOrDefault(2UL) as string);
                 break;
         }
@@ -344,10 +347,13 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
         Descriptor.ChannelId, controllerId, AgentEpoch, _connection, grant.Generation, new Guid(grant.TransferId),
         OwnershipEnforcement.Enforced, DateTimeOffset.UtcNow, grant.Lease);
 
-    private static TaskCompletionSource<SortedDictionary<ulong, object?>> Register(ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> replies, ulong id)
+    private TaskCompletionSource<SortedDictionary<ulong, object?>> Register(ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> replies, ulong id)
     {
         var completion = new TaskCompletionSource<SortedDictionary<ulong, object?>>(TaskCreationOptions.RunContinuationsAsynchronously);
         replies[id] = completion;
+        // The read loop may have ended before this request was registered: fail it instead of waiting forever.
+        if (_closed)
+            completion.TrySetException(new IOException(_closeReason ?? "Agent connection closed."));
         return completion;
     }
 

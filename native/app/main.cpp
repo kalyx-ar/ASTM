@@ -3,6 +3,7 @@
 #include <csignal>
 #include <cstdio>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -64,6 +65,11 @@ int main(int argc, char** argv) {
     if (!config) {
         std::cerr << "invalid configuration: " << error << "\n";
         return 65;
+    }
+    // TLS files may be given relative to the configuration file.
+    const auto base = std::filesystem::absolute(std::filesystem::path(config_path)).parent_path();
+    for (auto* path : {&config->tls_settings.certificate_file, &config->tls_settings.private_key_file, &config->tls_settings.client_ca_file}) {
+        if (!path->empty() && std::filesystem::path(*path).is_relative()) *path = (base / *path).string();
     }
     if (check_only) {
         std::cout << "configuration is valid: " << config->ports.size() << " port(s)\n";

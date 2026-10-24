@@ -40,7 +40,7 @@ native_socket to_native(std::intptr_t handle) { return handle == -1 ? kInvalid :
 std::intptr_t from_native(native_socket s) { return s == kInvalid ? -1 : static_cast<std::intptr_t>(s); }
 
 // select() instead of poll(): WSAPoll does not exist on Windows XP, and the agent handles few sockets.
-bool wait_readable(native_socket s, int timeout_ms) {
+bool select_readable(native_socket s, int timeout_ms) {
     fd_set set;
     FD_ZERO(&set);
     FD_SET(s, &set);
@@ -145,7 +145,7 @@ bool Socket::send_all(const std::uint8_t* data, std::size_t size) {
 int Socket::receive(std::uint8_t* buffer, std::size_t size, int timeout_ms) {
     const auto s = to_native(handle_);
     if (s == kInvalid) return -1;
-    if (!wait_readable(s, timeout_ms)) return -2;
+    if (!select_readable(s, timeout_ms)) return -2;
 #ifdef _WIN32
     const int n = ::recv(s, reinterpret_cast<char*>(buffer), static_cast<int>(size), 0);
 #else
@@ -218,7 +218,7 @@ bool Listener::open(const std::string& host, std::uint16_t port, std::string& er
 
 Socket Listener::accept(int timeout_ms) {
     const auto s = to_native(handle_);
-    if (s == kInvalid || !wait_readable(s, timeout_ms)) return Socket();
+    if (s == kInvalid || !select_readable(s, timeout_ms)) return Socket();
     native_socket client = ::accept(s, nullptr, nullptr);
     if (client == kInvalid) return Socket();
     set_no_delay(client);
@@ -229,6 +229,15 @@ void Listener::close() {
     if (handle_ == -1) return;
     ATSM_CLOSE_SOCKET(to_native(handle_));
     handle_ = -1;
+}
+
+}  // namespace atsm::platform
+
+namespace atsm::platform {
+
+bool Socket::wait_readable(int timeout_ms) const {
+    const auto s = to_native(handle_);
+    return s != kInvalid && select_readable(s, timeout_ms);
 }
 
 }  // namespace atsm::platform

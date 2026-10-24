@@ -46,6 +46,8 @@ public:
     bool send_all(const std::uint8_t* data, std::size_t size);
     /// Returns bytes read, 0 on orderly close, -1 on failure, -2 on timeout.
     int receive(std::uint8_t* buffer, std::size_t size, int timeout_ms);
+    /// True when data (or a close) is ready to read within timeout_ms.
+    bool wait_readable(int timeout_ms) const;
     void shutdown();
     void close();
     std::string peer() const;

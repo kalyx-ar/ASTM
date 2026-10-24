@@ -142,7 +142,7 @@ internal sealed class NativeAgent : IAsyncDisposable
         return null;
     }
 
-    public static async Task<NativeAgent> StartAsync(int instrumentPort)
+    public static async Task<NativeAgent> StartAsync(int instrumentPort, string tls = "\"Plain\"", string? backupCertificateSha256 = null)
     {
         var config = Path.Combine(Path.GetTempPath(), $"atsm-agent-{Guid.NewGuid():N}.json");
         await File.WriteAllTextAsync(config, $$"""
@@ -150,14 +150,14 @@ internal sealed class NativeAgent : IAsyncDisposable
               "schemaVersion": "atsm-agent/1",
               "agentId": "test-agent",
               "platformProfile": "test",
-              "listen": { "host": "127.0.0.1", "port": 0 },
+              "listen": { "host": "127.0.0.1", "port": 0, "tls": {{tls}} },
               "heartbeatMs": 2000,
               "ports": [
                 {
                   "portId": "architect-port",
                   "instrumentId": "architect-01",
                   "device": { "kind": "tcp", "host": "127.0.0.1", "port": {{instrumentPort}} },
-                  "ownership": { "leaseMs": 6000, "controllers": [ { "id": "edc-test", "priority": 10 }, { "id": "edc-backup", "priority": 20 } ] }
+                  "ownership": { "leaseMs": 6000, "controllers": [ { "id": "edc-test", "priority": 10 }, { "id": "edc-backup", "priority": 20{{(backupCertificateSha256 is null ? "" : $", \"certificateSha256\": \"{backupCertificateSha256}\"")}} } ] }
                 }
               ]
             }

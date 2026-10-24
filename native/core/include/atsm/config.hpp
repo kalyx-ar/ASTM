@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "atsm/transport_settings.hpp"
+
 namespace atsm {
 
 enum class Parity { None, Odd, Even, Mark, Space };
@@ -35,6 +37,8 @@ struct PortConfig {
     std::uint32_t lease_ms = 15000;
     std::size_t max_queued_requests = 16;
     std::map<std::string, int> controllers;
+    /// Optional SHA-256 (lower-case hex, DER) of the client certificate that identifies a controller in TLS mode.
+    std::map<std::string, std::string> controller_certificates;
     std::size_t max_write_bytes = 16 * 1024;
 };
 
@@ -44,6 +48,7 @@ struct AgentConfig {
     std::string listen_host = "0.0.0.0";
     std::uint16_t listen_port = 0;
     TlsMode tls = TlsMode::Plain;
+    TlsServerSettings tls_settings;
     std::uint32_t max_unit_bytes = 64 * 1024;
     std::uint32_t heartbeat_ms = 5000;
     std::vector<PortConfig> ports;

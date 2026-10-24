@@ -53,4 +53,6 @@ CBOR (RFC 8949) with deterministic encoding: definite lengths, shortest integer 
 
 ## Security
 
-`Plain` mode carries the `controllerId` from `Hello` without authentication; it is accepted only when listed in the port configuration and must be used only on trusted networks. The `Tls` mode (TLS 1.2 minimum, 1.3 preferred, mutual authentication) binds the identity to the client certificate. In this version the native TLS backend is pending approval (Mbed TLS); an endpoint configured as `Tls` refuses to start rather than fall back to plain.
+`Plain` mode carries the `controllerId` from `Hello` without authentication; it is accepted only when listed in the port configuration and must be used only on trusted networks.
+
+`Tls` mode (Mbed TLS 4.1 LTS in the native agent) requires TLS 1.2 or 1.3 (`minimumVersion` may force 1.3) and, by default, a client certificate that chains to `clientCa`. The `controllerId` of `Hello` must equal the certificate subject CN, or the certificate SHA-256 (DER) must equal the `certificateSha256` configured for that controller; otherwise the agent answers `Error` `ATSM-AG-IDENTITY-MISMATCH` and closes. A `Tls` endpoint never falls back to plain text, and an agent built without TLS refuses to start such an endpoint.
