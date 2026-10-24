@@ -15,5 +15,9 @@
     <ProjectReference Include="..\..\src\Atsm.Protocol.Lis01\Atsm.Protocol.Lis01.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Protocol.Lis02\Atsm.Protocol.Lis02.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Protocol.Mllp\Atsm.Protocol.Mllp.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Runtime\Atsm.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
   </ItemGroup>
 </Project>

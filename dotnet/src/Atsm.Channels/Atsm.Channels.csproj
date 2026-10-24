@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Instrument channels: TCP native (plain or TLS), generic streams and trace replay.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Atsm.Abstractions\Atsm.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
