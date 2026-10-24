@@ -88,6 +88,11 @@ public sealed class AstmInstrumentSession
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         var lease = await _channel.AcquireAsync(new ControlRequest(_options.ControllerId), cancellationToken).ConfigureAwait(false);
+        // A new session starts a fresh conversation: the low-level link begins neutral, so the technical
+        // transfer state is accepted as is. Operation-level recovery is decided by the dialect and the host.
+        var admission = await _channel.ConfirmTransferAsync(lease, lease.TransferId, cancellationToken).ConfigureAwait(false);
+        if (admission.State != TransferAdmissionState.Open)
+            throw new InvalidOperationException($"Channel refused the transfer: {admission.Code}");
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var start = _clock.GetTimestamp();
         using var timer = _clock.CreateTimer(_ => _inputs.Writer.TryWrite(Input.Tick), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);

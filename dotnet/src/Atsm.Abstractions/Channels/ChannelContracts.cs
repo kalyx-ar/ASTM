@@ -56,6 +56,6 @@ public enum WriteProgress { Completed, Partial, Unknown, Rejected }
 /// <summary>Technical write progress only: it never proves that the instrument received or processed the bytes.</summary>
 public sealed record WriteOutcome(Guid WriteId, int Requested, int Accepted, WriteProgress Progress, string? Code = null);
 
-public enum ChannelEventKind { Opened, Closed, Faulted, OwnershipGranted, OwnershipRevoked, Discontinuity, SignalChanged, Overflow }
+public enum ChannelEventKind { Opened, Closed, Faulted, OwnershipQueued, OwnershipGranted, OwnershipRevoked, Discontinuity, SignalChanged, Overflow }
 
 public sealed record ChannelEvent(ChannelEventKind Kind, DateTimeOffset Timestamp, string? Code = null, string? Detail = null);
