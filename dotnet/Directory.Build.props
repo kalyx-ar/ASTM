@@ -1,0 +1,17 @@
+<Project>
+  <!-- ATSM is a standalone repository: this file (and Directory.Build.targets) stop MSBuild
+       from importing the props/targets of any repository that happens to contain this checkout. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>0.1.0</Version>
+    <Product>ATSM</Product>
+    <Description>ATSM: neutral clinical laboratory instrument integration.</Description>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
