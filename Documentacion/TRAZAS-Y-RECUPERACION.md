@@ -109,3 +109,26 @@ Los consumidores en espera pueden recibir diagnósticos si está habilitado, per
 Las capturas pueden contener identificadores y datos clínicos. La configuración define acceso por dominio/rol, retención, límites, exportación y protección del almacenamiento. Los ejemplos del paquete son sintéticos y las claves/certificados se referencian por ubicación, sin incorporar su contenido.
 
 La traza conserva qué versiones interpretaron o modificaron un estado, quién ejecutó una recuperación y qué evidencia sustentó la decisión. Los valores de retención y los permisos finales se integran con las políticas existentes del EDC.
+
+## Reconstrucción de trazas reales y teóricas
+
+ATSM genérico no conoce ningún formato de log. Trabaja con **contenido puro**: bytes del cable, texto de mensajes (registros sin framing) o eventos, siempre con la dirección vista desde el host (`TraceSegment`). Un mismo método construye dos trazas:
+
+| Traza | Cómo se construye | Para qué |
+|---|---|---|
+| Real | Los segmentos tal como se capturaron (`TraceReconstruction.Real`) | Evidencia: qué pasó |
+| Teórica | Los mismos mensajes reproducidos por dos enlaces LIS01-A2 con reloj virtual, timers del perfil, velocidad de línea, tiempo de reacción y las pausas reales entre mensajes (`TraceReconstruction.Theoretical`) | Referencia: cómo debería verse según la norma y el perfil |
+
+Ambas pasan por la misma **pila de eventos** (`TraceStackBuilder`): técnica (bytes), enlace (observador pasivo LIS01: ENQ, frames, ACK/NAK, retransmisiones, contención, fin de transmisión), mensaje (LIS02 y diagnósticos) y operación (hechos canónicos, si se indica el perfil del plugin). `TraceMetrics` y `TraceComparison` dan la analítica: mensajes iguales o distintos, eventos de enlace que la traza real tuvo de más, duración de mensajes, latencia de respuesta del host y consultas sin respuesta.
+
+Un log que sólo registra mensajes, sin frames, también produce una traza teórica completa del cable.
+
+**Los plugins** sólo agregan adaptadores de log de su serie de equipos. El SDK ofrece `RegexLogAdapter`: el plugin declara una expresión regular con grupos `time`, `dir`, `payload` (y opcionalmente `length` o `label`), el formato de hora, la codificación, los tokens de control y qué significa cada dirección para quien escribió el log. No se programan parsers.
+
+**Evidencia del registrador.** El observador no descarta un frame con checksum incorrecto si el receptor lo confirmó con ACK. En ese caso el original era válido y lo alteró quien registró la traza: se reconstruye y se marca `lis01.altered-by-recorder`. El anonimizador conserva esa diferencia de checksum.
+
+```bash
+atsm-trace extract sysmex.port-monitor "AMS.txt" ams.atsmtrace --recorded-by instrument
+atsm-trace theoretical ams.atsmtrace ams.theory.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry --baud 0
+atsm-trace compare ams.atsmtrace ams.theory.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry
+```

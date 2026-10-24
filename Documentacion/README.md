@@ -93,9 +93,9 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 
 ## Pendiente de decidir
 
-- Licencia del repositorio ATSM (afecta a cómo se comparte y a la compatibilidad con Mbed TLS, Apache-2.0).
+- Licencia: decidido, libre uso. Firma: Strong Name con la SNK de EDC y Authenticode en el release (ver [ESTADO](ESTADO.md#decisiones-registradas)).
 - Aprobación de Mbed TLS y de la publicación de paquetes NuGet de ATSM para EDC.
-- Si el intercambio por archivo con laboratorio de derivación (`DeltaLab`) entra en ATSM o queda en EDC.
+- Si el intercambio por archivo con laboratorio de derivación (`DeltaLab`) entra en ATSM, como plugin aparte, o queda en EDC.
 - Primer instrumento para pruebas de banco y acceso a un equipo de prueba.
 
 ## Alcance de esta entrega

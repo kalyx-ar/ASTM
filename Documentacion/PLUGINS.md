@@ -107,7 +107,20 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 
 ## Migración desde Glyms, por plugin
 
-1. Convertir las trazas del equipo al formato ATSM con el importador correspondiente.
+1. Convertir las trazas del equipo al formato ATSM con el adaptador de log del plugin (`atsm-trace extract`) o como contenido puro (`from-text`, `from-binary`).
 2. Ejecutar el plugin legacy (o leer su código decompilado) para obtener la salida de referencia por mensaje.
 3. Escribir el perfil/mapa; contrastar contra la referencia y documentar cada diferencia como **conservar / corregir / retirar** con su evidencia ([IMPLEMENTACION § Registro por regla](IMPLEMENTACION.md)).
 4. Anonimizar el corpus resultante y fijarlo como `expected/`.
+
+## Dialecto estándar y adaptadores de log
+
+- `StandardAstmDialect` interpreta LIS02-A2 por posición de la norma. Es el plugin `clsi.lis02` para equipos sin desviaciones conocidas y la base que los dialectos de fabricante extienden: el de U-WAM sobrescribe sólo lo que su manual cambia (componentes de R.3, `valor^formato` en R.4, flags, R.9 como celda UD-10, Q por número de muestra, respuesta sin órdenes).
+- Los valores de interfaz que define la documentación de la marca o serie de equipos (límites de respuesta, longitud de frame, página de códigos) van en el **perfil** con su cita. Por ejemplo, U-WAM responde consultas en 8 s con analizador químico o en 18 s sin él, y por eso tiene dos perfiles.
+- Un plugin puede implementar `ITraceLogAdapterProvider` para leer los logs de su serie de equipos, configurando un `RegexLogAdapter` ([TRAZAS-Y-RECUPERACION § Reconstrucción](TRAZAS-Y-RECUPERACION.md#reconstrucción-de-trazas-reales-y-teóricas)).
+
+| Plugin | Estado |
+|---|---|
+| `clsi.lis02` (estándar) | Implementado |
+| `abbott.architect` | Implementado (ASI RS-232) |
+| `sysmex.uwam` | Implementado: perfiles LIS2-A2 / E1381-02, dialecto y adaptador `sysmex.port-monitor` |
+| `Atsm.Plugin.Glyms.Testing` | Sólo pruebas: adaptador `glyms.interface-log` para los logs del LIMS Glyms. Un plugin de integración con Glyms (pedidos desde su interfaz o su log) sería un trabajo aparte |

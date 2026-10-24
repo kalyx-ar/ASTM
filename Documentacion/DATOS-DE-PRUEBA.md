@@ -24,13 +24,13 @@ Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de S
 
 ```mermaid
 flowchart LR
-    R[Traza real local] --> I[Importador → .atsmtrace]
+    R[Traza real local] --> I[atsm-trace extract / from-text → .atsmtrace]
     I --> A[atsm-trace anonymize]
     A --> V[Revisión humana]
     V --> C[conformance/corpus del plugin]
 ```
 
-`atsm-trace anonymize` (herramienta del repositorio) trabaja **con el codec**, no con expresiones regulares sobre texto, para saber qué campo es qué:
+Las trazas se obtienen con `atsm-trace extract <adaptador>` (log de un fabricante o sistema), `from-text` o `from-binary`. `atsm-trace anonymize` trabaja **con el codec**, no con expresiones regulares sobre texto, para saber qué campo es qué:
 
 - Reemplaza campos de paciente (P: id, nombres, nacimiento, sexo, dirección, médico) por valores sintéticos consistentes dentro de la traza.
 - Seudonimiza identificadores de muestra/orden con un mapa estable por corpus (misma muestra → mismo seudónimo), de modo que la correlación O ↔ R se conserve.

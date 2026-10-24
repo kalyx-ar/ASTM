@@ -149,7 +149,7 @@ Una traza ATSM es independiente del canal y del fabricante:
 
 - Archivo `*.atsmtrace` (v1, `atsm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Un formato binario con hash encadenado queda para la traza durable del agente.
 - `atsm-trace dump` muestra una traza con los caracteres de control visibles para revisión humana.
-- **Importadores de trazas externas** convierten los logs existentes a este formato para alimentar `Replay`: log de Glyms (`>…<` con controles), log de Sysmex OnlineInterface (`R  057{…}` / `S …`), archivos de exportación ARCHITECT. Cada importador declara qué se pierde (por ejemplo, el log de Glyms no tiene offsets ni tiempos de byte).
+- Los logs externos se convierten en segmentos puros mediante **adaptadores de log que aportan los plugins** de cada serie de equipos; ATSM genérico reconstruye con ellos la traza real y la teórica ([TRAZAS-Y-RECUPERACION § Reconstrucción](TRAZAS-Y-RECUPERACION.md#reconstrucción-de-trazas-reales-y-teóricas)). Cada adaptador declara qué se pierde.
 
 ## Cuestiones abiertas
 
