@@ -61,7 +61,6 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 | Build Linux / Raspberry | Distro WSL o equipo Linux; adaptador POSIX escrito, no compilado |
 | ESP32 | Sin escribir; requiere ESP-IDF y hardware |
 | Canal `LocalSerial` .NET | Paquete oficial `System.IO.Ports` |
-| FileDrop propio | Retirado por decisión humana: P-01 resuelto con mensajes completos del anfitrión |
 | HL7 / LAW restante | Actor AWOS/LAB-28/LAB-29 y conformidad; R24/estado/inventario del fabricante, traza/anonimización HL7; ver P-02 |
 | Manual del CELL-DYN Ruby | El plugin se apoya en trazas; confirmar timers, encuadre del host y respuesta negativa |
 | Outbox durable del runtime | Sin implementar |

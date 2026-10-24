@@ -60,7 +60,6 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 
 | ID | Tema | Bloqueo |
 |---|---|---|
-| P-01 | Resuelto: mensajes completos del anfitrión, sin FileDrop propio | Ver decisión y pruebas abajo |
 | P-02 | Parcial: HL7/MLLP y ARCHITECT implementados; completar actor LAW/AWOS y conformidad | Requiere el alcance restante de perfiles/equipo |
 | P-03 | Kits de conformidad por plugin y corpus anonimizado | Revisión humana del corpus antes de publicarlo |
 | P-04 | Outbox durable del runtime | Ninguno |

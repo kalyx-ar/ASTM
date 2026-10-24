@@ -1,0 +1,36 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (no es un Issue del repositorio ATSM).
+Autorización humana y alcance previos: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6389732963
+Commit de implementación: 0da936ccf4974d4d03afc9501942610214a3594d
+Mensaje: feat: mensajes completos y HL7 con trazas del anfitrión (#205)
+Tipos: feat, fix, test, docs. Repositorio neutral kalyx-ar/ATSM, contenido dentro de EDC/LIMS/ATSM.
+
+Alcance realizado:
+- P-01 resuelto sin gestión de carpetas/FileDrop en ATSM. AstmMessageProcessor recibe bytes/Stream y conserva IDs por recepción explícita; WholeMessageInstrumentSession consume límites sin LIS01.
+- AstmInstrumentSession reutiliza el procesador; propaga fallos de captura y drena mensajes completos al EOF. Libera lease si se rechaza la transferencia.
+- ITraceSink exige EnsureReady. InstrumentCommunicationHost verifica el proveedor antes de la fábrica de canal; Application administra almacenamiento, cifrado, retención y diagnóstico.
+- Codec HL7 v2 con MSH/separadores/repeticiones/componentes/subcomponentes, escapes y ACK; sesión MLLP en modo original, aceptación durable antes de AA, correlación ORL y envíos inciertos sin reenvío automático.
+- Perfil ARCHITECT HL7 basado en 206797-101: OUL/R22, consultas ZOS, OML/O33 y ORL/O34. LAW LAB-27 parcial por contenedor (Q11/K11) separado, sin actor AWOS completo.
+- EDC exige SQLCipher estándar hospedado antes de comunicar y diagnóstico UI autorizado; no se implementó aún módulo/almacén/UI EDC, ni se incorporaron referencias ATSM a EDC.
+- SerialTunnel: no se añade spool persistente en el cliente. La captura recuperable en el agente requiere alcance y custodia cifrada específicos; no se aprueba volcado plano.
+
+Rutas:
+- dotnet/src/Atsm.Abstractions/{Channels,Tracing}; Atsm.Protocol.Hl7v2; Atsm.Protocol.Mllp; Atsm.Plugins; Atsm.Runtime/{Sessions,Tracing}.
+- dotnet/plugins/Atsm.Plugin.Abbott.Architect/ArchitectHl7Plugin.cs; dotnet/Atsm.slnx.
+- dotnet/tests/Atsm.Tests/{Runtime/CompleteMessageTests.cs,Hl7/}.
+- AGENTS.md; Documentacion/{CONTINUACION,ESTADO,MENSAJES-TRAZAS-HL7,INTEGRACION-EDC,INTERFAZ-COMUNICACION,MOTOR-GENERICO,MODELO-CANONICO,PLUGINS,ESTANDARES,TRAZAS-Y-RECUPERACION,IMPLEMENTACION,DATOS-DE-PRUEBA,README}.md.
+
+Pruebas y evidencia:
+- dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true --verbosity minimal: 118/118 aprobadas, 0 omitidas, duración de pruebas ~1 s.
+- Repetición dotnet test dotnet/Atsm.slnx -c Release --no-build --no-restore --verbosity minimal: 118/118 aprobadas, 0 omitidas, ~1 s.
+- ctest --test-dir native/build/win-x64 -C Release --verbose, repetido: 542 checks, 0 failures; suite nativa ~0,25 s. Código nativo sin cambios; se utilizó el binario local existente.
+- dotnet build dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true: correcto, 0 errores/advertencias; los ajustes finales de runtime se recompilaron y probaron en Release.
+- Token Strong Name de las bibliotecas de Release, incluida Atsm.Protocol.Hl7v2: 066190a23251f202. Authenticode no se verificó ni aplicó; corresponde al release.
+- git diff --cached --check: sin errores. No se agregaron paquetes externos; sólo BCL/proyectos ATSM y dependencias existentes de pruebas.
+- No se conectaron equipos reales ni se exportó/publicó corpus real o manuales. No se modificaron claves, derivación protegida ni baselines de confianza EDC.
+
+Límites y continuación:
+- P-02 parcial: faltan actor LAW/AWOS y lifecycle LAB-28/LAB-29, opciones/cardinalidades exhaustivas, R24/estado/inventario/notificaciones, trazas semánticas/anonimización HL7 y kit de conformidad por equipo.
+- El anfitrión conserva commit idempotente, recepción/hash/versiones y custodia; IDs estables por recepción no sustituyen conciliación clínica ni garantizan exactly-once.
+- ITraceSink.EnsureReady es un cambio de contrato fuente para adaptadores existentes; la firma no acredita Authenticode ni admisión de paquete EDC.
+- P-13 (integración EDC y UI/SQLCipher) y P-09 (captura protegida del agente) siguen pendientes. EDC #205 permanece abierto por su alcance mayor; Project propietario #12 en curso.
+- Estado final del incremento: P-01 y brecha LIS01 resueltos; primer incremento HL7/LAW entregado y límites registrados. Commits locales, sin push/PR ni release publicado.
