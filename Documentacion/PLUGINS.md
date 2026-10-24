@@ -122,5 +122,6 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 |---|---|
 | `clsi.lis02` (estándar) | Implementado |
 | `abbott.architect` | Implementado (ASI RS-232) |
-| `sysmex.uwam` | Implementado: perfiles LIS2-A2 / E1381-02, dialecto y adaptador `sysmex.port-monitor` |
+| `sysmex.uwam` | Implementado: perfiles LIS2-A2 / E1381-02, dialecto (incluye el analizador químico UC-3500/UC-1000) y adaptador `sysmex.port-monitor` |
+| `abbott.celldyn-ruby` | Implementado desde trazas: cada mensaje en un frame, `^ALL`, alarmas `FLAG`; pendiente de confirmar con el manual |
 | `Atsm.Plugin.Glyms.Testing` | Sólo pruebas: adaptador `glyms.interface-log` para los logs del LIMS Glyms. Un plugin de integración con Glyms (pedidos desde su interfaz o su log) sería un trabajo aparte |

@@ -31,7 +31,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-The .NET suite also runs two interoperability tests against `atsm-agent` when it has been built (or when `ATSM_AGENT_EXE` points to it); otherwise they are reported as skipped.
+The first CMake configure downloads Mbed TLS 4.1.1 and checks its SHA-256 (offline: `-DATSM_MBEDTLS_SOURCE_DIR=<folder>`; without TLS: `-DATSM_ENABLE_TLS=OFF`). The .NET suite also runs interoperability tests (plain and mutual TLS) against `atsm-agent` when it has been built (or when `ATSM_AGENT_EXE` points to it); otherwise they are reported as skipped.
 
 ## Data
 

@@ -110,7 +110,7 @@ El esquema CDDL (RFC 8610) de cada mapa CBOR será el contrato normativo; los ve
 - TLS 1.3 preferido, 1.2 mínimo; un endpoint `Tls` nunca degrada a claro.
 - mTLS recomendado: el certificado del host identifica al `controllerId`; el agente autoriza por puerto con una lista de identidades (huella de clave pública o SAN).
 - Modo `Plain` sólo con declaración explícita en la configuración y advertencia en `Hello`; adecuado para laboratorio de banco o redes aisladas.
-- Biblioteca TLS propuesta: **Mbed TLS 3.6 LTS** en todas las plataformas del agente. Es la que usa ESP-IDF, compila para XP (que no tiene TLS 1.2 nativo utilizable) y soporta TLS 1.3. Es dependencia de terceros: requiere aprobación y registro antes de incorporarse.
+- Biblioteca TLS: **Mbed TLS 4.1 LTS** (4.1.1), aprobada el 24 de octubre de 2026; ver [DEPENDENCIAS](DEPENDENCIAS.md). En XP el agente aporta su fuente de entropía; ESP32 usará la de ESP-IDF. Con mTLS, el `controllerId` debe coincidir con el CN del certificado o con su huella SHA-256 configurada.
 
 ## Agente nativo
 

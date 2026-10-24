@@ -39,6 +39,7 @@ flowchart LR
 | [TRAZAS-Y-RECUPERACION](TRAZAS-Y-RECUPERACION.md) | Niveles de traza, checkpoints, herramientas y recuperación por operación |
 | [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
 | [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
+| [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |
 | [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md) · [referencias-glyms.json](referencias-glyms.json) | Ensamblados legacy en producción, código decompilado y hashes (material local) |
@@ -57,7 +58,7 @@ flowchart LR
 ## Propuestas nuevas de esta revisión
 
 - Protocolo **ATSM Link v1**: cabecera binaria fija + control en CBOR determinista + bytes crudos; esquemas CDDL y vectores compartidos.
-- **Mbed TLS 3.6 LTS** como backend TLS único del agente (XP no tiene TLS 1.2 nativo utilizable; ESP-IDF ya lo usa). Requiere aprobación como dependencia.
+- **Mbed TLS 4.1 LTS** (4.1.1) como backend TLS del agente, aprobado; registro en [DEPENDENCIAS](DEPENDENCIAS.md).
 - **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
 - **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
 - **Host query sincrónico con plazo** y **resultados durables idempotentes**: dos caminos distintos hacia el anfitrión.
@@ -94,7 +95,7 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 ## Pendiente de decidir
 
 - Licencia: decidido, libre uso. Firma: Strong Name con la SNK de EDC y Authenticode en el release (ver [ESTADO](ESTADO.md#decisiones-registradas)).
-- Aprobación de Mbed TLS y de la publicación de paquetes NuGet de ATSM para EDC.
+- Publicación de paquetes NuGet de ATSM para EDC (Mbed TLS ya aprobado).
 - Si el intercambio por archivo con laboratorio de derivación (`DeltaLab`) entra en ATSM, como plugin aparte, o queda en EDC.
 - Primer instrumento para pruebas de banco y acceso a un equipo de prueba.
 
