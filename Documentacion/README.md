@@ -1,6 +1,6 @@
 # ATSM: integración de instrumentos de laboratorio
 
-Fecha: 24 de octubre de 2026. Estado: **propuesta de arquitectura y contratos**; todavía no hay código.
+Fecha: 24 de octubre de 2026. Estado: **propuesta en implementación**: núcleo .NET, plugin Architect, herramientas de traza y agente nativo Windows x64 implementados y probados; ver [ESTADO](ESTADO.md).
 
 ATSM es un proyecto **neutral**: un agente de comunicación, un motor genérico de los protocolos de laboratorio (CLSI LIS01-A2 / LIS02-A2, conocidos como ASTM E1381 / E1394, y HL7 v2.5.1 / IHE LAW) y plugins por fabricante. No depende de ningún LIS/LIMS; cada sistema anfitrión implementa un único puerto. El primer anfitrión será EDC ([INTEGRACION-EDC](INTEGRACION-EDC.md)).
 
@@ -38,6 +38,7 @@ flowchart LR
 | [CONTRATOS](CONTRATOS.md) | Identidades, arbitraje, generaciones, transferencia de control, estados |
 | [TRAZAS-Y-RECUPERACION](TRAZAS-Y-RECUPERACION.md) | Niveles de traza, checkpoints, herramientas y recuperación por operación |
 | [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
+| [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |
 | [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md) · [referencias-glyms.json](referencias-glyms.json) | Ensamblados legacy en producción, código decompilado y hashes (material local) |
@@ -99,4 +100,4 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 
 ## Alcance de esta entrega
 
-Documentación y contratos propuestos. No se compiló código, no se conectaron equipos ni se ejecutaron pruebas. [verificacion-propuesta.json](verificacion-propuesta.json) registra la comprobación documental de la entrega anterior.
+La propuesta inicial era sólo documental; lo implementado y comprobado desde entonces está en [ESTADO](ESTADO.md). No se conectaron equipos reales. [verificacion-propuesta.json](verificacion-propuesta.json) registra la comprobación documental de la entrega anterior.

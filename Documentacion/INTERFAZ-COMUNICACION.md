@@ -147,8 +147,8 @@ dotnet/src/Atsm.Channels/
 
 Una traza ATSM es independiente del canal y del fabricante:
 
-- Archivo `*.atsmtrace`: cabecera con versión, origen, configuración efectiva y capacidades; luego registros `{monotonic, utc, direction, kind, bytes|event}`; sección final con hash.
-- Exportación legible en JSON Lines para revisión humana.
+- Archivo `*.atsmtrace` (v1, `atsm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Un formato binario con hash encadenado queda para la traza durable del agente.
+- `atsm-trace dump` muestra una traza con los caracteres de control visibles para revisión humana.
 - **Importadores de trazas externas** convierten los logs existentes a este formato para alimentar `Replay`: log de Glyms (`>…<` con controles), log de Sysmex OnlineInterface (`R  057{…}` / `S …`), archivos de exportación ARCHITECT. Cada importador declara qué se pierde (por ejemplo, el log de Glyms no tiene offsets ni tiempos de byte).
 
 ## Cuestiones abiertas
