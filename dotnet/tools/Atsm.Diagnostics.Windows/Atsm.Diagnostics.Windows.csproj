@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF>
+    <AssemblyName>atsm-diagnostics</AssemblyName><Description>ATSM maintenance diagnostics for Windows.</Description>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" /></ItemGroup>
+  <ItemGroup><None Update="README.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+</Project>

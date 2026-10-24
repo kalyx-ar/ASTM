@@ -1,6 +1,6 @@
 # Plugins específicos
 
-Estado: propuesta. Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico.
+Estado: contratos de motor implementados; manifiestos/carga dinámica y kits formales de conformidad pendientes. Los ejemplos declarativos siguientes siguen siendo propuesta (contratos reales en `dotnet/src/Atsm.Plugins`). Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico. Repertorio vigente y aplicación Windows: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 ## Qué hace y qué no hace
 
@@ -97,10 +97,11 @@ Ordenado por evidencia disponible (manual + traza + plugin legacy):
 | `Abbott.CellDynRuby` | CELL-DYN Ruby | LIS2-A | — (falta) | `Celldyn RUBYInterface.log` | `Plugin_Celldyn_Ruby` | 2 |
 | `Sysmex.Uwam` | UF-5000, UC-3500 vía U-WAM | E1381-02 / LIS2-A2 (TCP) | R315168 rev. 22, `SYSMEX RECORDS.xlsx` | `Sysmex/*` (con host query) | — | 3 |
 | `ArchitectHl7Plugin` (en Abbott.Architect) | ARCHITECT (interfaz HL7) | HL7 v2.5.1 original / MLLP, ZOS; perfil distinto de LAW | 206797-101 | Sólo sintéticas | — | Primer corte implementado |
-| `Sysmex.XnL` | XN-L | E1394-97 (TCP) | 1273-MKT rev. 3 | — | — | Pendiente de equipo |
-| `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | — | — | Pendiente de equipo |
+| `BioRad.Cfx` | Exportaciones Maestro de CFX | CSV y RDML 1.0/1.1 | 10000126764B; esquema RDML | Sintéticas | — | Implementado, validar exportaciones reales |
+| `Sysmex.XnL` | XN-L 350/450/550 | E1381-02 / E1394-97 | 1273-MKT rev. 3 | Sintéticas | — | Recepción implementada, pendiente de equipo |
+| `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | Sintéticas | — | Recepción implementada, pendiente de equipo |
 | `Sysmex.Suit` | Middleware SUIT | E1381/E1394-91 + extensiones | v8.0 | — | — | Pendiente de equipo |
-| `Diagast.Qwalys3` | QWALYS 3 | E1381-95 / E1394-95 | Connection Manual | — | — | Pendiente de equipo |
+| `Diagast.Qwalys` | QWALYS 3 | E1381-95 / ASTM ASCII | Connection Manual | Sintéticas | — | Recepción implementada, pendiente de equipo |
 | DeltaLab (fuera de ATSM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | GlymsInter | No es un plugin instrumental |
 
 Architect primero: es el único con manual, trazas abundantes y plugin productivo. Ruby segundo: confirma que el motor generaliza (terminador vacío, comparadores, `FLAG`). U-WAM tercero: aporta TCP nativo y host query real.
@@ -124,4 +125,6 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 | `abbott.architect` | Implementado (ASI RS-232) |
 | `sysmex.uwam` | Implementado: perfiles LIS2-A2 / E1381-02, dialecto (incluye el analizador químico UC-3500/UC-1000) y adaptador `sysmex.port-monitor` |
 | `abbott.celldyn-ruby` | Implementado desde trazas: cada mensaje en un frame, `^ALL`, alarmas `FLAG`; pendiente de confirmar con el manual |
+| `biorad.cfx` | `IInstrumentContentPlugin`: cuantificación CSV/RDML 1.0/1.1; recibe contenido, sin archivos/control directo ni clasificación clínica |
+| `sysmex.xnl`, `sysmex.cs2500`, `diagast.qwalys3` | Recepción según manual con pruebas sintéticas; sin consultas/órdenes, hardware o corpus real verificado |
 | `Atsm.Plugin.Glyms.Testing` | Sólo pruebas: adaptador `glyms.interface-log` para los logs del LIMS Glyms. Un plugin de integración con Glyms (pedidos desde su interfaz o su log) sería un trabajo aparte |

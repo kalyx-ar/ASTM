@@ -13,7 +13,8 @@ flowchart LR
     S[Instrumento RS232] <--> G[Agente C++<br/>puerto, arbitraje, traza]
     G <-->|ATSM Link v1 sobre TCP/TLS| C
     N[Instrumento TCP / HL7] <--> C
-    F[Carpeta de intercambio] --> C
+    F[Archivos del anfitrión] --> E[Scheduler / ETL<br/>custodia y contenido completo]
+    E --> M
     subgraph Host .NET
       C[1 · Interfaz de comunicación<br/>IInstrumentChannel] <--> M[2 · Motor genérico<br/>LIS01 · LIS02 · MLLP · HL7v2]
       M <--> P[3 · Plugins por fabricante<br/>perfil + dialecto]
@@ -40,6 +41,7 @@ flowchart LR
 | [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
 | [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
 | [CONTINUACION](CONTINUACION.md) | Pendientes con alcance y criterios de aceptación, para retomar el trabajo |
+| [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) | GUI Windows, casos protegidos, catálogo real por modelo y prioridad Argentina |
 | [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |

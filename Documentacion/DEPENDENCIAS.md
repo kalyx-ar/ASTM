@@ -26,6 +26,21 @@ ESP32: ESP-IDF trae su propia versión de Mbed TLS. El firmware del agente usar�
 
 Las bibliotecas de ejecución .NET usan sólo la BCL de .NET 10: `System.Net.Security` (TLS del host), `System.Text.Json`, `System.Threading.Channels` y `System.Text.Encoding.CodePages`.
 
+### Herramienta gráfica Windows (2026-10-24, EDC#205)
+
+La GUI solicitada incorpora WPF y `System.Security.Cryptography.ProtectedData` desde **Microsoft.WindowsDesktop.App 10.0.13**, instalado con el SDK oficial 10.0.402 en `C:\Program Files\dotnet`. Es una referencia de framework (`UseWPF`), no un paquete NuGet adicional ni una DLL tomada de terceros. Consumidor: `Atsm.Diagnostics.Windows`; `Atsm.Diagnostics.Core` y el motor siguen en `net10.0` sin dependencia de Windows. Las referencias entre proyectos son internas a ATSM.
+
+Origen: instalación oficial Microsoft .NET, runtime bajo `shared/Microsoft.WindowsDesktop.App/10.0.13`; código fuente oficial en [dotnet/wpf](https://github.com/dotnet/wpf) y [dotnet/runtime](https://github.com/dotnet/runtime), con licencia MIT del código fuente. La instalación binaria conserva sus términos **MICROSOFT .NET LIBRARY**, `C:\Program Files\dotnet\LICENSE.txt`. El paquete publicado depende del framework instalado: no redistribuye un runtime ni agrega transitivas NuGet de producción. Aprobación implícita de librería oficial dentro de la GUI Windows elegida por el usuario; alcance registrado antes de editar en [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6390140976), con esta evidencia de distribución complementaria.
+
+Verificación del runtime local (no sólo las referencias), 2026-10-24:
+
+| Ensamblado (versión CLR 10.0.0.0) | Token Strong Name | SHA-256 | Authenticode |
+|---|---|---|---|
+| `PresentationFramework.dll` | `31bf3856ad364e35` | `c6950a0d6addfb7a365c11fe0aa82a4677043a263102f1779aa9be8fd3624019` | `Valid` |
+| `System.Security.Cryptography.ProtectedData.dll` | `b03f5f7f11d50a3a` | `e8b3b537062fc54282d3ce1379100bde27921a15ad1c53a7f7c92b04ae3abadb` | `Valid` |
+
+No se añade editor/hash a listas de confianza EDC. Los ensamblados propios se verifican con Strong Name de distribución; su Authenticode queda pendiente del release y no se confunde con la firma de Microsoft. No se incorporó ningún paquete de terceros.
+
 ## Sólo pruebas
 
 | Paquete | Versión | Licencia | Nota |

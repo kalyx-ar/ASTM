@@ -4,6 +4,8 @@ Neutral integration of clinical laboratory instruments: a native serial ↔ TCP 
 
 Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](Documentacion/CONTINUACION.md) · documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
 
+Aplicación gráfica Windows: [diagnóstico de mantenimiento](Documentacion/DIAGNOSTICO-MANTENIMIENTO.md), con catálogo integrado, lectura de logs/exportaciones y captura TCP/SerialTunnel. Incluye Bio-Rad CFX (CSV/RDML), Sysmex U-WAM/XN-L/CS-2500, QWALYS y Abbott; cada perfil declara su evidencia y límites, sin atribuir homologación en hardware.
+
 ## Layout
 
 ```text

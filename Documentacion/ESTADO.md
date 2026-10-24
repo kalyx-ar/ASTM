@@ -22,11 +22,15 @@ Instantánea del 24 de octubre de 2026. Describe lo que existe y lo que se compr
 | Plugin Sysmex U-WAM (LIS2-A2 / E1381-02) y adaptador del monitor de puertos de Sysmex | `dotnet/plugins/Atsm.Plugin.Sysmex.Uwam` | Mensajes sintéticos según R315168 rev. 22 y trazas reales locales |
 | Plugin Abbott CELL-DYN Ruby (LIS2-A, derivado de trazas) | `dotnet/plugins/Atsm.Plugin.Abbott.CellDynRuby` | Mensajes sintéticos con la estructura de las trazas y trazas reales locales |
 | Plugin de pruebas Glyms (sólo adaptador de log, fuera del motor neutral) | `dotnet/plugins/Atsm.Plugin.Glyms.Testing` | Log sintético y logs reales locales |
+| Bio-Rad CFX Maestro, CSV/RDML 1.0/1.1 | `dotnet/plugins/Atsm.Plugin.BioRad.Cfx` | Exportaciones sintéticas; referencias/exclusiones/Cq original, sin control directo ni homologación de modelos |
+| Sysmex XN-L y CS-2500 | `dotnet/plugins/Atsm.Plugin.Sysmex.XnL`, `Atsm.Plugin.Sysmex.Cs2500` | Perfiles de recepción según manual; componentes de prueba/muestra y estados crudos; consultas/órdenes sin implementar |
+| DIAGAST QWALYS 3 | `dotnet/plugins/Atsm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |
+| Diagnóstico Windows WPF independiente | `dotnet/tools/Atsm.Diagnostics.Windows`, `Atsm.Diagnostics.Core` | 11 perfiles integrados, logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; render sintético inspeccionado |
 | Agente nativo C++17 con TLS (Mbed TLS 4.1.1) | `native/` | 542 verificaciones nativas (CBOR, Link v1, árbitro, configuración, TLS sin archivos válidos, sesión completa por TCP); pruebas cruzadas mTLS desde .NET |
 | Especificación ATSM Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
 | Firma Strong Name con la SNK de la distribución | `dotnet/Directory.Build.targets` | Mismo token que EDC (`066190a23251f202`); la clave no está en el repositorio |
 
-Pruebas: `dotnet test dotnet/Atsm.slnx` → 118 correctas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Repetidas sin intermitencias.
+Pruebas de esta entrega: `dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true` → 142 correctas, 0 omitidas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Ambas repetidas sin intermitencias. GUI: publicación Release sin advertencias, DPAPI de usuario Windows y render fuera de pantalla (`--smoke-test`), sin homologación de hardware. Repertorio, fuentes argentinas, uso y límites: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 ## Verificación con datos reales (sólo local)
 
@@ -49,7 +53,7 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 - El agente v1 no implementa `TraceRead`, observadores ni rol de conexión invertido; anuncia `traceCapture = 0`.
 - Los bytes recibidos sin dueño se cuentan y se informan en `Granted`; no se entregan.
 - TLS del agente con Mbed TLS 4.1.1: servidor TLS 1.2/1.3 con certificado de cliente obligatorio por defecto. El rol de cliente TLS del agente (conexión saliente) no está implementado.
-- Los plugins se registran de forma estática en `atsm-trace`; la carga desde una carpeta de plugins queda pendiente.
+- Catálogo integrado compartido por `atsm-trace` y la GUI; la carga/admisión de DLL desde una carpeta queda pendiente. CFX se analiza desde GUI/API, no con los comandos ASTM de la CLI.
 
 ## Pendiente
 

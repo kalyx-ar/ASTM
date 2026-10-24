@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\tools\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>

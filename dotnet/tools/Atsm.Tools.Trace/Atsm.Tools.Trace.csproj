@@ -9,6 +9,7 @@
     <Description>Import, anonymize, summarize and interpret ATSM traces.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />

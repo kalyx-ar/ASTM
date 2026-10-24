@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Independent diagnostic host: bundled catalog, analysis and protected-case contracts.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.CellDynRuby\Atsm.Plugin.Abbott.CellDynRuby.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.XnL\Atsm.Plugin.Sysmex.XnL.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Cs2500\Atsm.Plugin.Sysmex.Cs2500.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.BioRad.Cfx\Atsm.Plugin.BioRad.Cfx.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Diagast.Qwalys\Atsm.Plugin.Diagast.Qwalys.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Glyms.Testing\Atsm.Plugin.Glyms.Testing.csproj" />
+  </ItemGroup>
+</Project>

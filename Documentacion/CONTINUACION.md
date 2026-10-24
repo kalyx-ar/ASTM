@@ -20,7 +20,9 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 118 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 142 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba DPAPI/render por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+
+Aplicación Windows: `dotnet publish dotnet/tools/Atsm.Diagnostics.Windows/Atsm.Diagnostics.Windows.csproj -c Release --no-restore -p:AtsmRequireStrongName=true`; no forma parte del build multiplataforma `Atsm.slnx`. Ver [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) para uso, catálogo y evidencia por modelo.
 
 Verificación local con trazas reales (no se publican; imprimir sólo agregados):
 
@@ -49,7 +51,9 @@ Los mismos pasos sirven con `glyms.interface-log` (logs `Documentacion/trazas_ex
 | Sesión ASTM | `dotnet/src/Atsm.Runtime/Sessions/AstmInstrumentSession.cs` |
 | Canales (Stream, TCP, Replay, SerialTunnel) | `dotnet/src/Atsm.Channels` |
 | Trazas real/teórica, pila, métricas, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `dotnet/tools/Atsm.Tools.Trace` |
-| Plugins | `dotnet/plugins/*` (Architect, CELL-DYN Ruby, U-WAM, Glyms de pruebas) |
+| Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y Glyms de pruebas) |
+| Catálogo compartido y anfitrión de mantenimiento | `dotnet/tools/Atsm.Diagnostics.Core` |
+| GUI Windows WPF | `dotnet/tools/Atsm.Diagnostics.Windows` (DPAPI del usuario; no depende de EDC) |
 | Agente nativo | `native/core`, `native/platform`, `native/tls`, `native/app` |
 | Protocolo agente ↔ host | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` |
 | Legado Glyms (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md)) |
@@ -102,7 +106,13 @@ Si `ILabWorkflowHost.IngestAsync` falla, hoy el lote sólo queda como diagnósti
 
 - Manifiesto `atsm-plugin.json` (id, versión, `engineApi`, hash de perfiles) y un `AssemblyLoadContext` coleccionable por plugin que comparta sólo `Atsm.Abstractions`/`Atsm.Plugins`.
 - Verificación de firma (Strong Name y, si corresponde, Authenticode) y lista de editores admitidos.
-- `atsm-trace` debe usar este catálogo en lugar del estático (`Catalog` en `Program.cs`).
+- Ya existe un catálogo integrado compartido por CLI y GUI (`DiagnosticCatalog`). Falta sustituir la composición estática por admisión dinámica segura; no se modificó la confianza ni se permite cargar DLL arbitrarias.
+
+### Entrega de mantenimiento y repertorio (2026-10-24)
+
+GUI Windows implementada con log/exportación y TCP/SerialTunnel, caso protegido preparado antes de conectar y simulación de host sin órdenes; 11 perfiles. Añadidos CFX CSV/RDML y perfiles de recepción Sysmex XN-L, CS-2500 y QWALYS. Fuentes, capacidades, presencia argentina y límites en [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
+
+Continuar por validación real CFX/XN-L, kits P-03 y extensión por modelo/firmware (prioridad humana CFX → Sysmex → QWALYS); XN-1000/XN y SUIT requieren confirmar su interfaz antes de agregarlos. No declarar soporte de toda una marca por compartir protocolo. La GUI no completa P-04, P-05, P-09, P-10 ni P-13. Para EDC las trazas continúan siendo responsabilidad de Application/SQLCipher.
 
 ### P-06 Build Windows XP
 
