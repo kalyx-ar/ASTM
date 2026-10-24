@@ -14,6 +14,12 @@ public sealed record AstmSessionOptions(string ControllerId, Lis01Role Role = Li
 {
     public int ReadBufferBytes { get; init; } = 4096;
 
+    /// <summary>
+    /// False for diagnostic replay: a recorded instrument cannot react, so host messages (query answers, orders) are
+    /// built and written to the trace as events but never transmitted. Low-level ACK/NAK replies are still produced.
+    /// </summary>
+    public bool TransmitHostMessages { get; init; } = true;
+
     /// <summary>Receives every technical and interpretation finding of the session (also written to the trace).</summary>
     public Action<AtsmDiagnostic>? Diagnostics { get; init; }
 }
@@ -28,6 +34,7 @@ public static class SessionCodes
     public const string SendNotDelivered = "ATSM-RT-SEND-NOT-DELIVERED";
     public const string WriteNotCompleted = "ATSM-RT-WRITE-NOT-COMPLETED";
     public const string DialectFailed = "ATSM-RT-DIALECT-FAILED";
+    public const string TransmissionSuppressed = "ATSM-RT-TRANSMISSION-SUPPRESSED";
 }
 
 /// <summary>
@@ -103,7 +110,9 @@ public sealed class AstmInstrumentSession
 
     /// <summary>Downloads orders without a prior query and waits for the low-level outcome.</summary>
     public Task<Lis01SendCompleted> SendOrdersAsync(IReadOnlyList<WorkOrder> orders, CancellationToken cancellationToken) =>
-        SendRecordsAsync(_dialect.BuildOrders(orders), cancellationToken);
+        _options.TransmitHostMessages
+            ? SendRecordsAsync(_dialect.BuildOrders(orders), cancellationToken)
+            : throw new InvalidOperationException("This session does not transmit host messages.");
 
     private Task<Lis01SendCompleted> SendRecordsAsync(IReadOnlyList<Lis02Record> records, CancellationToken cancellationToken)
     {
@@ -272,8 +281,12 @@ public sealed class AstmInstrumentSession
         {
             var answer = await AnswerAsync(query, cancellationToken).ConfigureAwait(false);
             var records = _dialect.BuildQueryAnswer(query, answer);
-            if (records.Count > 0)
+            if (records.Count == 0)
+                continue;
+            if (_options.TransmitHostMessages)
                 await SendRecordsAsync(records, cancellationToken).ConfigureAwait(false);
+            else
+                Report(SessionCodes.TransmissionSuppressed, AtsmSeverity.Information, $"query answer of {records.Count} records not transmitted");
         }
     }
 

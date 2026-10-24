@@ -19,5 +19,6 @@
     <ProjectReference Include="..\..\src\Atsm.Runtime\Atsm.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.TraceTools\Atsm.TraceTools.csproj" />
   </ItemGroup>
 </Project>

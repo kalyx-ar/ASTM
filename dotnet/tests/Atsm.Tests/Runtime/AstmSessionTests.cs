@@ -111,7 +111,7 @@ public class AstmSessionTests
         var profile = plugin.Profiles[0];
         var instrument = new InstrumentRef("architect-01");
         var replay = new ReplayChannel("replay", entries);
-        var session = new AstmInstrumentSession(replay, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new AstmSessionOptions("replayer"));
+        var session = new AstmInstrumentSession(replay, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new AstmSessionOptions("replayer") { TransmitHostMessages = false });
 
         await session.RunAsync(CancellationToken.None).WaitAsync(Timeout);
 
