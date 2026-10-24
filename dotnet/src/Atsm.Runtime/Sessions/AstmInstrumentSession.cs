@@ -122,7 +122,7 @@ public sealed class AstmInstrumentSession
     private Task<Lis01SendCompleted> SendRecordsAsync(IReadOnlyList<Lis02Record> records, CancellationToken cancellationToken)
     {
         var completion = new TaskCompletionSource<Lis01SendCompleted>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var bytes = Lis02Codec.ToRecordBytes(records, _profile.Encoding);
+        var bytes = _profile.Frame(records, _profile.HostFraming);
         if (!_inputs.Writer.TryWrite(new Input(InputKind.Send, null, -1, bytes, completion)))
             completion.TrySetCanceled(cancellationToken);
         return completion.Task.WaitAsync(cancellationToken);

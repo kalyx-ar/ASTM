@@ -95,6 +95,22 @@ public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogForm
 /// </summary>
 public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor(UwamPlugin.PluginId))
 {
+    /// <summary>Parameter through which U-WAM reports errors of the urine chemistry analyzer (UC-3500 / UC-1000), R315168 appendix B.1.</summary>
+    public const string ChemistryErrorParameter = "C-Error Code";
+    public const string ChemistryError = "ATSM-UWAM-CHEMISTRY-ERROR";
+
+    public override AstmInterpretation Interpret(Lis02Message message, TraceRef trace)
+    {
+        var interpretation = base.Interpret(message, trace);
+        // A chemistry error may leave the results of that sample blank (R315168 B.1 note *2); the code maps through appendix K.
+        var errors = interpretation.Observations
+            .Where(o => o.Test.Vendor.Code == ChemistryErrorParameter && o.Value.RawText.Trim() is { Length: > 0 } code && code != "0000")
+            .Select(o => new Atsm.Abstractions.Diagnostics.AtsmDiagnostic(ChemistryError, Atsm.Abstractions.Diagnostics.AtsmSeverity.Warning,
+                $"Urine chemistry analyzer error {o.Value.RawText.Trim()} (R315168 appendix K)", o.Specimen.SpecimenId))
+            .ToList();
+        return errors.Count == 0 ? interpretation : interpretation with { Diagnostics = [.. interpretation.Diagnostics, .. errors] };
+    }
+
     protected override OrderContext ReadOrder(Lis02Record record) =>
         base.ReadOrder(record) with { Rack = NullIfEmpty(record.Text(3, 2)), Position = NullIfEmpty(record.Text(3, 3)) };
 

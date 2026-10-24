@@ -4,6 +4,7 @@ using System.Text.Json;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.Abbott.Architect;
+using Atsm.Plugin.Abbott.CellDynRuby;
 using Atsm.Plugin.Glyms.Testing;
 using Atsm.Plugin.Sysmex.Uwam;
 using Atsm.Plugins;
@@ -124,6 +125,8 @@ int Theoretical(string input, string output)
         Encoding = profile?.Encoding ?? Encoding.Latin1,
         BaudRate = int.TryParse(Option("--baud"), out var baud) ? baud : 9600,
         ResponseDelay = double.TryParse(Option("--reaction"), CultureInfo.InvariantCulture, out var reaction) ? TimeSpan.FromMilliseconds(reaction) : TimeSpan.FromMilliseconds(5),
+        InstrumentFraming = profile?.InstrumentFraming ?? AstmFraming.FramePerRecord,
+        HostFraming = profile?.HostFraming ?? AstmFraming.FramePerRecord,
     };
     var plans = TraceReconstruction.Plan(stack);
     var (theoreticalHeader, theoretical) = TraceReconstruction.Theoretical(plans, options, header.InstrumentId, $"theoretical:{Path.GetFileName(input)}");
@@ -269,7 +272,7 @@ static int Fail()
 /// <summary>Plugins known to this build. Dynamic discovery from a plugin folder is a later step.</summary>
 internal static class Catalog
 {
-    public static IReadOnlyList<IInstrumentPlugin> Plugins { get; } = [new StandardAstmPlugin(), new ArchitectPlugin(), new UwamPlugin()];
+    public static IReadOnlyList<IInstrumentPlugin> Plugins { get; } = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), new UwamPlugin()];
 
     public static IReadOnlyList<ITraceLogAdapter> Adapters { get; } =
         Plugins.OfType<ITraceLogAdapterProvider>().Append(new GlymsTestingPlugin()).SelectMany(p => p.LogAdapters).ToList();

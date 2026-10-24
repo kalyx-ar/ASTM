@@ -32,7 +32,26 @@ public sealed record AstmProfile(
     IReadOnlySet<AstmWorkflow> Workflows,
     TimeSpan QueryAnswerBudget,
     OwnershipEnforcement RequiredOwnership,
-    IReadOnlyList<string> Evidence);
+    IReadOnlyList<string> Evidence)
+{
+    /// <summary>How the host frames the messages it sends. Most instruments expect one record per ETX-terminated frame chain.</summary>
+    public AstmFraming HostFraming { get; init; } = AstmFraming.FramePerRecord;
+
+    /// <summary>How the instrument frames what it sends; used to build theoretical traces that match the device.</summary>
+    public AstmFraming InstrumentFraming { get; init; } = AstmFraming.FramePerRecord;
+
+    /// <summary>LIS01 messages to transmit for one LIS02 message, according to <paramref name="framing"/>.</summary>
+    public List<ReadOnlyMemory<byte>> Frame(IEnumerable<Lis02Record> records, AstmFraming framing) =>
+        framing == AstmFraming.FramePerRecord
+            ? Lis02Codec.ToRecordBytes(records, Encoding)
+            : [Encoding.GetBytes(Lis02Codec.Serialize(records))];
+}
+
+/// <summary>
+/// <see cref="FramePerRecord"/>: each record ends a frame chain with ETX. <see cref="FramePerMessage"/>: the whole LIS02 message
+/// (all records, CR-separated) is one frame chain, split with ETB only when it exceeds the frame size.
+/// </summary>
+public enum AstmFraming { FramePerRecord, FramePerMessage }
 
 public sealed record DialectContext(InstrumentRef Instrument, TimeProvider Clock);
 

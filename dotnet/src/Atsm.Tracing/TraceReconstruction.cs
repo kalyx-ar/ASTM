@@ -24,6 +24,10 @@ public sealed record TheoreticalOptions
 
     /// <summary>Time a side takes to react to the bytes it received.</summary>
     public TimeSpan ResponseDelay { get; init; } = TimeSpan.FromMilliseconds(5);
+
+    public Atsm.Plugins.AstmFraming InstrumentFraming { get; init; } = Atsm.Plugins.AstmFraming.FramePerRecord;
+
+    public Atsm.Plugins.AstmFraming HostFraming { get; init; } = Atsm.Plugins.AstmFraming.FramePerRecord;
 }
 
 /// <summary>
@@ -106,7 +110,10 @@ public static class TraceReconstruction
             if (start > now)
                 now = start;
             var sender = plan.Direction == TraceDirection.Received ? instrument : host;
-            sender.Enqueue(plan.Records.Select(r => (ReadOnlyMemory<byte>)options.Encoding.GetBytes(r + "\r")).ToList());
+            var framing = plan.Direction == TraceDirection.Received ? options.InstrumentFraming : options.HostFraming;
+            sender.Enqueue(framing == Atsm.Plugins.AstmFraming.FramePerRecord
+                ? plan.Records.Select(r => (ReadOnlyMemory<byte>)options.Encoding.GetBytes(r + "\r")).ToList()
+                : [options.Encoding.GetBytes(string.Concat(plan.Records.Select(r => r + "\r")))]);
             now = Pump(host, instrument, now, options, entries, origin);
         }
 

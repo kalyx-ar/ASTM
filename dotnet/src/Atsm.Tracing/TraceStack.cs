@@ -95,9 +95,11 @@ public sealed class TraceStackBuilder(Encoding encoding, IAstmDialect? dialect =
         var frame = observation.FrameNumber >= 0 ? $"frame {observation.FrameNumber}{(observation.Final ? " ETX" : string.Empty)}" : null;
         var detail = frame is null ? observation.Detail : observation.Detail is null ? frame : $"{frame}: {observation.Detail}";
         events.Add(new StackEvent(StackLevel.Link, observation.Sequence, at, direction, "lis01." + Kebab(observation.Kind.ToString()), detail, observation.FirstSequence));
-        if (observation.Kind != Lis01ObservationKind.TransmissionEnd || observation.Messages is null)
+        // Empty transmissions (ENQ followed by EOT) are link checks: they stay as link events, not messages.
+        if (observation.Kind != Lis01ObservationKind.TransmissionEnd || observation.Messages is not { Count: > 0 })
             return;
-        var records = observation.Messages.Select(m => encoding.GetString(m).TrimEnd('\r')).ToList();
+        // A LIS01 message may carry one record or a whole LIS02 message (CR-separated records).
+        var records = observation.Messages.SelectMany(m => encoding.GetString(m).Split('\r', StringSplitOptions.RemoveEmptyEntries)).ToList();
         var start = elapsed.GetValueOrDefault(observation.FirstSequence);
         Complete(direction, observation.FirstSequence, observation.Sequence, start, at, records, observation.Complete, events, messages);
     }

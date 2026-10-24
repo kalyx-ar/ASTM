@@ -15,5 +15,6 @@
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Glyms.Testing\Atsm.Plugin.Glyms.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.CellDynRuby\Atsm.Plugin.Abbott.CellDynRuby.csproj" />
   </ItemGroup>
 </Project>
