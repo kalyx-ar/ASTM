@@ -1,0 +1,80 @@
+{
+  "estado": "OK",
+  "fecha_utc": "2026-10-24T16:18:27.980426+00:00",
+  "alcance": "Validación documental, referencias locales, hashes y consistencia de ejemplos. No compila ni ejecuta agente, protocolos o negocio.",
+  "documentos_revisados": 12,
+  "enlaces_locales_comprobados": 108,
+  "enlaces_web_solo_referenciados": 3,
+  "bloques_markdown_cerrados": 13,
+  "json_leidos": 3,
+  "binarios_originales_verificados": 13,
+  "puntos_de_lectura_verificados": 16,
+  "comprobaciones_semanticas_de_ejemplos": 11,
+  "advertencias": [
+    {
+      "tipo": "Cambio previo del C# decompilado",
+      "archivo": "Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
+      "sha256_actual": "959EF864F92E1E27FBBEE8759F066C959C20A851A78DF08340D1EF283DC9C41D",
+      "sha256_extraccion": "E3D6676FCA844066CF44987DB44B6AAB766BA477D6B7727A696E53885710B15A",
+      "accion": "Conservado; consultar el ensamblado original."
+    }
+  ],
+  "errores": [],
+  "archivos_del_paquete": [
+    {
+      "archivo": "ARQUITECTURA.md",
+      "bytes": 9840,
+      "sha256": "DAF85E545049A161E1B0FB821C6F5604400CBAC8672E6530F9C6F7A962411431"
+    },
+    {
+      "archivo": "CONTEXTO-PARA-EDC.md",
+      "bytes": 3298,
+      "sha256": "82A9615E7DA63D90D00432FD8C34FF9DC8731C2ED12E825B562C8DA64B8D5D5D"
+    },
+    {
+      "archivo": "CONTRATOS.md",
+      "bytes": 11942,
+      "sha256": "51D2C1831C4541256C371A58CD971A3B51BF62539F0C453712B9ED436D3DC2B9"
+    },
+    {
+      "archivo": "ejemplos/agente.json",
+      "bytes": 1864,
+      "sha256": "6F8E73FEB95870D3F5310E8EBA0D7A6068071AFC83BB5CF9E1EBBFF20249312C"
+    },
+    {
+      "archivo": "ejemplos/instrumento.json",
+      "bytes": 1373,
+      "sha256": "E8126E51193CD46BF1FE6C588093FCF3069617A9E38427E757641252BD3FC871"
+    },
+    {
+      "archivo": "ejemplos/README.md",
+      "bytes": 1714,
+      "sha256": "E1FB78A04AD6033C7DD300771792AEB7F8C6717B70788F0AA710FA7AA5D899DC"
+    },
+    {
+      "archivo": "IMPLEMENTACION.md",
+      "bytes": 9100,
+      "sha256": "8CD6527E9DEF78EB60212AEDA35401A2838497292BA11DCFE32A3A062356E0C5"
+    },
+    {
+      "archivo": "README.md",
+      "bytes": 5537,
+      "sha256": "638F84BF27D484EC771F08CA01E4862F0DE7C1CEE80F065C8B88E351F838F16B"
+    },
+    {
+      "archivo": "referencias-glyms.json",
+      "bytes": 24382,
+      "sha256": "CF9A716A8FDA3481B7CA143869B0C29C8ACD5D3907B4CF562ECCAAF1ECA77BEB"
+    },
+    {
+      "archivo": "REFERENCIAS-GLYMS.md",
+      "bytes": 16189,
+      "sha256": "D7D81789695F6ADD93AAA54730984BD500FDD09DAE85F6E3515DBCA85D062DD3"
+    },
+    {
+      "archivo": "TRAZAS-Y-RECUPERACION.md",
+      "bytes": 9253,
+      "sha256": "282E203BABA1C9336783290AC748DD5D12391D3A277D02C3AFB444A55DD2548E"
+    }
+  ]
+}

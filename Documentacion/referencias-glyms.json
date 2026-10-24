@@ -1,0 +1,513 @@
+{
+  "fecha": "2026-10-24",
+  "raiz_glyms_original": "H:/Github/Glyms",
+  "uso_productivo": "Informado por el usuario; no se ejecutaron los ensamblados para verificar cada camino.",
+  "calidad": "Código legacy y de baja calidad: evidencia de comportamiento, no modelo de implementación nuevo.",
+  "referencias": [
+    {
+      "id": "G01",
+      "nombre": "RS232",
+      "proposito": "Transporte serial reutilizable; referencia de parámetros, buffers, timeouts y Win32.",
+      "original_relativo": "Original/GlymsInterfaces/RS232.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/RS232.dll.deploy",
+      "sha256_original": "B335FDF5062886D36E1222A33FFCFD05D6E800B29CE994C4CE30C3BA17E1D7BE",
+      "bytes": 28672,
+      "ensamblados": [
+        {
+          "identidad": "RS232, Version=1.24.0.0, Culture=neutral, PublicKeyToken=515d87df384dcc81",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/RS232/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/RS232/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/RS232/GsmComm/RS232/Rs232.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/RS232/GsmComm/RS232/Rs232.cs",
+          "proposito": "Leer puerto, paridad, stop bits, buffers, eventos y llamadas nativas.",
+          "simbolos": [
+            {
+              "nombre": "Rs232",
+              "linea_aproximada": 14
+            },
+            {
+              "nombre": "DllImport",
+              "linea_aproximada": 417
+            }
+          ],
+          "sha256_actual": "1A48D8C59FF519A9B9204217739E22EF78CE5BAB61C0198ABD03410C79BFE280",
+          "sha256_manifiesto_extraccion": "1A48D8C59FF519A9B9204217739E22EF78CE5BAB61C0198ABD03410C79BFE280",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G02",
+      "nombre": "Contrato de plugins",
+      "proposito": "Contrato de extensión del host legacy.",
+      "original_relativo": "Original/GlymsInterfaces/Plugin.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/Plugin.dll.deploy",
+      "sha256_original": "9EE3218E502BAAFD6121EF5698AB795D04029B62C3E9976CE139AB9E92AA54F0",
+      "bytes": 5120,
+      "ensamblados": [
+        {
+          "identidad": "Plugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPlugin.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPlugin.cs",
+          "proposito": "Contrato actual, parsing, upload y caracteres de control.",
+          "simbolos": [
+            {
+              "nombre": "IPlugin",
+              "linea_aproximada": 4
+            },
+            {
+              "nombre": "ProcesarMenaje",
+              "linea_aproximada": 14
+            },
+            {
+              "nombre": "UploadMuestra",
+              "linea_aproximada": 16
+            }
+          ],
+          "sha256_actual": "AEA7C584C382067E83ACE6200B6F07AF14131488C54CDFD84A28C2DFF3E19E69",
+          "sha256_manifiesto_extraccion": "AEA7C584C382067E83ACE6200B6F07AF14131488C54CDFD84A28C2DFF3E19E69",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPluginHost.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPluginHost.cs",
+          "proposito": "Registro de plugins en el host.",
+          "simbolos": [
+            {
+              "nombre": "IPluginHost",
+              "linea_aproximada": 4
+            },
+            {
+              "nombre": "Register",
+              "linea_aproximada": 6
+            }
+          ],
+          "sha256_actual": "6C000F7367270A631E8AE2BD56D8C1D35ED9CD0E357B57AEBBFAB147C4B8951E",
+          "sha256_manifiesto_extraccion": "6C000F7367270A631E8AE2BD56D8C1D35ED9CD0E357B57AEBBFAB147C4B8951E",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G03",
+      "nombre": "Architect",
+      "proposito": "Dialectos y particularidades de un instrumento en producción según el usuario.",
+      "original_relativo": "Original/Plugins ATSM/Plugin_Architect.dll",
+      "original_absoluto": "H:/Github/Glyms/Original/Plugins ATSM/Plugin_Architect.dll",
+      "sha256_original": "7911195965FD2718F255039295C39760B349BE5F90B04D2E85807902BAA59572",
+      "bytes": 22016,
+      "ensamblados": [
+        {
+          "identidad": "Plugin_Architect, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin_Architect/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Architect/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
+          "proposito": "Parsing H/P/O/R/C/Q/L, muestra, variante de analito, órdenes salientes, framing y checksum.",
+          "simbolos": [
+            {
+              "nombre": "ProcesarMenaje",
+              "linea_aproximada": 53
+            },
+            {
+              "nombre": "UploadMuestra",
+              "linea_aproximada": 135
+            },
+            {
+              "nombre": "FinMensaje",
+              "linea_aproximada": 38
+            },
+            {
+              "nombre": "checksum",
+              "linea_aproximada": 148
+            }
+          ],
+          "sha256_actual": "959EF864F92E1E27FBBEE8759F066C959C20A851A78DF08340D1EF283DC9C41D",
+          "sha256_manifiesto_extraccion": "E3D6676FCA844066CF44987DB44B6AAB766BA477D6B7727A696E53885710B15A",
+          "coincide_con_manifiesto": false
+        }
+      ]
+    },
+    {
+      "id": "G04",
+      "nombre": "CELL-DYN Ruby",
+      "proposito": "Segundo dialecto para contrastar qué puede generalizarse en el motor.",
+      "original_relativo": "Original/Plugins ATSM/Plugin_Celldyn_Ruby.dll",
+      "original_absoluto": "H:/Github/Glyms/Original/Plugins ATSM/Plugin_Celldyn_Ruby.dll",
+      "sha256_original": "5E2C6A8AADA6393859F4462D9FF4E2E705C244DA760DFA22A6F8CD713F816179",
+      "bytes": 16384,
+      "ensamblados": [
+        {
+          "identidad": "Plugin_Celldyn_Ruby, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/Plugin_Celldyn_Ruby/PlugIn.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/Plugin_Celldyn_Ruby/PlugIn.cs",
+          "proposito": "Estados F/W, comparadores, alarmas FLAG, tramas salientes y terminador.",
+          "simbolos": [
+            {
+              "nombre": "ProcesarMenaje",
+              "linea_aproximada": 54
+            },
+            {
+              "nombre": "UploadMuestra",
+              "linea_aproximada": 129
+            },
+            {
+              "nombre": "FinMensaje",
+              "linea_aproximada": 38
+            },
+            {
+              "nombre": "checksum",
+              "linea_aproximada": 140
+            }
+          ],
+          "sha256_actual": "A4AC7287297880E6CB396626DDD7B58FA394B7BD2062FE24A3D5AACEECE6781D",
+          "sha256_manifiesto_extraccion": "A4AC7287297880E6CB396626DDD7B58FA394B7BD2062FE24A3D5AACEECE6781D",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G05",
+      "nombre": "Host de interfaces",
+      "proposito": "Host legacy: coordinación serial/TCP, carga de plugins y relación con el LIMS.",
+      "original_relativo": "Original/GlymsInterfaces/GlymsInter.exe.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/GlymsInter.exe.deploy",
+      "sha256_original": "70D71CE6FF1BB1E3CC1899A3A326985EEFFD796F354F1169444EE632F1B92931",
+      "bytes": 2760664,
+      "ensamblados": [
+        {
+          "identidad": "GlymsInter, Version=3.1.3.1, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/GlymsInter/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/GlymsInter/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Integraciones/GlymsInter/GlymsInter/FormInter.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/GlymsInter/GlymsInter/FormInter.cs",
+          "proposito": "Seguir coordinación del host; parte del código conserva ofuscación.",
+          "simbolos": [
+            {
+              "nombre": "FormInter",
+              "linea_aproximada": 54
+            }
+          ],
+          "sha256_actual": "E5395F4B62F9B34B8EAE28DC1EE0293BB1F8CAD515E12FA3CF9E7BB801FFF309",
+          "sha256_manifiesto_extraccion": "E5395F4B62F9B34B8EAE28DC1EE0293BB1F8CAD515E12FA3CF9E7BB801FFF309",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G06",
+      "nombre": "Reglas de negocio y equivalencias",
+      "proposito": "Equivalencias, valores, rangos, flags y estados que se mezclan con integración.",
+      "original_relativo": "Original/GlymsWin/GlymsBiz.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsBiz.dll.deploy",
+      "sha256_original": "15DACAF4FE522692C5B37AB4F8C7CEEE2138E33B1787C30BAF12063ECDD061C1",
+      "bytes": 648704,
+      "ensamblados": [
+        {
+          "identidad": "GlymsBiz, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsBiz/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsBiz/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsBiz/GlymsBiz/_lims/Inter_Equival.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsBiz/GlymsBiz/_lims/Inter_Equival.cs",
+          "proposito": "Separar normalización del mensaje de las políticas del LIMS.",
+          "simbolos": [
+            {
+              "nombre": "VerificaEquivalenciasEstadoRes",
+              "linea_aproximada": 18
+            }
+          ],
+          "sha256_actual": "E7EABFBC8818A069DE7D79730366E709672D1692BCB334A3D3B664D2962F4B27",
+          "sha256_manifiesto_extraccion": "E7EABFBC8818A069DE7D79730366E709672D1692BCB334A3D3B664D2962F4B27",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G07",
+      "nombre": "Acceso a datos",
+      "proposito": "Contratos PostgreSQL y persistencia; seguir también funciones y triggers.",
+      "original_relativo": "Original/GlymsWin/GlymsDal.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsDal.dll.deploy",
+      "sha256_original": "64F252AB19ABC350E1CB899CF98D3785E91B9F4458D5BA285E677F78A12C01C2",
+      "bytes": 1479168,
+      "ensamblados": [
+        {
+          "identidad": "GlymsDal, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsDal/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsDal/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsDal/GlymsDal/_lims/_Resultado.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsDal/GlymsDal/_lims/_Resultado.cs",
+          "proposito": "Inserción y lectura de resultados; referencia para los adaptadores de Application.",
+          "simbolos": [
+            {
+              "nombre": "Insert",
+              "linea_aproximada": 24
+            }
+          ],
+          "sha256_actual": "9FB58724C242793C8266C09A89C8078C123948655E9EC7C6F22293EB3892D681",
+          "sha256_manifiesto_extraccion": "9FB58724C242793C8266C09A89C8078C123948655E9EC7C6F22293EB3892D681",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G08",
+      "nombre": "Entidades y catálogos",
+      "proposito": "Conceptos legacy de resultados y configuración de instrumentos.",
+      "original_relativo": "Original/GlymsWin/GlymsEnt.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsEnt.dll.deploy",
+      "sha256_original": "6405F122FB46E5F054759F70CD28DABBCBA1C87387A926AAF20AFC1360013155",
+      "bytes": 397824,
+      "ensamblados": [
+        {
+          "identidad": "GlymsEnt, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsEnt/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Resultado.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Resultado.cs",
+          "proposito": "Campos y convenciones del resultado original.",
+          "simbolos": [
+            {
+              "nombre": "_Resultado",
+              "linea_aproximada": 16
+            }
+          ],
+          "sha256_actual": "DF8457B7C6FF12FDE8D9852680BBE76D77EBA964E009164C61212D7ED894EA5B",
+          "sha256_manifiesto_extraccion": "DF8457B7C6FF12FDE8D9852680BBE76D77EBA964E009164C61212D7ED894EA5B",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_analito.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_analito.cs",
+          "proposito": "Equivalencias de analitos del equipo.",
+          "simbolos": [
+            {
+              "nombre": "_Interface_analito",
+              "linea_aproximada": 16
+            }
+          ],
+          "sha256_actual": "0D2C2DD6D48E4FD4A3CE75495D379A3D8156BE487B6D3D8B7C69EBA2BD5855A7",
+          "sha256_manifiesto_extraccion": "0D2C2DD6D48E4FD4A3CE75495D379A3D8156BE487B6D3D8B7C69EBA2BD5855A7",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_regla.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_regla.cs",
+          "proposito": "Reglas asociadas a equivalencias.",
+          "simbolos": [
+            {
+              "nombre": "_Interface_regla",
+              "linea_aproximada": 16
+            }
+          ],
+          "sha256_actual": "6A1789B6EA729A4BA46B360E173BE0C7F0826AEEF171005CD6BF60C48F56BD2F",
+          "sha256_manifiesto_extraccion": "6A1789B6EA729A4BA46B360E173BE0C7F0826AEEF171005CD6BF60C48F56BD2F",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_robot.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_robot.cs",
+          "proposito": "Configuración del instrumento/robot.",
+          "simbolos": [
+            {
+              "nombre": "_Interface_robot",
+              "linea_aproximada": 17
+            }
+          ],
+          "sha256_actual": "A343D53D2F888A55D04E17894AB97A3D5A0406DB8E3465E57CA659188AE36FE8",
+          "sha256_manifiesto_extraccion": "A343D53D2F888A55D04E17894AB97A3D5A0406DB8E3465E57CA659188AE36FE8",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Deter_numerico.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Deter_numerico.cs",
+          "proposito": "Rangos y fórmulas del LIMS.",
+          "simbolos": [
+            {
+              "nombre": "_Deter_numerico",
+              "linea_aproximada": 16
+            }
+          ],
+          "sha256_actual": "045862DAD37F2DEA1F606749A8FA09C0F4B69ABDFF7B8E91D1B531FCE466E3C3",
+          "sha256_manifiesto_extraccion": "045862DAD37F2DEA1F606749A8FA09C0F4B69ABDFF7B8E91D1B531FCE466E3C3",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G09",
+      "nombre": "Escritorio y operación",
+      "proposito": "Validaciones y decisiones de operación presentes en formularios.",
+      "original_relativo": "Original/GlymsWin/GlymsWin.exe.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsWin.exe.deploy",
+      "sha256_original": "FEF6F2CDF93B1B8BF535DA544D3EF3F2002FE89D585EDFEE05DFEC3E02E196EB",
+      "bytes": 12011992,
+      "ensamblados": [
+        {
+          "identidad": "GlymsWin, Version=1.6.7.32, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsWin/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsWin/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsWin/GlymsWin/_lims/Interface_Lista.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsWin/GlymsWin/_lims/Interface_Lista.cs",
+          "proposito": "Punto de lectura de la gestión de interfaces del escritorio.",
+          "simbolos": [
+            {
+              "nombre": "Interface_Lista",
+              "linea_aproximada": 21
+            }
+          ],
+          "sha256_actual": "D50A226AEB1B974B04894D5208E78DEF03B179467DCFF8BD3DFDB7C1AD737C4E",
+          "sha256_manifiesto_extraccion": "D50A226AEB1B974B04894D5208E78DEF03B179467DCFF8BD3DFDB7C1AD737C4E",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G10",
+      "nombre": "Web y módulos de aplicación",
+      "proposito": "Bundle .NET Linux; contiene GlymsWeb, GlymsShared y GlymsShared2.",
+      "original_relativo": "Original/GlymsWeb/GlymsWeb",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWeb/GlymsWeb",
+      "sha256_original": "22255CA6675FAB763DB48188657243A9F03EC9CB1AB000BC4F73E5486452EC36",
+      "bytes": 56848310,
+      "ensamblados": [
+        {
+          "identidad": "GlymsShared, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsShared/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared/_extraccion.json"
+        },
+        {
+          "identidad": "GlymsShared2, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsShared2/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/_extraccion.json"
+        },
+        {
+          "identidad": "GlymsWeb, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsWeb/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsWeb/_extraccion.json"
+        }
+      ],
+      "fuentes": [
+        {
+          "ruta_relativa": "Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/Modulos/ModuloIngresos.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/Modulos/ModuloIngresos.cs",
+          "proposito": "Ingreso de órdenes y coordinación de reglas/persistencia de la web.",
+          "simbolos": [
+            {
+              "nombre": "ModuloIngresos",
+              "linea_aproximada": 17
+            }
+          ],
+          "sha256_actual": "3E41C498012D2917DFEBD822873EE0F5A803A4BF3853857CE62057CA31A06256",
+          "sha256_manifiesto_extraccion": "3E41C498012D2917DFEBD822873EE0F5A803A4BF3853857CE62057CA31A06256",
+          "coincide_con_manifiesto": true
+        },
+        {
+          "ruta_relativa": "Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/GlymsContext.cs",
+          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/GlymsContext.cs",
+          "proposito": "Adaptación PostgreSQL y ejecución de consultas de los módulos.",
+          "simbolos": [
+            {
+              "nombre": "EjecutarQueryDinamica",
+              "linea_aproximada": 251
+            }
+          ],
+          "sha256_actual": "2969609ACF1EF4D83A162B44A1979B4B42257E8C65ECECBDB6C99BB2EC96B67D",
+          "sha256_manifiesto_extraccion": "2969609ACF1EF4D83A162B44A1979B4B42257E8C65ECECBDB6C99BB2EC96B67D",
+          "coincide_con_manifiesto": true
+        }
+      ]
+    },
+    {
+      "id": "G11",
+      "nombre": "Utilidades propias",
+      "proposito": "Helpers propios y convenciones transversales; revisar consumidores antes de portar.",
+      "original_relativo": "Original/GlymsWin/GlymsUtils.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsUtils.dll.deploy",
+      "sha256_original": "C1D11134DF89E88AC3931230B607BEB667D95D3337684CFE589345F9C5B40F1C",
+      "bytes": 270336,
+      "ensamblados": [
+        {
+          "identidad": "GlymsUtils, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsUtils/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsUtils/_extraccion.json"
+        }
+      ],
+      "fuentes": []
+    },
+    {
+      "id": "G12",
+      "nombre": "Servicios administrativos",
+      "proposito": "Contexto de proveedores y circuitos empresariales fuera del transporte ASTM.",
+      "original_relativo": "Original/GlymsWin/GlymsFact.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsFact.dll.deploy",
+      "sha256_original": "7B0C7E4ECC383A9C1159AAE20ED64F8586780254C6D2AA677ADD491D17FE057D",
+      "bytes": 323584,
+      "ensamblados": [
+        {
+          "identidad": "GlymsFact, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsFact/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsFact/_extraccion.json"
+        }
+      ],
+      "fuentes": []
+    },
+    {
+      "id": "G13",
+      "nombre": "Utilidades QR",
+      "proposito": "Contexto auxiliar de publicación/informes; no es parte del motor ASTM.",
+      "original_relativo": "Original/GlymsWin/CryptoQrUtilities.dll.deploy",
+      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/CryptoQrUtilities.dll.deploy",
+      "sha256_original": "D61D558CFEC178D3B36E0FC8C5D23011962DD98DDF7D32112F310FCD689FA926",
+      "bytes": 14336,
+      "ensamblados": [
+        {
+          "identidad": "CryptoQrUtilities, Version=0.9.1.0, Culture=neutral, PublicKeyToken=null",
+          "manifiesto_relativo": "Decompilado/Codigo/Integraciones/CryptoQrUtilities/_extraccion.json",
+          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/CryptoQrUtilities/_extraccion.json"
+        }
+      ],
+      "fuentes": []
+    }
+  ]
+}

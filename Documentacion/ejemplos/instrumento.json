@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "proposal-1",
+  "exampleOnly": true,
+  "enabled": false,
+  "instrumentId": "instrumento-sintetico-01",
+  "domainId": "dominio-sintetico",
+  "controllerId": "edc-server-a",
+  "etlPlacement": "Server",
+  "transport": {
+    "kind": "ManagedSerialTunnel",
+    "host": "bridge-01.example.invalid",
+    "port": 28241,
+    "portId": "serial-01",
+    "tls": {
+      "mode": "Tls",
+      "minimumVersion": "TLS1.2",
+      "expectedPeerIdentity": "bridge-01.example.invalid",
+      "trustedAgentCaRef": "<CA-de-agentes>",
+      "clientCertificateRef": "<certificado-del-controlador>",
+      "privateKeyRef": "<clave-del-controlador>"
+    },
+    "requiredCapabilities": {
+      "enforcedOwnership": true,
+      "controlLease": true,
+      "traceCapture": "Durable"
+    }
+  },
+  "plugin": {
+    "id": "architect",
+    "version": "por-implementar",
+    "profile": "architect-por-caracterizar",
+    "engine": "AstmEngine",
+    "timingProfileStatus": "PendingEvidence"
+  },
+  "recovery": {
+    "policyProvider": "PluginAndProcess",
+    "automaticRawTraceReplay": false,
+    "requireCurrentControlLease": true,
+    "diagnosticReplayHasExternalEffects": false
+  },
+  "trace": {
+    "captureTechnical": true,
+    "captureProtocol": true,
+    "captureOperation": true,
+    "retentionPolicyRef": "<politica-EDC>",
+    "storeRef": "<almacen-de-trazas-y-checkpoints>"
+  }
+}
