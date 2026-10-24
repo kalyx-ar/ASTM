@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>CLSI LIS01-A2 (ASTM E1381) low-level protocol as a deterministic state machine.</Description>
+  </PropertyGroup>
+</Project>
