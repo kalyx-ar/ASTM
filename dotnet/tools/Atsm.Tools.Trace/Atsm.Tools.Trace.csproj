@@ -9,9 +9,11 @@
     <Description>Import, anonymize, summarize and interpret ATSM traces.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Atsm.TraceTools\Atsm.TraceTools.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Glyms.Testing\Atsm.Plugin.Glyms.Testing.csproj" />
   </ItemGroup>
 </Project>

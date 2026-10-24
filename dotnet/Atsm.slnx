@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/plugins/">
     <Project Path="plugins/Atsm.Plugin.Abbott.Architect/Atsm.Plugin.Abbott.Architect.csproj" />
+    <Project Path="plugins/Atsm.Plugin.Glyms.Testing/Atsm.Plugin.Glyms.Testing.csproj" />
+    <Project Path="plugins/Atsm.Plugin.Sysmex.Uwam/Atsm.Plugin.Sysmex.Uwam.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Atsm.Abstractions/Atsm.Abstractions.csproj" />
@@ -11,7 +13,7 @@
     <Project Path="src/Atsm.Protocol.Mllp/Atsm.Protocol.Mllp.csproj" />
     <Project Path="src/Atsm.Runtime/Atsm.Runtime.csproj" />
     <Project Path="src/Atsm.Testing/Atsm.Testing.csproj" />
-    <Project Path="src/Atsm.TraceTools/Atsm.TraceTools.csproj" />
+    <Project Path="src/Atsm.Tracing/Atsm.Tracing.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Atsm.Tests/Atsm.Tests.csproj" />

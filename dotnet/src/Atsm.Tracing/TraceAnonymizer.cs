@@ -4,7 +4,7 @@ using Atsm.Abstractions.Tracing;
 using Atsm.Protocol.Lis01;
 using Atsm.Protocol.Lis02;
 
-namespace Atsm.TraceTools;
+namespace Atsm.Tracing;
 
 public sealed record AnonymizationOptions
 {
@@ -69,6 +69,16 @@ public sealed class TraceAnonymizer(AnonymizationOptions? options = null)
                 continue;
             }
 
+            if (entry.Code == TraceReconstruction.MessageCode)
+            {
+                var md = delimiters[entry.Direction];
+                var record = AnonymizeRecordText(_options.Encoding.GetString(entry.Data.Span), ref md);
+                delimiters[entry.Direction] = md;
+                output.Add(entry with { Data = _options.Encoding.GetBytes(record) });
+                frames++;
+                continue;
+            }
+
             var assembler = assemblers[entry.Direction];
             var rebuilt = new List<byte>();
             foreach (var piece in assembler.Feed(entry.Data.Span))
@@ -79,6 +89,21 @@ public sealed class TraceAnonymizer(AnonymizationOptions? options = null)
                     continue;
                 }
                 var parsed = Lis01Frame.Parse(piece.Frame, acceptLowercaseChecksum: true, strictText: false);
+                if (parsed.Error == Lis01FrameError.Checksum && RecordedChecksum(piece.Frame) is { } recorded)
+                {
+                    // Keep the evidence: the rewritten frame differs from its computed checksum by the same amount as the original.
+                    var delta = (byte)(recorded - Lis01Frame.Checksum(piece.Frame.AsSpan(0, piece.Frame.Length - 4)));
+                    var dc = delimiters[entry.Direction];
+                    var text2 = AnonymizeRecordText(_options.Encoding.GetString(parsed.Text.Span), ref dc);
+                    delimiters[entry.Direction] = dc;
+                    var frame = Lis01Frame.Build(parsed.FrameNumber, _options.Encoding.GetBytes(text2), parsed.IsFinal);
+                    var adjusted = (byte)(Lis01Frame.Checksum(frame.AsSpan(1, frame.Length - 5)) + delta);
+                    frame[^4] = (byte)"0123456789ABCDEF"[adjusted >> 4];
+                    frame[^3] = (byte)"0123456789ABCDEF"[adjusted & 0x0F];
+                    rebuilt.AddRange(frame);
+                    frames++;
+                    continue;
+                }
                 if (!parsed.IsValid)
                 {
                     // Cannot be rewritten safely: drop the payload and keep only its size as evidence.
@@ -265,6 +290,22 @@ public sealed class TraceAnonymizer(AnonymizationOptions? options = null)
         return pseudonym;
     }
 
+    private static byte? RecordedChecksum(byte[] frameAfterStx)
+    {
+        if (frameAfterStx.Length < 6)
+            return null;
+        static int Nibble(byte b) => b switch
+        {
+            >= (byte)'0' and <= (byte)'9' => b - '0',
+            >= (byte)'A' and <= (byte)'F' => b - 'A' + 10,
+            >= (byte)'a' and <= (byte)'f' => b - 'a' + 10,
+            _ => -1,
+        };
+        var high = Nibble(frameAfterStx[^4]);
+        var low = Nibble(frameAfterStx[^3]);
+        return high < 0 || low < 0 ? null : (byte)(high << 4 | low);
+    }
+
     /// <summary>Re-scans the output for P records whose identifying fields were not replaced.</summary>
     private List<string> FindResidual(List<TraceEntry> entries)
     {
@@ -275,6 +316,24 @@ public sealed class TraceAnonymizer(AnonymizationOptions? options = null)
             var assembler = new FrameAssembler();
             foreach (var entry in entries.Where(e => e.Direction == direction))
             {
+                if (entry.Code == TraceReconstruction.MessageCode)
+                {
+                    foreach (var line in _options.Encoding.GetString(entry.Data.Span).Split('\r'))
+                    {
+                        if (line.Length < 2 || char.ToUpperInvariant(line[0]) != 'P')
+                            continue;
+                        var patient = new Lis02Record(line, Lis02Delimiters.Default);
+                        foreach (var field in (ReadOnlySpan<int>)[3, 4, 5, 6, 7])
+                        {
+                            foreach (var component in patient.Components(field))
+                            {
+                                if (component.Trim().Length > 0 && component != "SYN" && !known.Contains(component))
+                                    residual.Add($"entry {entry.Sequence}: P.{field}");
+                            }
+                        }
+                    }
+                    continue;
+                }
                 foreach (var piece in assembler.Feed(entry.Data.Span))
                 {
                     if (piece.Frame is null)

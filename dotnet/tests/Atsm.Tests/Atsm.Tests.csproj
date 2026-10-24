@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\src\Atsm.Runtime\Atsm.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
-    <ProjectReference Include="..\..\src\Atsm.TraceTools\Atsm.TraceTools.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Glyms.Testing\Atsm.Plugin.Glyms.Testing.csproj" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ namespace Atsm.Protocol.Lis01;
 
 public enum Lis01FrameError { None, Structure, FrameNumber, Checksum, RestrictedCharacter }
 
-/// <param name="Text">Frame text between the frame number and ETB/ETX.</param>
+/// <param name="Text">Frame text between the frame number and ETB/ETX. Also set for <see cref="Lis01FrameError.Checksum"/>, for diagnosis only.</param>
 public readonly record struct Lis01ParsedFrame(Lis01FrameError Error, int FrameNumber, ReadOnlyMemory<byte> Text, bool IsFinal)
 {
     public bool IsValid => Error == Lis01FrameError.None;
@@ -101,7 +101,7 @@ public static class Lis01Frame
         if (!TryHex(span[terminatorIndex + 1], acceptLowercaseChecksum, out var high)
             || !TryHex(span[terminatorIndex + 2], acceptLowercaseChecksum, out var low)
             || (high << 4 | low) != expected)
-            return new(Lis01FrameError.Checksum, frameNumber, default, false);
+            return new(Lis01FrameError.Checksum, frameNumber, text, terminator == Etx);
         return new(Lis01FrameError.None, frameNumber, text, terminator == Etx);
     }
 
