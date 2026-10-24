@@ -28,7 +28,7 @@ Cada capa es reemplazable y se prueba sola. Una pieza sólo conoce la capa inmed
 | `Lis01Link` | CLSI LIS01-A2 / E1381 | Establecimiento (ENQ/ACK/NAK), frames con número 0–7 y checksum módulo 256 en hex, ETB/ETX, máximo de 247 caracteres por frame, terminación (EOT), contención (el instrumento tiene prioridad), timers de establecimiento, ACK de frame y receptor, reintentos por frame, NAK de ocupado |
 | `MllpLink` | HL7 MLLP | `VT … FS CR`, un mensaje por bloque |
 | `DelimitedLink` | — | Mensajes delimitados por bytes configurables, para dialectos sin capa baja estándar |
-| `WholeMessage` | — | Para `FileDrop`: el canal ya entrega el mensaje completo |
+| `WholeMessageInstrumentSession` | — | Límites de mensajes aportados por el anfitrión; `AstmMessageProcessor` también recibe bytes/Stream directamente |
 
 `Lis01Link` es una máquina de estados pura alimentada por eventos (`BytesReceived`, `TimerElapsed`, `SendRequested`) que produce acciones (`Write`, `StartTimer`, `MessageReceived`, `Fault`). No tiene hilos ni E/S: se prueba de forma determinista con un reloj virtual.
 
@@ -45,7 +45,7 @@ Valores por defecto según LIS01-A2. El perfil puede declarar desviaciones docum
 - Encoding de caracteres por perfil (ASCII, Latin-1, UTF-8) declarado, no adivinado.
 - Serialización inversa con los mismos delimitadores para construir mensajes salientes.
 
-**`Hl7v2Codec`** (HL7 v2.x): MSH con caracteres de codificación, segmentos, campos/componentes/subcomponentes, escape, ACK original y mejorado. El soporte LAW (OUL^R22, OML^O33, QBP^Q11/RSP^K11) se implementa como flujos de trabajo encima del codec, no dentro de él.
+**`Hl7Codec`** (HL7 v2.x, primer corte implementado): MSH con caracteres de codificación, segmentos, campos/componentes/subcomponentes, escape, ACK original y mejorado. El soporte LAW (OUL^R22, OML^O33, QBP^Q11/RSP^K11) se implementa como flujos de trabajo encima del codec, no dentro de él.
 
 Ambos codecs ofrecen una vista posicional sin modelo y un validador por perfil que informa problemas como datos (no excepciones) para que el plugin decida.
 
@@ -128,3 +128,7 @@ Además de T01–T10 y A01–A02 de [IMPLEMENTACION](IMPLEMENTACION.md):
 | E06 | Host query con host lento | Respuesta de política dentro del plazo y evento registrado |
 | E07 | Mismo corpus por `LocalSerial`, `SerialTunnel` y `Replay` | Salida canónica idéntica |
 | E08 | MLLP con mensaje partido y dos mensajes en un segmento TCP | Dos mensajes, sin pérdida |
+
+## Corte implementado del 2026-10-24
+
+P-01 usa el mismo `AstmMessageProcessor` desde LIS01 y desde contenido completo; no se agregan watchers ni carpetas al motor. HL7 dispone de codec, sesión MLLP original y dialecto ARCHITECT ZOS; LAW LAB-27 es un corte parcial separado. La aplicación prepara `ITraceSink` antes de conectar; las sesiones verifican disponibilidad y propagan fallos. La lista propuesta de capas/LAW anterior no acredita su implementación íntegra. Ver [alcance, fuentes y límites](MENSAJES-TRAZAS-HL7.md).

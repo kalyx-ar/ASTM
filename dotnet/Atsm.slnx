@@ -12,6 +12,7 @@
     <Project Path="src/Atsm.Protocol.Lis01/Atsm.Protocol.Lis01.csproj" />
     <Project Path="src/Atsm.Protocol.Lis02/Atsm.Protocol.Lis02.csproj" />
     <Project Path="src/Atsm.Protocol.Mllp/Atsm.Protocol.Mllp.csproj" />
+    <Project Path="src/Atsm.Protocol.Hl7v2/Atsm.Protocol.Hl7v2.csproj" />
     <Project Path="src/Atsm.Runtime/Atsm.Runtime.csproj" />
     <Project Path="src/Atsm.Testing/Atsm.Testing.csproj" />
     <Project Path="src/Atsm.Tracing/Atsm.Tracing.csproj" />

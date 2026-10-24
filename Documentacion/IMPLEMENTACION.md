@@ -97,3 +97,7 @@ Caso de aceptación y resultado de la prueba:
 - Autoridad efectiva para excluir controladores en TCP nativo.
 
 Resolver estos puntos dentro de la implementación no requiere volver a discutir la decisión ya acordada de C++, TCP, TLS configurable y motor/plugins C#.
+
+## Incremento P-01 / HL7 del 2026-10-24
+
+La autorización y el alcance verificable están en [Mensajes, trazas y HL7](MENSAJES-TRAZAS-HL7.md). Pruebas nuevas en `Runtime/CompleteMessageTests`, `Hl7/Hl7Tests` y `Hl7/Hl7SessionTests`: equivalencia ASTM/mensaje completo, IDs de recepción, límites/EOF, fallo de captura anterior a ACK/conexión, MSH/escapes, ACK después de custodia, correlación ORL, timeout incierto, ZOS y corte LAW LAB-27. No se afirma actor LAW completo ni UI/SQLCipher EDC implementados.

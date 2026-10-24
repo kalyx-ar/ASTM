@@ -39,17 +39,17 @@ Evaluación exigida por [creación de módulos](../../../Documentacion/Arquitect
 
 | Capacidad EDC | Aplicación al LIMS/ATSM | Estado |
 |---|---|---|
-| ETL `kalyx.etl.io` | Resultados del instrumento como `EtlEvent` durable e idempotente (EventId = `ObservationId` GUID7) hacia un `IEtlInputPort` del LIMS; reintentos y pendientes sin sesión | Propuesto |
+| ETL `kalyx.etl.io` | Resultados del instrumento como `EtlEvent` durable e idempotente (EventId = `ObservationId`, conservado durante reintentos) hacia un `IEtlInputPort` del LIMS; reintentos y pendientes sin sesión | Propuesto |
 | Puerto tipado (sin ETL) | Host query: respuesta sincrónica dentro del plazo LIS01-A2; un journal asíncrono no lo cumple | Propuesto |
 | Identidades / CEAC | `controllerId` = instancia EDC autenticada; certificados mTLS por tenant; permisos de operar instrumento, ver trazas (contienen datos clínicos) y ejecutar recuperación | Propuesto |
 | Instancias de tenant (#111) | Cada tenant tiene sus instrumentos, agentes autorizados, outbox y almacén de trazas en su carpeta | Propuesto |
 | Sync / operación remota | Cliente local como controlador alternativo; conciliación al volver al servidor | Pendiente de diseño (R03) |
-| Scheduler | Barrido de `FileDrop`, reenvío de outbox, retención de trazas | Propuesto |
-| Persistencia / EF Migrations | Configuración de instrumentos, mapeos, outbox, índice de trazas en la base del LIMS | Propuesto |
+| Scheduler / ETL | Watcher de Scheduler y conector LIMS/ETL con custodia/hash/idempotencia; entrega mensajes completos a ATSM. Reenvío de outbox y retención del propietario | Frontera adoptada; conector EDC pendiente |
+| Persistencia / EF Migrations | SQLCipher estándar del propietario para originales de comunicación e índice/consulta, hospedado por Application antes de conectar; configuración, mapeos y outbox del LIMS | Requisito adoptado; adaptador/migraciones/UI EDC pendientes |
 | Lang | Los códigos estables `ATSM-*` se traducen en Presentation con seed propio | Propuesto |
 | DataViews / CRUDPage | Configuración de instrumentos, equivalencias y monitor | Propuesto |
 | Console / IA | Consulta de estado de instrumentos y trazas como herramientas, con permisos | Evaluar |
-| Firma de ensamblados (#119) | ATSM firma con su propia SNK; EDC registra editor/hash según su baseline | Requiere decisión |
+| Firma de ensamblados (#119) | ATSM utiliza la SNK de la distribución, ya implementada; admisión de paquetes por EDC conforme a su baseline | Firma comprobada; adopción/admisión EDC pendiente |
 
 ## Dependencia y distribución
 
@@ -77,3 +77,7 @@ Evaluación exigida por [creación de módulos](../../../Documentacion/Arquitect
 4. Prueba de punta a punta con el canal `Replay` y el corpus anonimizado de Architect.
 
 Ningún paso usa equipos productivos.
+
+## Custodia adoptada el 2026-10-24
+
+Application prepara el almacén SQLCipher del tenant e implementa `ITraceSink.EnsureReady`/`Write` antes de crear conexiones; `InstrumentCommunicationHost` ofrece esa frontera antes de la fábrica de canal. La UI futura consulta evidencia/rangos/versiones por puertos autorizados de Application; reproducción diagnóstica no abre equipo ni aplica resultados. No se permite un volcado plano alternativo de datos sensibles. Los archivos de cliente y su retención pertenecen al conector, no a ATSM. No se creó todavía el módulo LIMS, su almacén SQLCipher ni su UI. Ver [decisión, análisis de buffer y límites](MENSAJES-TRAZAS-HL7.md).

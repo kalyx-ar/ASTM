@@ -9,6 +9,10 @@ Instantánea del 24 de octubre de 2026. Describe lo que existe y lo que se compr
 | Contratos neutrales (canal, modelo canónico, `ILabWorkflowHost`, traza, segmentos puros) | `dotnet/src/Atsm.Abstractions` | Compila sin advertencias (`TreatWarningsAsErrors`) |
 | Capa baja CLSI LIS01-A2: máquina de estados activa y observador pasivo | `dotnet/src/Atsm.Protocol.Lis01` | Frames, checksum (vector de traza real), ETB, retransmisión, contención, timeouts, interrupción, división del stream; observación de NAK, retransmisión y alteración por el registrador |
 | Codec CLSI LIS02-A2 | `dotnet/src/Atsm.Protocol.Lis02` | Delimitadores declarados, escapes, builder, orden de registros |
+| Mensajes completos P-01 | `AstmMessageProcessor`, `WholeMessageInstrumentSession` | Bytes/Stream del anfitrión, sin watcher; IDs estables por recepción y límites/EOF |
+| HL7 v2.5.1 / ARCHITECT | `Atsm.Protocol.Hl7v2`, `Hl7MessageProcessor`, `Hl7InstrumentSession`, `ArchitectHl7Plugin` | OUL/R22, ZOS, OML/ORL, ACK original, MLLP fragmentado y correlación; sólo pruebas sintéticas |
+| LAW LAB-27 parcial | `LawQueryMessages` | WOS por contenedor y RSP/K11; no actor LAW/AWOS completo |
+| Custodia de trazas | `ITraceSink.EnsureReady`, `InstrumentCommunicationHost` | Comprobación anterior a la fábrica/canal, fallos propagados; persistencia/UI del anfitrión |
 | Framing MLLP | `dotnet/src/Atsm.Protocol.Mllp` | Bloques partidos, ruido, desbordamiento |
 | SDK de plugins: perfil declarativo, dialecto LIS02-A2 estándar, adaptador regex de logs | `dotnet/src/Atsm.Plugins` | Usado por los plugins Architect, U-WAM y Glyms (pruebas) |
 | Runtime de sesión ASTM | `dotnet/src/Atsm.Runtime` | Sesión completa con simulador: resultados, consulta con presupuesto, respuesta negativa, descarga de órdenes, reproducción de traza |
@@ -22,7 +26,7 @@ Instantánea del 24 de octubre de 2026. Describe lo que existe y lo que se compr
 | Especificación ATSM Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
 | Firma Strong Name con la SNK de la distribución | `dotnet/Directory.Build.targets` | Mismo token que EDC (`066190a23251f202`); la clave no está en el repositorio |
 
-Pruebas: `dotnet test dotnet/Atsm.slnx` → 77 correctas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Repetidas sin intermitencias.
+Pruebas: `dotnet test dotnet/Atsm.slnx` → 118 correctas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Repetidas sin intermitencias.
 
 ## Verificación con datos reales (sólo local)
 
@@ -41,7 +45,7 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 
 ## Diferencias con la propuesta
 
-- Formato de traza v1: JSON Lines (`atsm-trace/1`). El binario con hash encadenado queda para la traza durable del agente.
+- Formato de traza v1: JSON Lines (`atsm-trace/1`). La aplicación orquestante posee la persistencia; cualquier captura durable del agente requiere custodia cifrada y alcance propio.
 - El agente v1 no implementa `TraceRead`, observadores ni rol de conexión invertido; anuncia `traceCapture = 0`.
 - Los bytes recibidos sin dueño se cuentan y se informan en `Granted`; no se entregan.
 - TLS del agente con Mbed TLS 4.1.1: servidor TLS 1.2/1.3 con certificado de cliente obligatorio por defecto. El rol de cliente TLS del agente (conexión saliente) no está implementado.
@@ -57,8 +61,8 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 | Build Linux / Raspberry | Distro WSL o equipo Linux; adaptador POSIX escrito, no compilado |
 | ESP32 | Sin escribir; requiere ESP-IDF y hardware |
 | Canal `LocalSerial` .NET | Paquete oficial `System.IO.Ports` |
-| `FileDrop` | Sin implementar |
-| HL7 v2 / LAW | Codec y flujos sin implementar; existe el framing MLLP |
+| FileDrop propio | Retirado por decisión humana: P-01 resuelto con mensajes completos del anfitrión |
+| HL7 / LAW restante | Actor AWOS/LAB-28/LAB-29 y conformidad; R24/estado/inventario del fabricante, traza/anonimización HL7; ver P-02 |
 | Manual del CELL-DYN Ruby | El plugin se apoya en trazas; confirmar timers, encuadre del host y respuesta negativa |
 | Outbox durable del runtime | Sin implementar |
 | Carga dinámica de plugins | Catálogo estático por ahora |
@@ -73,3 +77,7 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 - **xUnit 2.9.3** sólo en pruebas, misma versión que EDC.
 - **Mbed TLS 4.1 LTS** aprobado para el agente; se usa el parche 4.1.1 ([DEPENDENCIAS](DEPENDENCIAS.md)).
 - **UC-3500:** cubierto por R315168. El analizador químico informa al LIS a través de U-WAM en el mismo ASTM (parámetros `C-*`, `C-Error Code` con el apéndice K, límite de 8 s); `UC-3500.txt` es el enlace interno U-WAM↔UC-3500, que el LIS no ve.
+
+## Ampliación humana del 2026-10-24
+
+P-01 y la independencia de LIS01 se entregan mediante mensajes completos. Las trazas pertenecen a la aplicación orquestante; para EDC, Application debe hospedar SQLCipher estándar antes de conectar y la futura UI ofrecerá diagnóstico autorizado, sin fallback plano de datos sensibles. No se implementó esa UI/almacén EDC en la biblioteca neutral. No se agrega spool de disco a SerialTunnel; la captura remota requiere diseño específico. Fuentes, autorización, casos y límites: [MENSAJES-TRAZAS-HL7](MENSAJES-TRAZAS-HL7.md).

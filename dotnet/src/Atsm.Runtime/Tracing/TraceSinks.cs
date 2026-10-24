@@ -20,12 +20,19 @@ public abstract class TraceSinkBase : ITraceSink
 
     public Guid TraceId { get; }
 
+    public virtual void EnsureReady()
+    {
+        if (TraceId == Guid.Empty) throw new InvalidOperationException("ATSM-TRACE-NOT-READY");
+    }
+
     public long Write(TraceDirection direction, ReadOnlySpan<byte> data, string? code = null, string? detail = null)
     {
         lock (_gate)
         {
-            var entry = new TraceEntry(_sequence++, _clock.GetElapsedTime(_start), _clock.GetUtcNow(), direction, data.ToArray(), code, detail);
+            EnsureReady();
+            var entry = new TraceEntry(_sequence, _clock.GetElapsedTime(_start), _clock.GetUtcNow(), direction, data.ToArray(), code, detail);
             Append(entry);
+            _sequence++;
             return entry.Sequence;
         }
     }
@@ -61,6 +68,7 @@ public sealed class JsonLinesTraceWriter : TraceSinkBase, IDisposable
     public const string Format = "atsm-trace/1";
 
     private readonly StreamWriter _writer;
+    private bool _disposed;
 
     public JsonLinesTraceWriter(Stream stream, TraceHeader header, TimeProvider? clock = null)
         : base(header.TraceId, clock)
@@ -69,7 +77,14 @@ public sealed class JsonLinesTraceWriter : TraceSinkBase, IDisposable
         _writer.WriteLine(JsonSerializer.Serialize(header with { Format = Format }, TraceJson.Options));
     }
 
-    public void Dispose() => _writer.Dispose();
+    public override void EnsureReady()
+    {
+        base.EnsureReady();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!_writer.BaseStream.CanWrite) throw new IOException("ATSM-TRACE-NOT-WRITABLE");
+    }
+
+    public void Dispose() { _disposed = true; _writer.Dispose(); }
 
     protected override void Append(TraceEntry entry) =>
         _writer.WriteLine(JsonSerializer.Serialize(TraceLine.From(entry), TraceJson.Options));

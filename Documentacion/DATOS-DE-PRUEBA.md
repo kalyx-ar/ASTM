@@ -15,7 +15,7 @@ Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de S
 | Carpeta | Archivos | Origen | Uso |
 |---|---|---|---|
 | `trazas_externas/glyms/Logs/*.log` | 3 | Host Glyms: C4000, CELL-DYN Ruby, I1000 | Conversación LIS01 con controles, reintentos y errores (`Parsing Error`, cola borrada por reintentos) |
-| `trazas_externas/glyms/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan `FileDrop` y el plugin Architect |
+| `trazas_externas/glyms/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan mensajes completos del anfitrión y el plugin Architect; no un watcher ATSM |
 | `trazas_externas/glyms/Pedidos/`, `Resultados/` | 6 + 6 | Intercambio por archivo con formato propio (`H|DeltaLab…`, `H|glyms…`) | Candidato a plugin de archivo; a confirmar |
 | `trazas_externas/Sysmex/` | 8 | Sysmex OnlineInterface/U-WAM: UF-5000, UC-3500, AMS | Host query (`Q`), respuesta con `P/C/O`, resultados de orina |
 | `manuales/` | 11 | Fabricantes | Ver [ESTANDARES § Evidencia](ESTANDARES.md) |

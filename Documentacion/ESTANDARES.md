@@ -27,7 +27,7 @@ Estado: propuesta, 24 de octubre de 2026. ATSM es neutral respecto del LIS/LIMS 
 | Identificación de dispositivos | UDI (cuando el equipo lo informe) | Número de serie del registro H | Se conserva como dato, no se infiere |
 | Observabilidad técnica | OpenTelemetry (trazas/métricas/logs) | — | Salud y latencia; **no** sustituye la traza binaria de evidencia |
 
-Los nombres de mensaje HL7 de la tabla son los de LAW. Su lista final se cierra con el manual del primer instrumento HL7.
+Los nombres de mensaje HL7 de la tabla son los de LAW. El primer perfil de fabricante implementado es ARCHITECT 206797-101: usa QBP^ZOS/RSP^ZOS, ACK original y granularidad por muestra; no equivale a un actor LAW completo. `LawQueryMessages` entrega un primer corte LAB-27 Q11/K11 separado. Ver [alcance y fuentes](MENSAJES-TRAZAS-HL7.md).
 
 ## Evidencia disponible en el repositorio
 

@@ -1,6 +1,12 @@
 namespace Atsm.Abstractions.Channels;
 
-public enum ChannelKind { SerialTunnel, TcpNative, LocalSerial, FileDrop, Replay, Simulated }
+public enum ChannelKind
+{
+    SerialTunnel, TcpNative, LocalSerial,
+    [Obsolete("ATSM does not manage file drops. The host supplies complete messages.")]
+    FileDrop,
+    Replay, Simulated, WholeMessage,
+}
 
 /// <summary>Who actually prevents a second controller from writing to the instrument.</summary>
 public enum OwnershipEnforcement { None, Advisory, Enforced }
@@ -45,7 +51,7 @@ public sealed record TransferAdmission(TransferAdmissionState State, string? Cod
 public enum ReleaseOutcome { Released, NotOwner, AlreadyExpired }
 
 /// <param name="Count">Bytes copied into the caller's buffer. Zero together with <paramref name="EndOfStream"/> ends the channel.</param>
-/// <param name="IsMessageBoundary">True when the channel delivers whole messages (FileDrop) and this read ends one.</param>
+/// <param name="IsMessageBoundary">True when the host supplies complete messages and this read ends one.</param>
 public sealed record ReadOutcome(int Count, bool EndOfStream, bool IsMessageBoundary = false, ulong? StreamOffset = null)
 {
     public static readonly ReadOutcome End = new(0, EndOfStream: true);

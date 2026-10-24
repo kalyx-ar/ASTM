@@ -96,12 +96,12 @@ Ordenado por evidencia disponible (manual + traza + plugin legacy):
 | `Abbott.Architect` | ARCHITECT i1000SR, c4000 | ASI: LIS1-A / LIS2-A2 (RS232) | 91407-108 | `I1000Interface.log`, `C4000Interface.log`, `Importar/*` | `Plugin_Architect` | **1** |
 | `Abbott.CellDynRuby` | CELL-DYN Ruby | LIS2-A | — (falta) | `Celldyn RUBYInterface.log` | `Plugin_Celldyn_Ruby` | 2 |
 | `Sysmex.Uwam` | UF-5000, UC-3500 vía U-WAM | E1381-02 / LIS2-A2 (TCP) | R315168 rev. 22, `SYSMEX RECORDS.xlsx` | `Sysmex/*` (con host query) | — | 3 |
-| `Abbott.Architect.Hl7` | ARCHITECT (interfaz HL7) | HL7 v2.5.1 LAW, MLLP | 206797-101 | — | — | 4 (camino moderno) |
+| `ArchitectHl7Plugin` (en Abbott.Architect) | ARCHITECT (interfaz HL7) | HL7 v2.5.1 original / MLLP, ZOS; perfil distinto de LAW | 206797-101 | Sólo sintéticas | — | Primer corte implementado |
 | `Sysmex.XnL` | XN-L | E1394-97 (TCP) | 1273-MKT rev. 3 | — | — | Pendiente de equipo |
 | `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | — | — | Pendiente de equipo |
 | `Sysmex.Suit` | Middleware SUIT | E1381/E1394-91 + extensiones | v8.0 | — | — | Pendiente de equipo |
 | `Diagast.Qwalys3` | QWALYS 3 | E1381-95 / E1394-95 | Connection Manual | — | — | Pendiente de equipo |
-| `File.DeltaLab` (a confirmar) | Intercambio de pedidos/resultados por archivo | Formato propio `H|…/P|A|T|…` | — | `glyms/Pedidos`, `glyms/Resultados` | GlymsInter | A confirmar si entra en ATSM |
+| DeltaLab (fuera de ATSM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | GlymsInter | No es un plugin instrumental |
 
 Architect primero: es el único con manual, trazas abundantes y plugin productivo. Ruby segundo: confirma que el motor generaliza (terminador vacío, comparadores, `FLAG`). U-WAM tercero: aporta TCP nativo y host query real.
 

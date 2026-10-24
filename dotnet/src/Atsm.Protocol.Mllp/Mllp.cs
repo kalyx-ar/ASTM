@@ -28,6 +28,7 @@ public readonly record struct MllpEvent(MllpEventKind Kind, byte[]? Payload, int
 /// </summary>
 public sealed class MllpDecoder(int maxMessageBytes = 1024 * 1024)
 {
+    public bool HasIncompleteBlock => _inBlock;
     private readonly List<byte> _buffer = [];
     private bool _inBlock;
     private bool _sawEnd;

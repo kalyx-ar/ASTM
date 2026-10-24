@@ -12,6 +12,7 @@ ATSM es un repositorio **neutral** (`github.com/kalyx-ar/ATSM`): integración de
 6. **Commits.** Mensajes en español, con prefijo convencional (`feat:`, `fix:`, `docs:`, `build:`, `test:`). Un tema por commit. No hacer push ni crear issues o PR sin pedido explícito.
 7. **Documentación.** En español. Actualizar `ESTADO.md` y `CONTINUACION.md` al terminar un pendiente; no reescribir decisiones registradas.
 8. **Firma.** Strong Name con la SNK de la distribución (EDC: `Kalyx.EDC.snk`, fuera de este repositorio); no generar claves nuevas. Authenticode se aplica en el release.
+9. **Mensajes y trazas (decisión humana 2026-10-24).** ATSM no administra carpetas de intercambio: el anfitrión entrega bytes/Stream o límites de mensajes. La aplicación orquestante prepara y administra `ITraceSink` antes de conectar; no crear fallback de logs ni spool plano de datos sensibles. En EDC corresponde SQLCipher estándar y diagnóstico autorizado por UI de Application. `EnsureReady`/fallos de captura son parte del contrato. SerialTunnel no tiene buffer de disco aprobado; ver [Mensajes, trazas y HL7](Documentacion/MENSAJES-TRAZAS-HL7.md). ARCHITECT ZOS y LAW Q11/K11 son perfiles distintos; no declarar conformidad LAW completa por disponer del codec.
 
 ## Entorno conocido (Windows, sesión de desarrollo)
 

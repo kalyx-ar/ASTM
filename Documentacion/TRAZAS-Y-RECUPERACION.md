@@ -132,3 +132,9 @@ atsm-trace extract sysmex.port-monitor "AMS.txt" ams.atsmtrace --recorded-by ins
 atsm-trace theoretical ams.atsmtrace ams.theory.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry --baud 0
 atsm-trace compare ams.atsmtrace ams.theory.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry
 ```
+
+## Decisión humana del 2026-10-24: custodia de la aplicación
+
+La aplicación orquestante administra todo volcado y almacenamiento de trazas. `ITraceSink.EnsureReady` debe confirmar disponibilidad antes de conectar (`InstrumentCommunicationHost` lo hace antes de la fábrica); `Write` propaga fallos y el proveedor declara su punto de durabilidad. EDC exige SQLCipher estándar hospedado desde Application, diagnóstico por UI autorizada y ningún fallback plano de datos sensibles. Esta decisión no instala persistencia EDC dentro de ATSM. JSON Lines es serialización/intercambio explícito; las herramientas históricas de anonimización son ASTM y no acreditan anonimización HL7.
+
+No se añade un spool de disco en SerialTunnel: duplica custodia de bytes ya recibidos y no recupera lo perdido antes del host. La futura captura del agente requiere custodia cifrada, límites/rangos/identidades y recuperación por proceso; un hash encadenado no cifra. El [análisis completo y los límites](MENSAJES-TRAZAS-HL7.md#evaluación-del-buffer-en-serialtunnel) distinguen caídas de proceso, red y agente.

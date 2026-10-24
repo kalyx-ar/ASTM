@@ -51,7 +51,7 @@ flowchart LR
 
 1. **Agente C++17 nativo** para RS232 ↔ TCP, con TLS configurable por endpoint y arbitraje exclusivo por instrumento. Plataformas: Windows XP/7/8/10/11, Linux x64/ARM (Raspberry) y ESP32, cada una con build y verificación propios. Sin UDP.
 2. **Motor y plugins en C# (`net10.0`)**, alojables en servidor o en cliente local.
-3. **El motor recibe un canal binario con eventos**, el mismo para túnel serial, TCP nativo, serial local, carpeta de intercambio y reproducción de trazas.
+3. **El motor recibe un canal binario con eventos**, el mismo para túnel serial, TCP nativo, serial local, mensajes completos aportados por el anfitrión y reproducción de trazas.
 4. **El agente no interpreta el protocolo**; el motor implementa el estándar; el plugin sólo el dialecto; el anfitrión decide el negocio.
 5. **Recuperación por operación**, con evidencia de traza; no hay política universal de cancelar o reenviar.
 6. **Datos reales fuera del repositorio**; el corpus publicado es anonimizado.
@@ -63,7 +63,7 @@ flowchart LR
 - **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
 - **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
 - **Host query sincrónico con plazo** y **resultados durables idempotentes**: dos caminos distintos hacia el anfitrión.
-- Canales `FileDrop` y `Replay`; **importadores** de logs de Glyms y Sysmex al formato de traza ATSM.
+- Mensajes completos del anfitrión (P-01 resuelto, sin gestión de archivos en ATSM) y canal `Replay`; **importadores** de logs de Glyms y Sysmex al formato de traza ATSM.
 - **Kit de conformidad por plugin** ejecutado con `dotnet test` sobre corpus anonimizado.
 
 ## Estructura propuesta del repositorio
@@ -97,9 +97,11 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 
 - Licencia: decidido, libre uso. Firma: Strong Name con la SNK de EDC y Authenticode en el release (ver [ESTADO](ESTADO.md#decisiones-registradas)).
 - Publicación de paquetes NuGet de ATSM para EDC (Mbed TLS ya aprobado).
-- Si el intercambio por archivo con laboratorio de derivación (`DeltaLab`) entra en ATSM, como plugin aparte, o queda en EDC.
+- DeltaLab por archivo: resuelto por decisión humana, conector EDC/ETL, fuera del motor instrumental.
 - Primer instrumento para pruebas de banco y acceso a un equipo de prueba.
 
 ## Alcance de esta entrega
 
 La propuesta inicial era sólo documental; lo implementado y comprobado desde entonces está en [ESTADO](ESTADO.md). No se conectaron equipos reales. [verificacion-propuesta.json](verificacion-propuesta.json) registra la comprobación documental de la entrega anterior.
+
+La ampliación [Mensajes, trazas y HL7](MENSAJES-TRAZAS-HL7.md) registra P-01 resuelto, HL7/MLLP y ARCHITECT implementados, LAW parcial y la custodia de trazas por la aplicación orquestante. En EDC se exige SQLCipher preparado antes de comunicar y diagnóstico autorizado por UI; su composición sigue pendiente.

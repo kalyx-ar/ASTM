@@ -12,7 +12,7 @@ flowchart LR
       A[SerialTunnel<br/>agente ATSM Link]
       B[TcpNative<br/>cliente o servidor]
       C[LocalSerial<br/>COM / tty del host]
-      D[FileDrop<br/>carpeta vigilada]
+      D[Mensajes completos<br/>fuente del anfitrión]
       E[Replay<br/>traza capturada]
     end
     A & B & C & D & E --> I[IInstrumentChannel]
@@ -26,10 +26,10 @@ flowchart LR
 | `SerialTunnel` | Equipo RS232 lejos del host | Fuerte (la aplica el agente) | Agente + host | Canal principal; TLS por endpoint |
 | `TcpNative` | Equipo con Ethernet | Sólo si el equipo o un proxy común la aplican | Host | Rol cliente o servidor según el manual; TLS si el equipo lo soporta |
 | `LocalSerial` | Host junto al equipo (cliente local, desarrollo) | Del sistema operativo | Host | Mismo motor sin agente; útil para pruebas de banco |
-| `FileDrop` | Equipos/middleware que intercambian archivos (p. ej. exportación de ARCHITECT a carpeta, intercambio con laboratorio de derivación) | Por lock de archivo y movimiento atómico | Copia del archivo + hash | Cada archivo es un mensaje completo; no hay capa baja |
+| Mensajes completos | Bytes/Stream o canal suministrado por el anfitrión | Del anfitrión | `ITraceSink` hospedado por la aplicación | `AstmMessageProcessor` / `WholeMessageInstrumentSession`; sin LIS01 ni gestión de archivos |
 | `Replay` | Diagnóstico, pruebas, conformidad | No aplica | Es la traza | Nunca abre un puerto físico ni produce efectos externos |
 
-`FileDrop` existe porque las trazas de Glyms muestran importación por archivos (`Logs/Importar`, `Transform_Logs`, `Pedidos`, `Resultados`). Se incorpora con el mismo contrato para no tener un segundo camino de ingestión.
+La decisión humana del 2026-10-24 retira el FileDrop propio: EDC usa Scheduler + conector LIMS/ETL y suministra mensajes al motor. Los intercambios con otros laboratorios pertenecen a ese conector. El valor enum `FileDrop` se conserva sólo como reserva de compatibilidad, no como canal implementado.
 
 ## Contrato del canal en .NET
 
@@ -53,7 +53,7 @@ public interface IInstrumentChannel : IAsyncDisposable
 }
 ```
 
-- Es la forma concreta de `IInstrumentByteChannel` de CONTRATOS; se renombra a `IInstrumentChannel` porque `FileDrop` entrega mensajes completos (`ReadOutcome.IsMessageBoundary = true`).
+- Es la forma concreta de `IInstrumentByteChannel` de CONTRATOS; se renombra a `IInstrumentChannel` porque el anfitrión puede entregar mensajes completos (`ReadOutcome.IsMessageBoundary = true`).
 - Usa `Memory<byte>`/`ValueTask` para no asignar por lectura.
 - Un canal sin exclusión real devuelve un `ControlLease` con `Enforcement = Advisory`; el motor puede negarse a operar si el perfil exige `Enforced`.
 
@@ -126,7 +126,7 @@ native/
 
 - Un proceso, varios puertos. Cada puerto tiene su máquina de estados Puerto/Propiedad de CONTRATOS.
 - Lectura serial con entrega inmediata de lo disponible (sin esperar trama); latencia acotada por `forwardDelayMs` configurable (0 por defecto).
-- Captura de traza en anillo RAM y, si el perfil lo declara, en disco con segmentos rotativos y hash encadenado por segmento.
+- Captura remota RAM/durable: propuesta pendiente. El agente v1 anuncia `traceCapture = 0`; cualquier persistencia sensible exige cifrado y custodia del anfitrión, no sólo hash encadenado.
 - Configuración en JSON validada contra `spec/agent-config.schema.json`; el agente rechaza claves desconocidas.
 - Sin intérprete ASTM: el agente no conoce ENQ ni ACK.
 
@@ -137,7 +137,7 @@ dotnet/src/Atsm.Channels/
   SerialTunnel/   cliente Link v1 (System.IO.Pipelines), TLS con SslStream
   TcpNative/      cliente/servidor TCP, TLS opcional
   LocalSerial/    System.IO.Ports
-  FileDrop/       FileSystemWatcher + barrido periódico, movimiento atómico a procesados/rechazados
+  # Sin FileDrop: el anfitrión entrega contenido y posee los archivos
   Replay/         lectura de traza ATSM
 ```
 
@@ -147,7 +147,7 @@ dotnet/src/Atsm.Channels/
 
 Una traza ATSM es independiente del canal y del fabricante:
 
-- Archivo `*.atsmtrace` (v1, `atsm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Un formato binario con hash encadenado queda para la traza durable del agente.
+- Archivo `*.atsmtrace` (v1, `atsm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Es intercambio explícito, no persistencia operativa EDC: Application hospeda SQLCipher antes de conectar; no hay fallback plano. Ver [custodia y buffer](MENSAJES-TRAZAS-HL7.md).
 - `atsm-trace dump` muestra una traza con los caracteres de control visibles para revisión humana.
 - Los logs externos se convierten en segmentos puros mediante **adaptadores de log que aportan los plugins** de cada serie de equipos; ATSM genérico reconstruye con ellos la traza real y la teórica ([TRAZAS-Y-RECUPERACION § Reconstrucción](TRAZAS-Y-RECUPERACION.md#reconstrucción-de-trazas-reales-y-teóricas)). Cada adaptador declara qué se pierde.
 

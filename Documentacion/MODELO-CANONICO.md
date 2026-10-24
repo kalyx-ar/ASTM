@@ -28,7 +28,7 @@ public sealed record ObservationValue(string RawText, decimal? Numeric, string? 
     CodedValue? Coded, string? RawUnit, CodedValue? Unit /* UCUM */);
 
 public sealed record InstrumentObservation(
-    Guid ObservationId,                 // GUID v7 generado por ATSM
+    Guid ObservationId,                 // UUIDv7 en dialecto aislado; UUIDv8 estable por recepción en runtime
     InstrumentRef Instrument,
     SpecimenRef Specimen,
     CodeSet Test,

@@ -6,5 +6,6 @@
     <ProjectReference Include="..\Atsm.Abstractions\Atsm.Abstractions.csproj" />
     <ProjectReference Include="..\Atsm.Protocol.Lis01\Atsm.Protocol.Lis01.csproj" />
     <ProjectReference Include="..\Atsm.Protocol.Lis02\Atsm.Protocol.Lis02.csproj" />
+    <ProjectReference Include="..\Atsm.Protocol.Hl7v2\Atsm.Protocol.Hl7v2.csproj" />
   </ItemGroup>
 </Project>

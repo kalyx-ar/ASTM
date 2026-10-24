@@ -20,7 +20,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 77 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 118 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Verificación local con trazas reales (no se publican; imprimir sólo agregados):
 
@@ -60,42 +60,34 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 
 | ID | Tema | Bloqueo |
 |---|---|---|
-| P-01 | Canal FileDrop | Ninguno |
-| P-02 | HL7 v2.5.1 / IHE LAW y plugin ARCHITECT HL7 | Ninguno (manual disponible) |
+| P-01 | Resuelto: mensajes completos del anfitrión, sin FileDrop propio | Ver decisión y pruebas abajo |
+| P-02 | Parcial: HL7/MLLP y ARCHITECT implementados; completar actor LAW/AWOS y conformidad | Requiere el alcance restante de perfiles/equipo |
 | P-03 | Kits de conformidad por plugin y corpus anonimizado | Revisión humana del corpus antes de publicarlo |
 | P-04 | Outbox durable del runtime | Ninguno |
 | P-05 | Carga dinámica de plugins | Ninguno |
 | P-06 | Build Windows XP | Instalar toolset `v141_xp`; equipo o VM XP |
 | P-07 | Build Linux / Raspberry Pi | Distro WSL o equipo Linux/ARM |
 | P-08 | Firmware ESP32 | ESP-IDF y hardware con interfaz RS232 |
-| P-09 | Agente: rol cliente TLS, captura y lectura de traza, observadores | Ninguno |
+| P-09 | Agente: rol cliente TLS, captura protegida y lectura de traza, observadores | Definir custodia/cifrado antes de persistencia sensible |
 | P-10 | Canal LocalSerial .NET | Aprobación del paquete oficial `System.IO.Ports` |
 | P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
 | P-12 | Robustez del agente | Ninguno |
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 
-### P-01 Canal FileDrop
+### P-01 Resuelto: mensajes completos del anfitrión
 
-**Qué es.** Algunos equipos y sistemas intermedios no hablan por puerto ni por socket: escriben un archivo por mensaje en una carpeta, y leen de otra carpeta las órdenes que les deja el LIS. Las exportaciones del ARCHITECT (`trazas_externas/glyms/Logs/Importar/`, archivos LIS02 completos) y el intercambio de pedidos y resultados por archivo (`glyms/Pedidos`, `glyms/Resultados`) son ese caso. FileDrop presenta esa carpeta al motor como un `IInstrumentChannel` más: cada archivo es un mensaje completo, sin capa LIS01, y queda en la traza igual que el tráfico de un puerto.
+La decisión humana del 2026-10-24 reemplaza el canal FileDrop propuesto: ATSM no vigila ni administra archivos. `AstmMessageProcessor` recibe bytes/Stream con un `receptionId` conservado por el anfitrión; `WholeMessageInstrumentSession` consume límites de mensajes sin LIS01 y comparte el procesador con la sesión ASTM. El host conserva custodia/idempotencia y disposición del original. EDC lo compone con Scheduler + conector ETL; DeltaLab queda allí.
 
-**Alcance.**
-- `dotnet/src/Atsm.Channels/FileDrop/`: vigilar una carpeta de entrada (`FileSystemWatcher` más barrido periódico, porque el watcher pierde eventos) y leer sólo archivos estables (tamaño sin cambios, o renombrado atómico por convención del perfil). Después de interpretarlo, mover cada archivo a `processed/` o `rejected/` con su hash.
-- Escritura de órdenes: archivo temporal en la carpeta de salida y renombrado atómico.
-- Para la sesión: `ReadOutcome.IsMessageBoundary = true`. Agregar `WholeMessage` como capa baja alternativa (MOTOR-GENERICO § Capa baja); hoy la sesión asume LIS01.
-- Trazas: registrar cada archivo como contenido de mensaje (`TraceReconstruction.MessageCode`) con nombre y hash en el detalle.
-- Perfil: patrón de nombres, codificación, separador de registros y política de archivos rechazados, todo en el plugin.
+Aceptación comprobada: equivalencia semántica con el dialecto existente, recepción fragmentada, rechazo de mensajes incompletos/límites, Stream del llamador abierto, IDs estables al reintentar y distintos para otra recepción, cancelación y fallos de traza observables. No se atribuye gestión de carpetas a ATSM.
 
-**Aceptación.** Un archivo de exportación ARCHITECT sintético produce las mismas observaciones que el mismo contenido recibido por LIS01. Un archivo a medio escribir no se procesa. Un archivo inválido va a `rejected/` con diagnóstico. No hay pérdida ni duplicación al reiniciar a mitad del procesamiento (marcador por hash).
+### P-02 HL7 v2.5.1 / IHE LAW — primer incremento entregado
 
-**Decisión abierta.** Si el intercambio por archivo con el laboratorio de derivación (`H|DeltaLab…`) entra en ATSM como plugin propio o queda en EDC. Su formato no es LIS02-A2 estándar.
+Implementados codec HL7 con MSH/separadores/escapes, primitivas ACK original/mejorado, sesión MLLP **original**, host query con presupuesto, ingestión antes de AA y correlación de ORL. `ArchitectHl7Plugin` en el plugin Abbott interpreta OUL^R22, responde QBP^ZOS con RSP^ZOS y construye OML^O33; no se sustituye ZOS por Q11. Los presupuestos se suministran desde la configuración del equipo.
 
-### P-02 HL7 v2.5.1 / IHE LAW
+LAW: `LawQueryMessages` implementa primitivas LAB-27 WOS por contenedor y RSP^K11, sin incrustar órdenes (LAB-28 es separado). No se implementó un actor LAW completo ni se declara conformidad. Quedan AWOS/lifecycle LAB-28/LAB-29, opciones y cardinalidades exhaustivas; OUL^R24, estados/inventario/notificaciones del fabricante, traza semántica/anonimizador HL7 y kit de conformidad. El runtime rechaza modo mejorado; disponer de sus códigos no acredita custodia commit.
 
-- Codec HL7 v2 en `dotnet/src/Atsm.Protocol.Hl7v2`: MSH con caracteres de codificación, segmentos, campos, componentes y subcomponentes, escapes, ACK original y mejorado. Existe el framing MLLP (`Atsm.Protocol.Mllp`).
-- Sesión HL7 sobre MLLP (análoga a `AstmInstrumentSession`) y flujos LAW: OUL^R22 (resultados), QBP^Q11/RSP^K11 (consulta), OML^O33 (órdenes), ACK. Hacen falta contratos de dialecto HL7 en el SDK (`IHl7Dialect`).
-- Plugin `abbott.architect.hl7` con el manual `Documentacion/manuales/ASTM Alinity 206797-101.pdf`, que es el *ARCHITECT System HL7 Interface Manual* (el nombre del archivo no corresponde al contenido).
-- **Aceptación:** el mismo resultado llega igual al modelo canónico por ASTM y por HL7 (MODELO-CANONICO § Equivalencia con LAW).
+Manual local usado: `manuales/ASTM Alinity 206797-101.pdf`, cuyo contenido es ARCHITECT System HL7 Interface Manual 206797-101 (2012). Detalles, pruebas, fuentes y límites en [MENSAJES-TRAZAS-HL7](MENSAJES-TRAZAS-HL7.md).
 
 ### P-03 Kits de conformidad por plugin
 
@@ -130,7 +122,7 @@ Crear `native/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae s
 ### P-09 Agente: lo reservado en Link v1
 
 - **Rol cliente TLS:** el agente conecta hacia el host, para sitios sin puertos entrantes. La configuración y la autorización se mantienen iguales.
-- **Traza en el agente:** captura RAM/disco por puerto, `TraceRead`/`TraceChunk` (0x30/0x31) y `traceCapture` real en `Capabilities`.
+- **Traza en el agente:** extensión pendiente; evaluar custodia cifrada, sin spool plano. Ver análisis en MENSAJES-TRAZAS-HL7. Captura RAM/disco por puerto, `TraceRead`/`TraceChunk` (0x30/0x31) y `traceCapture` real en `Capabilities`.
 - **Observadores:** copias de diagnóstico para candidatos en espera, sin capacidad de escribir.
 - Actualizar `spec/link-v1.md`, los vectores y ambas implementaciones.
 
@@ -171,7 +163,7 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 ## Hipótesis y decisiones abiertas
 
 - **CELL-DYN Ruby:** encuadre del host y respuesta negativa (P-11).
-- **DeltaLab** por archivo: ATSM o EDC (P-01).
+- **DeltaLab** por archivo: resuelto el 2026-10-24, conector EDC/ETL, fuera de los plugins instrumentales ATSM (P-01).
 - **ARCHITECT:** 309 exportaciones de control llegan sin registro P y generan `ATSM-L02-UNEXPECTED-RECORD-ORDER`. Decidir si el perfil lo admite como variante documentada o si sigue como aviso.
 - **U-WAM:** el modo E1381-95 (sin timeouts según R315168 5.2.5) no tiene perfil propio.
 

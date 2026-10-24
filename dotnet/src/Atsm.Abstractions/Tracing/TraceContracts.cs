@@ -22,6 +22,11 @@ public interface ITraceSink
 {
     Guid TraceId { get; }
 
-    /// <summary>Records an entry and returns its sequence number.</summary>
+    /// <summary>The orchestrating application must prepare storage before starting communications.
+    /// Throw if capture is unavailable. ATSM never creates a fallback file or opens a database.</summary>
+    void EnsureReady();
+
+    /// <summary>Records an entry and returns its sequence number. Failures must propagate; the host
+    /// defines the durability of a successful write and owns storage, encryption and retention.</summary>
     long Write(TraceDirection direction, ReadOnlySpan<byte> data, string? code = null, string? detail = null);
 }
