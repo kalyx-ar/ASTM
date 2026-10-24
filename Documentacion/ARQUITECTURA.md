@@ -5,11 +5,11 @@
 | Componente | Responsabilidades |
 |---|---|
 | Agente C++ | Apertura/configuración del puerto, lectura/escritura binaria, señales seriales, TCP/TLS, buffers acotados, arbitraje y diagnóstico técnico |
-| Canal común del ETL | Adaptar agente remoto o TCP nativo a lectura/escritura y eventos; retirar la envoltura de transporte antes de entregar los bytes al motor |
-| Motor ASTM C# | Framing incremental, checksum, numeración, estados de conversación, temporizadores y mecanismos genéricos de intercambio |
-| Plugin del instrumento | Perfil y extensiones del dialecto, registros propietarios, interpretación de órdenes/resultados, correlación y política de recuperación del proceso |
-| Gestor ETL | Alojar motor/plugins, resolver dependencias, coordinar ingestión/órdenes y derivar operaciones a Application |
-| LIMS / Application / Domain | OT, muestra, analitos, equivalencias, validación, persistencia, permisos e historial de negocio |
+| Canal común del host | Adaptar agente remoto, TCP nativo, serial local, carpeta o traza a lectura/escritura y eventos; retirar la envoltura de transporte antes de entregar los bytes al motor ([INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md)) |
+| Motor genérico C# | Framing incremental, checksum, numeración, estados de conversación, temporizadores y mecanismos genéricos de intercambio ([MOTOR-GENERICO](MOTOR-GENERICO.md)) |
+| Plugin del instrumento | Perfil y extensiones del dialecto, registros propietarios, interpretación de órdenes/resultados, correlación y política de recuperación del proceso ([PLUGINS](PLUGINS.md)) |
+| Runtime ATSM | Alojar motor/plugins, resolver dependencias, coordinar ingestión/órdenes y entregar hechos canónicos al anfitrión |
+| Anfitrión (LIS/LIMS, p. ej. EDC) | OT, muestra, analitos, equivalencias, validación, persistencia, permisos e historial de negocio |
 
 El agente no inspecciona registros ASTM ni genera confirmaciones ASTM. Las confirmaciones que emita sobre una escritura describen etapas técnicas, como aceptación del buffer o escritura al driver. El motor y el plugin interpretan las respuestas del instrumento.
 
@@ -26,31 +26,11 @@ La transparencia cubre bytes y contrato de canal, no igualdad de capacidades: un
 
 Si el failover exige exclusión efectiva para TCP nativo y el instrumento no la proporciona, todos los candidatos deben acceder por un árbitro/proxy común. Un lock entre procesos EDC no bloquea a un cliente que pueda acceder directamente al socket del instrumento.
 
-## Distribución en las cuatro capas de EDC
+## Empaquetado neutral
 
-Los nombres siguientes son orientativos. Adaptarlos después de inspeccionar la solución real.
+El agente, el motor, los plugins y las herramientas viven en el repositorio ATSM y no referencian ningún LIS/LIMS, UI ni base de datos. El anfitrión implementa `ILabWorkflowHost` ([MODELO-CANONICO](MODELO-CANONICO.md)); la estructura de proyectos está en el [README](README.md#estructura-propuesta-del-repositorio).
 
-```text
-EDC.Domain/
-  Lims/Resultados, Muestras, Ordenes, Equivalencias, Politicas
-EDC.Application/
-  Lims/Instrumentos/RecibirResultados, SolicitarAnalisis, ConciliarOperacion
-  Abstractions/InstrumentBusinessGateway, ReceivedMessageStore
-EDC.Infrastructure/
-  Lims/ATSM/Transport/ManagedSerialTunnel, NativeTcp
-  Lims/ATSM/Protocol/AstmEngine, AstmProfiles
-  Lims/ATSM/Plugins/Architect, CelldynRuby
-  Lims/ATSM/Runtime/Host, Ownership, Traces, Recovery
-EDC.Presentation/
-  Lims/Instrumentos/Configuracion, Monitor, Trazas, Recuperacion
-
-InstrumentBridge.Native/             # ejecutable C++ independiente
-  core/, platform/windows/, platform/posix/, platform/esp32/, tls/
-```
-
-El protocolo y sus puertos técnicos pertenecen a Infrastructure o a una librería técnica independiente usada por esa capa. Domain y Application no dependen de COM, sockets, framing ni tipos ASTM. Application define los contratos de negocio que consume el adaptador del plugin.
-
-El motor puede empaquetarse como librería C# sin referencias al LIMS, a la UI o a la base de datos. La librería y los plugins siguen siendo piezas técnicas de Infrastructure; no constituyen una quinta capa del negocio.
+En un anfitrión por capas, ATSM pertenece a Infrastructure: Domain y Application no dependen de COM, sockets, framing ni tipos ATSM, y ATSM no constituye una capa de negocio adicional. El encaje concreto en EDC está en [INTEGRACION-EDC](INTEGRACION-EDC.md).
 
 ## Motor genérico y plugin
 
@@ -58,16 +38,16 @@ El motor ofrece mecanismos comunes y puntos de extensión. Cada perfil fija deli
 
 El plugin proporciona identificación y versión, perfil compatible, adaptación de registros, construcción de mensajes, interpretación de respuestas y evaluación de recuperación. Puede extender el comportamiento genérico cuando exista una variante propietaria demostrada, sin duplicar el motor completo.
 
-El resultado del plugin se convierte a contratos tipados de Application: equipo, dominio, muestra/orden, analito, valor original, comparador, unidad, flags, estado del equipo, fecha y referencias de traza. La asociación con una determinación del LIMS y su estado clínico se resuelve mediante las reglas del EDC.
+El resultado del plugin se convierte al modelo canónico: equipo, muestra/orden, analito, valor original, comparador, unidad, flags, estado del equipo, fecha y referencias de traza. La asociación con una determinación y su estado clínico se resuelve con las reglas del anfitrión.
 
 Un estado `F` de un instrumento no se transforma automáticamente en Validado Final del LIMS. El significado y la transición se comprueban por perfil y política de negocio.
 
 ## Despliegues
 
-| Modalidad | Ubicación del agente | Ubicación del ETL y plugins |
+| Modalidad | Ubicación del agente | Ubicación del runtime y plugins |
 |---|---|---|
-| Servidor central | PC próximo al equipo, Raspberry o ESP32 | Servidor EDC |
-| Resolución local | Equipo compatible próximo al instrumento | Cliente EDC con motor/plugins instalados |
+| Servidor central | PC próximo al equipo, Raspberry o ESP32 | Servidor del anfitrión (p. ej. EDC) |
+| Resolución local | Equipo compatible próximo al instrumento | Cliente del anfitrión con motor/plugins instalados |
 | Primario/respaldo | Un agente compartido por los candidatos | Servidor A, servidor B o cliente local, con un único controlador |
 | Instrumento TCP nativo | Puede prescindir de puente serial | ETL directo o proxy común si se necesita arbitraje externo |
 

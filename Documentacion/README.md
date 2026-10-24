@@ -1,62 +1,102 @@
-# Propuesta para EDC / LIMS / ATSM
+# ATSM: integración de instrumentos de laboratorio
 
-Fecha: 24 de octubre de 2026. Estado: propuesta de arquitectura y contratos para implementar en el repositorio EDC. Se conserva `ATSM` en la ruta solicitada; el nombre del protocolo en los documentos es **ASTM**.
+Fecha: 24 de octubre de 2026. Estado: **propuesta de arquitectura y contratos**; todavía no hay código.
 
-## Decisión de partida
+ATSM es un proyecto **neutral**: un agente de comunicación, un motor genérico de los protocolos de laboratorio (CLSI LIS01-A2 / LIS02-A2, conocidos como ASTM E1381 / E1394, y HL7 v2.5.1 / IHE LAW) y plugins por fabricante. No depende de ningún LIS/LIMS; cada sistema anfitrión implementa un único puerto. El primer anfitrión será EDC ([INTEGRACION-EDC](INTEGRACION-EDC.md)).
 
-Construir un agente **C++ nativo** que conecte RS232 con **TCP**, con **TLS configurable por endpoint** y arbitraje de acceso por instrumento. El ETL, ejecutado en un cliente EDC o en el servidor EDC, utilizará un motor ASTM genérico en **C#** y plugins por fabricante/modelo. También se admitirán instrumentos con TCP nativo a través del mismo contrato de canal.
+El nombre del repositorio se mantiene `ATSM`; en el texto, el protocolo se llama por su nombre normativo.
 
-**UDP queda excluido de esta propuesta.** El transporte conserva bytes y eventos técnicos. La interpretación del protocolo, las operaciones y la recuperación de sesiones corresponden al motor ASTM, al plugin y al proceso de negocio.
+## Las tres piezas
 
 ```mermaid
 flowchart LR
-    S[Instrumento RS232] <--> G[Agente C++: puerto y arbitraje]
-    G <-->|TCP con TLS configurable| C[Canal de instrumento del ETL]
-    N[Instrumento TCP nativo] <--> C
-    C <--> A[Motor ASTM genérico C#]
-    A <--> P[Plugin fabricante / modelo]
-    P <--> E[ETL: cliente o servidor EDC]
-    E <--> L[LIMS: casos de uso y reglas]
+    S[Instrumento RS232] <--> G[Agente C++<br/>puerto, arbitraje, traza]
+    G <-->|ATSM Link v1 sobre TCP/TLS| C
+    N[Instrumento TCP / HL7] <--> C
+    F[Carpeta de intercambio] --> C
+    subgraph Host .NET
+      C[1 · Interfaz de comunicación<br/>IInstrumentChannel] <--> M[2 · Motor genérico<br/>LIS01 · LIS02 · MLLP · HL7v2]
+      M <--> P[3 · Plugins por fabricante<br/>perfil + dialecto]
+      P <--> K[Modelo canónico]
+    end
+    K <--> H[ILabWorkflowHost<br/>EDC u otro LIS]
 ```
 
-## Guía de lectura
-
-| Documento | Para qué sirve |
+| Pieza | Documento |
 |---|---|
-| [ARQUITECTURA.md](ARQUITECTURA.md) | Responsabilidades, cuatro capas, plataformas, TLS y despliegue |
-| [CONTRATOS.md](CONTRATOS.md) | Canal común, arbitraje, permisos de control, eventos y contrato agente–ETL |
-| [TRAZAS-Y-RECUPERACION.md](TRAZAS-Y-RECUPERACION.md) | Herramientas transversales, trazas, checkpoints y escenarios de recuperación |
-| [IMPLEMENTACION.md](IMPLEMENTACION.md) | Etapas de trabajo, pruebas de aceptación y decisiones por instrumento |
-| [REFERENCIAS-GLYMS.md](REFERENCIAS-GLYMS.md) | Rutas absolutas a ensamblados originales, código decompilado y evidencia de negocio |
-| [CONTEXTO-PARA-EDC.md](CONTEXTO-PARA-EDC.md) | Texto listo para transferir a la sesión que implemente en EDC |
-| [ejemplos/agente.json](ejemplos/agente.json) | Configuración ilustrativa del puente y sus límites |
-| [ejemplos/instrumento.json](ejemplos/instrumento.json) | Selección del transporte, plugin y perfil en el ETL |
-| [referencias-glyms.json](referencias-glyms.json) | Mapa legible por herramientas, con rutas y hashes de los binarios |
+| 1. Interfaz de comunicación: canales, agente nativo, protocolo ATSM Link, TLS, formato de traza | [INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md) |
+| 2. Motor genérico: capas baja/mensaje/sesión/flujos, perfiles | [MOTOR-GENERICO](MOTOR-GENERICO.md) |
+| 3. Plugins: contrato, nivel declarativo, aislamiento, kit de conformidad, catálogo inicial | [PLUGINS](PLUGINS.md) |
+| Modelo canónico y puerto del anfitrión (LAW/FHIR, LOINC/UCUM) | [MODELO-CANONICO](MODELO-CANONICO.md) |
 
-## Requisitos acordados
+## Documentos de soporte
 
-1. La librería ASTM recibe un stream binario bidireccional y eventos de estado; conserva independencia de COM, IP y TLS.
-2. El agente administra bytes, puerto, control de flujo y propiedad exclusiva. El plugin adapta ASTM a las particularidades reales del instrumento.
-3. Puede haber múltiples candidatos conectados, con un único controlador activo por instrumento y cola de solicitudes de control.
-4. El cambio de controlador puede ser entre servidores o hacia un cliente local con capacidad de resolver ASTM.
-5. Las herramientas comunes registran y permiten entender la traza. La decisión de recuperación se toma por operación, protocolo y proceso; no hay una política universal de cancelación o reenvío.
-6. Las plataformas objetivo son Windows XP/7/8/10/11, Linux, Raspberry y ESP. El primer perfil de microcontrolador propuesto es ESP32; otros modelos requieren su propia comprobación.
-7. C++ permite reducir overhead y compartir el núcleo; el rendimiento y la compatibilidad deben comprobarse en los builds y dispositivos concretos.
+| Documento | Contenido |
+|---|---|
+| [ESTANDARES](ESTANDARES.md) | Normas por capa, ediciones aceptadas y evidencia de manuales/trazas |
+| [ARQUITECTURA](ARQUITECTURA.md) | Responsabilidades, despliegues, plataformas, TLS, latencia |
+| [CONTRATOS](CONTRATOS.md) | Identidades, arbitraje, generaciones, transferencia de control, estados |
+| [TRAZAS-Y-RECUPERACION](TRAZAS-Y-RECUPERACION.md) | Niveles de traza, checkpoints, herramientas y recuperación por operación |
+| [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
+| [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
+| [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |
+| [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md) · [referencias-glyms.json](referencias-glyms.json) | Ensamblados legacy en producción, código decompilado y hashes (material local) |
+| [CONTEXTO-PARA-EDC](CONTEXTO-PARA-EDC.md) | Texto para transferir a la sesión que implemente en EDC |
+| [ejemplos/](ejemplos/README.md) | Configuración sintética de agente e instrumento |
 
-## Base de conocimiento de Glyms
+## Decisiones tomadas
 
-**Según lo informado por el usuario, los desarrollos de Glyms aquí referenciados están en uso productivo.** Contienen lógica legacy y código de baja calidad, pero aportan evidencia de procesos y particularidades que deben investigarse al migrar. La calidad del código no invalida su valor como referencia de comportamiento.
+1. **Agente C++17 nativo** para RS232 ↔ TCP, con TLS configurable por endpoint y arbitraje exclusivo por instrumento. Plataformas: Windows XP/7/8/10/11, Linux x64/ARM (Raspberry) y ESP32, cada una con build y verificación propios. Sin UDP.
+2. **Motor y plugins en C# (`net10.0`)**, alojables en servidor o en cliente local.
+3. **El motor recibe un canal binario con eventos**, el mismo para túnel serial, TCP nativo, serial local, carpeta de intercambio y reproducción de trazas.
+4. **El agente no interpreta el protocolo**; el motor implementa el estándar; el plugin sólo el dialecto; el anfitrión decide el negocio.
+5. **Recuperación por operación**, con evidencia de traza; no hay política universal de cancelar o reenviar.
+6. **Datos reales fuera del repositorio**; el corpus publicado es anonimizado.
 
-La propuesta distingue decisiones nuevas, comportamiento visible en el código y confirmaciones pendientes con equipos/usuarios. Una rama de código recuperada no demuestra por sí sola que se ejecute en todas las instalaciones. Las anomalías conocidas requieren una decisión explícita de conservar, corregir o retirar.
+## Propuestas nuevas de esta revisión
 
-Las rutas y hashes están en [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md). Se trabaja con C# decompilado, no con el proyecto fuente original. En `Plugin_Architect/PlugIn.cs` existe una diferencia previa respecto del hash de extracción: se conserva como está y se mantiene la referencia al ensamblado original para contrastar.
+- Protocolo **ATSM Link v1**: cabecera binaria fija + control en CBOR determinista + bytes crudos; esquemas CDDL y vectores compartidos.
+- **Mbed TLS 3.6 LTS** como backend TLS único del agente (XP no tiene TLS 1.2 nativo utilizable; ESP-IDF ya lo usa). Requiere aprobación como dependencia.
+- **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
+- **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
+- **Host query sincrónico con plazo** y **resultados durables idempotentes**: dos caminos distintos hacia el anfitrión.
+- Canales `FileDrop` y `Replay`; **importadores** de logs de Glyms y Sysmex al formato de traza ATSM.
+- **Kit de conformidad por plugin** ejecutado con `dotnet test` sobre corpus anonimizado.
+
+## Estructura propuesta del repositorio
+
+```text
+ATSM/
+  README.md  LICENSE  SECURITY.md  CHANGELOG.md
+  spec/                  link-v1.cddl, agent-config.schema.json, profile.schema.json, model-v1, trace-v1
+  native/                agente C++17 (core, platform/win32|posix|esp32, tls, tools) — CMake
+  dotnet/
+    src/                 Atsm.Abstractions, Atsm.Channels, Atsm.Protocol.*, Atsm.Runtime, Atsm.Fhir, Atsm.Testing
+    plugins/             Atsm.Plugin.Abbott.Architect, Atsm.Plugin.Abbott.CellDynRuby, Atsm.Plugin.Sysmex.Uwam, …
+    tools/               atsm-trace (importar, anonimizar, ver, comparar), atsm-sim (simulador de instrumento)
+    tests/
+  conformance/           vectores de Link v1 y corpus anonimizado compartido
+  Documentacion/         esta carpeta
+```
+
+## Orden de trabajo sugerido
+
+1. `spec/` + `Atsm.Abstractions` + `Atsm.Testing` (canal simulado, reloj virtual).
+2. `Atsm.Protocol.Lis01` y `Lis02` con casos E01–E05 sintéticos.
+3. `atsm-trace import/anonymize` sobre las trazas Architect → primer corpus.
+4. Plugin Architect sobre `Replay` y `LocalSerial`; luego Ruby y U-WAM.
+5. Agente nativo (Windows x64 → XP → Linux → ESP32) y canal `SerialTunnel`.
+6. Arbitraje y failover; HL7/LAW.
+
+En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el canal `Replay`.
+
+## Pendiente de decidir
+
+- Licencia del repositorio ATSM (afecta a cómo se comparte y a la compatibilidad con Mbed TLS, Apache-2.0).
+- Aprobación de Mbed TLS y de la publicación de paquetes NuGet de ATSM para EDC.
+- Si el intercambio por archivo con laboratorio de derivación (`DeltaLab`) entra en ATSM o queda en EDC.
+- Primer instrumento para pruebas de banco y acceso a un equipo de prueba.
 
 ## Alcance de esta entrega
 
-Se entrega documentación portable, contratos propuestos, ejemplos de configuración y referencias verificables. El repositorio EDC no está en este workspace: los nombres de proyectos y carpetas son una correspondencia para adaptar a sus cuatro capas. No se compiló un agente, no se conectaron equipos y no se ejecutaron pruebas operativas.
-
-Para trasladar la propuesta, copiar esta carpeta a `EDC/LIMS/ATSM` o a la ubicación documental equivalente. Los enlaces internos del paquete son relativos. Las referencias a Glyms incluyen rutas absolutas del workspace actual y un manifiesto con rutas relativas al directorio Glyms, para poder resolverlas en otra máquina.
-
-## Control de la entrega
-
-[verificacion-propuesta.json](verificacion-propuesta.json) registra enlaces/rutas comprobados, lectura de JSON, consistencia de los ejemplos y hashes de las referencias. La diferencia previa del C# de Architect se identifica como advertencia conocida. Este control no acredita compilación, soporte de plataformas ni ejecución de protocolos o de negocio.
+Documentación y contratos propuestos. No se compiló código, no se conectaron equipos ni se ejecutaron pruebas. [verificacion-propuesta.json](verificacion-propuesta.json) registra la comprobación documental de la entrega anterior.

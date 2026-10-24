@@ -1,0 +1,113 @@
+# Plugins específicos
+
+Estado: propuesta. Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico.
+
+## Qué hace y qué no hace
+
+| El plugin hace | El plugin no hace |
+|---|---|
+| Declarar perfiles (capa baja, codec, desviaciones, flujos) | Abrir puertos, sockets o archivos |
+| Traducir registros/segmentos del dialecto ↔ modelo canónico | Framing, checksum, timers del estándar |
+| Correlacionar consultas, órdenes y resultados del equipo | Mapear a catálogos del laboratorio (lo hace el runtime con `CodeMappingSet`) |
+| Interpretar estados/flags del fabricante | Validar clínicamente o publicar resultados |
+| Evaluar recuperación con evidencia | Acceder a la base del host |
+| Aportar corpus de conformidad | Mostrar UI |
+
+Comparado con el `IPlugin` de Glyms (strings, arrays posicionales por `ref`, caracteres de control y checksum dentro del plugin, `About()` con UI), todo lo de framing pasa al motor y la salida pasa a ser tipada.
+
+## Dos niveles
+
+1. **Declarativo (preferido):** perfil JSON + mapa de campos. Cubre la mayoría de equipos ASTM que siguen LIS02-A2 con pocas desviaciones.
+2. **Código:** una clase que implementa los puntos de extensión cuando el dialecto tiene lógica (componentes condicionales, registros M, correlación especial).
+
+```json
+{
+  "dialect": "sysmex.uwam",
+  "results": {
+    "specimenId": "O.3.3",
+    "test":       { "code": "R.3.5", "display": "R.3.5" },
+    "value":      "R.4", "unit": "R.5", "flags": "R.7", "status": "R.9",
+    "resultTime": "R.13", "operator": "R.11"
+  },
+  "status": { "F": "Final", "C": "Correction" },
+  "comparatorPrefix": true
+}
+```
+
+El ejemplo es ilustrativo: las posiciones reales de U-WAM salen de su manual y de las trazas. Las rutas usan la notación `Registro.campo.componente` 1-based de LIS02-A2 y se validan contra el corpus del plugin.
+
+## Contrato de código
+
+```csharp
+namespace Atsm.Plugins;
+
+public interface IInstrumentPlugin
+{
+    PluginDescriptor Describe();     // id, versión, versión mínima del motor, modelos/firmware, perfiles
+    IReadOnlyList<InstrumentProfile> Profiles { get; }
+
+    IDialect CreateDialect(InstrumentProfile profile, PluginContext context);
+}
+
+public interface IDialect
+{
+    // Entrada: mensaje ya decodificado por el codec del perfil.
+    DialectResult Interpret(ProtocolMessage message, DialectContext context);
+
+    // Salida: intención canónica → mensaje del dialecto.
+    ProtocolMessage BuildOrders(IReadOnlyList<WorkOrder> orders, DialectContext context);
+    ProtocolMessage BuildQueryAnswer(OrderQueryAnswer answer, DialectContext context);
+
+    RecoveryAssessment AssessRecovery(RecoveryEvidence evidence);
+}
+```
+
+- `DialectResult` contiene hechos canónicos (`InstrumentObservation`, `OrderQuery`, estado del equipo) **y observaciones del dialecto** (campos ignorados, valores fuera de patrón) que no impiden procesar.
+- Un plugin no lanza excepciones por datos del instrumento: devuelve problemas con código estable.
+- `PluginContext` sólo ofrece reloj, log estructurado y configuración del plugin.
+
+## Empaquetado y aislamiento
+
+- Paquete NuGet `Atsm.Plugin.<Fabricante>.<Familia>` con manifiesto `atsm-plugin.json` (id, versión SemVer, `engineApi` compatible, hash de perfiles, licencia).
+- El runtime carga cada plugin en su propio `AssemblyLoadContext` coleccionable; sólo comparte `Atsm.Abstractions`.
+- Firma: el host puede exigir Strong Name y/o Authenticode y una lista de editores admitidos.
+- Versionado: cambiar la interpretación de un campo incrementa la versión del plugin; la traza registra qué versión interpretó cada mensaje para reprocesar si hace falta.
+
+## Kit de conformidad
+
+Cada plugin incluye:
+
+```text
+conformance/
+  corpus/          trazas *.atsmtrace sintéticas o anonimizadas
+  expected/        salida canónica esperada (JSON) por traza
+  scenarios.json   casos E/P/R: host query, orden, repetición, corte a mitad de frame…
+  CONFORMANCE.md   declaración: qué perfiles, qué flujos, qué quedó sin probar
+```
+
+`dotnet test` ejecuta `Atsm.Testing.ConformanceRunner` sobre el corpus con el canal `Replay` y compara contra `expected/`. Un plugin no se publica sin pasar su kit.
+
+## Catálogo inicial propuesto
+
+Ordenado por evidencia disponible (manual + traza + plugin legacy):
+
+| Plugin | Equipos | Protocolo | Manual | Trazas | Legacy Glyms | Prioridad |
+|---|---|---|---|---|---|---|
+| `Abbott.Architect` | ARCHITECT i1000SR, c4000 | ASI: LIS1-A / LIS2-A2 (RS232) | 91407-108 | `I1000Interface.log`, `C4000Interface.log`, `Importar/*` | `Plugin_Architect` | **1** |
+| `Abbott.CellDynRuby` | CELL-DYN Ruby | LIS2-A | — (falta) | `Celldyn RUBYInterface.log` | `Plugin_Celldyn_Ruby` | 2 |
+| `Sysmex.Uwam` | UF-5000, UC-3500 vía U-WAM | E1381-02 / LIS2-A2 (TCP) | R315168 rev. 22, `SYSMEX RECORDS.xlsx` | `Sysmex/*` (con host query) | — | 3 |
+| `Abbott.Architect.Hl7` | ARCHITECT (interfaz HL7) | HL7 v2.5.1 LAW, MLLP | 206797-101 | — | — | 4 (camino moderno) |
+| `Sysmex.XnL` | XN-L | E1394-97 (TCP) | 1273-MKT rev. 3 | — | — | Pendiente de equipo |
+| `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | — | — | Pendiente de equipo |
+| `Sysmex.Suit` | Middleware SUIT | E1381/E1394-91 + extensiones | v8.0 | — | — | Pendiente de equipo |
+| `Diagast.Qwalys3` | QWALYS 3 | E1381-95 / E1394-95 | Connection Manual | — | — | Pendiente de equipo |
+| `File.DeltaLab` (a confirmar) | Intercambio de pedidos/resultados por archivo | Formato propio `H|…/P|A|T|…` | — | `glyms/Pedidos`, `glyms/Resultados` | GlymsInter | A confirmar si entra en ATSM |
+
+Architect primero: es el único con manual, trazas abundantes y plugin productivo. Ruby segundo: confirma que el motor generaliza (terminador vacío, comparadores, `FLAG`). U-WAM tercero: aporta TCP nativo y host query real.
+
+## Migración desde Glyms, por plugin
+
+1. Convertir las trazas del equipo al formato ATSM con el importador correspondiente.
+2. Ejecutar el plugin legacy (o leer su código decompilado) para obtener la salida de referencia por mensaje.
+3. Escribir el perfil/mapa; contrastar contra la referencia y documentar cada diferencia como **conservar / corregir / retirar** con su evidencia ([IMPLEMENTACION § Registro por regla](IMPLEMENTACION.md)).
+4. Anonimizar el corpus resultante y fijarlo como `expected/`.

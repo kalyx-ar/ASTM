@@ -30,3 +30,34 @@
 *.exe
 *.out
 *.app
+/Documentacion/manuales
+/Documentacion/trazas_externas
+
+# Material local: trazas reales con datos de pacientes y manuales con derechos de fabricantes.
+# Ver Documentacion/DATOS-DE-PRUEBA.md. Sólo se publica corpus anonimizado bajo conformance/.
+Documentacion/trazas_externas/
+Documentacion/manuales/
+*.atsmtrace.local
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+*.nupkg
+*.snupkg
+
+# C++ / CMake / ESP-IDF
+build/
+out/
+cmake-build-*/
+sdkconfig.old
+managed_components/
+
+# Claves y certificados
+*.snk
+*.pfx
+*.p12
+*.key
+*.pem

@@ -1,6 +1,6 @@
 {
   "fecha": "2026-10-24",
-  "raiz_glyms_original": "H:/Github/Glyms",
+  "raiz_glyms_original": "H:/Github/EDC/LIMS/LEGACY",
   "uso_productivo": "Informado por el usuario; no se ejecutaron los ensamblados para verificar cada camino.",
   "calidad": "Código legacy y de baja calidad: evidencia de comportamiento, no modelo de implementación nuevo.",
   "referencias": [
@@ -9,20 +9,20 @@
       "nombre": "RS232",
       "proposito": "Transporte serial reutilizable; referencia de parámetros, buffers, timeouts y Win32.",
       "original_relativo": "Original/GlymsInterfaces/RS232.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/RS232.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsInterfaces/RS232.dll.deploy",
       "sha256_original": "B335FDF5062886D36E1222A33FFCFD05D6E800B29CE994C4CE30C3BA17E1D7BE",
       "bytes": 28672,
       "ensamblados": [
         {
           "identidad": "RS232, Version=1.24.0.0, Culture=neutral, PublicKeyToken=515d87df384dcc81",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/RS232/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/RS232/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/RS232/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/RS232/GsmComm/RS232/Rs232.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/RS232/GsmComm/RS232/Rs232.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/RS232/GsmComm/RS232/Rs232.cs",
           "proposito": "Leer puerto, paridad, stop bits, buffers, eventos y llamadas nativas.",
           "simbolos": [
             {
@@ -45,20 +45,20 @@
       "nombre": "Contrato de plugins",
       "proposito": "Contrato de extensión del host legacy.",
       "original_relativo": "Original/GlymsInterfaces/Plugin.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/Plugin.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsInterfaces/Plugin.dll.deploy",
       "sha256_original": "9EE3218E502BAAFD6121EF5698AB795D04029B62C3E9976CE139AB9E92AA54F0",
       "bytes": 5120,
       "ensamblados": [
         {
           "identidad": "Plugin, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPlugin.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPlugin.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPlugin.cs",
           "proposito": "Contrato actual, parsing, upload y caracteres de control.",
           "simbolos": [
             {
@@ -80,7 +80,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPluginHost.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPluginHost.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin/PlugIn/IPluginHost.cs",
           "proposito": "Registro de plugins en el host.",
           "simbolos": [
             {
@@ -103,20 +103,20 @@
       "nombre": "Architect",
       "proposito": "Dialectos y particularidades de un instrumento en producción según el usuario.",
       "original_relativo": "Original/Plugins ATSM/Plugin_Architect.dll",
-      "original_absoluto": "H:/Github/Glyms/Original/Plugins ATSM/Plugin_Architect.dll",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/Plugins ATSM/Plugin_Architect.dll",
       "sha256_original": "7911195965FD2718F255039295C39760B349BE5F90B04D2E85807902BAA59572",
       "bytes": 22016,
       "ensamblados": [
         {
           "identidad": "Plugin_Architect, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin_Architect/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Architect/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin_Architect/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin_Architect/Plugin_Architect/PlugIn.cs",
           "proposito": "Parsing H/P/O/R/C/Q/L, muestra, variante de analito, órdenes salientes, framing y checksum.",
           "simbolos": [
             {
@@ -147,20 +147,20 @@
       "nombre": "CELL-DYN Ruby",
       "proposito": "Segundo dialecto para contrastar qué puede generalizarse en el motor.",
       "original_relativo": "Original/Plugins ATSM/Plugin_Celldyn_Ruby.dll",
-      "original_absoluto": "H:/Github/Glyms/Original/Plugins ATSM/Plugin_Celldyn_Ruby.dll",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/Plugins ATSM/Plugin_Celldyn_Ruby.dll",
       "sha256_original": "5E2C6A8AADA6393859F4462D9FF4E2E705C244DA760DFA22A6F8CD713F816179",
       "bytes": 16384,
       "ensamblados": [
         {
           "identidad": "Plugin_Celldyn_Ruby, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/Plugin_Celldyn_Ruby/PlugIn.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/Plugin_Celldyn_Ruby/PlugIn.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/Plugin_Celldyn_Ruby/Plugin_Celldyn_Ruby/PlugIn.cs",
           "proposito": "Estados F/W, comparadores, alarmas FLAG, tramas salientes y terminador.",
           "simbolos": [
             {
@@ -191,20 +191,20 @@
       "nombre": "Host de interfaces",
       "proposito": "Host legacy: coordinación serial/TCP, carga de plugins y relación con el LIMS.",
       "original_relativo": "Original/GlymsInterfaces/GlymsInter.exe.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsInterfaces/GlymsInter.exe.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsInterfaces/GlymsInter.exe.deploy",
       "sha256_original": "70D71CE6FF1BB1E3CC1899A3A326985EEFFD796F354F1169444EE632F1B92931",
       "bytes": 2760664,
       "ensamblados": [
         {
           "identidad": "GlymsInter, Version=3.1.3.1, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/GlymsInter/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/GlymsInter/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/GlymsInter/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Integraciones/GlymsInter/GlymsInter/FormInter.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/GlymsInter/GlymsInter/FormInter.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/GlymsInter/GlymsInter/FormInter.cs",
           "proposito": "Seguir coordinación del host; parte del código conserva ofuscación.",
           "simbolos": [
             {
@@ -223,20 +223,20 @@
       "nombre": "Reglas de negocio y equivalencias",
       "proposito": "Equivalencias, valores, rangos, flags y estados que se mezclan con integración.",
       "original_relativo": "Original/GlymsWin/GlymsBiz.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsBiz.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsBiz.dll.deploy",
       "sha256_original": "15DACAF4FE522692C5B37AB4F8C7CEEE2138E33B1787C30BAF12063ECDD061C1",
       "bytes": 648704,
       "ensamblados": [
         {
           "identidad": "GlymsBiz, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsBiz/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsBiz/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsBiz/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsBiz/GlymsBiz/_lims/Inter_Equival.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsBiz/GlymsBiz/_lims/Inter_Equival.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsBiz/GlymsBiz/_lims/Inter_Equival.cs",
           "proposito": "Separar normalización del mensaje de las políticas del LIMS.",
           "simbolos": [
             {
@@ -255,20 +255,20 @@
       "nombre": "Acceso a datos",
       "proposito": "Contratos PostgreSQL y persistencia; seguir también funciones y triggers.",
       "original_relativo": "Original/GlymsWin/GlymsDal.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsDal.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsDal.dll.deploy",
       "sha256_original": "64F252AB19ABC350E1CB899CF98D3785E91B9F4458D5BA285E677F78A12C01C2",
       "bytes": 1479168,
       "ensamblados": [
         {
           "identidad": "GlymsDal, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsDal/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsDal/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsDal/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsDal/GlymsDal/_lims/_Resultado.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsDal/GlymsDal/_lims/_Resultado.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsDal/GlymsDal/_lims/_Resultado.cs",
           "proposito": "Inserción y lectura de resultados; referencia para los adaptadores de Application.",
           "simbolos": [
             {
@@ -287,20 +287,20 @@
       "nombre": "Entidades y catálogos",
       "proposito": "Conceptos legacy de resultados y configuración de instrumentos.",
       "original_relativo": "Original/GlymsWin/GlymsEnt.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsEnt.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsEnt.dll.deploy",
       "sha256_original": "6405F122FB46E5F054759F70CD28DABBCBA1C87387A926AAF20AFC1360013155",
       "bytes": 397824,
       "ensamblados": [
         {
           "identidad": "GlymsEnt, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsEnt/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Resultado.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Resultado.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Resultado.cs",
           "proposito": "Campos y convenciones del resultado original.",
           "simbolos": [
             {
@@ -314,7 +314,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_analito.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_analito.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_analito.cs",
           "proposito": "Equivalencias de analitos del equipo.",
           "simbolos": [
             {
@@ -328,7 +328,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_regla.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_regla.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_regla.cs",
           "proposito": "Reglas asociadas a equivalencias.",
           "simbolos": [
             {
@@ -342,7 +342,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_robot.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_robot.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Interface_robot.cs",
           "proposito": "Configuración del instrumento/robot.",
           "simbolos": [
             {
@@ -356,7 +356,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Deter_numerico.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Deter_numerico.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsEnt/GlymsEnt/_lims/_Deter_numerico.cs",
           "proposito": "Rangos y fórmulas del LIMS.",
           "simbolos": [
             {
@@ -375,20 +375,20 @@
       "nombre": "Escritorio y operación",
       "proposito": "Validaciones y decisiones de operación presentes en formularios.",
       "original_relativo": "Original/GlymsWin/GlymsWin.exe.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsWin.exe.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsWin.exe.deploy",
       "sha256_original": "FEF6F2CDF93B1B8BF535DA544D3EF3F2002FE89D585EDFEE05DFEC3E02E196EB",
       "bytes": 12011992,
       "ensamblados": [
         {
           "identidad": "GlymsWin, Version=1.6.7.32, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsWin/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsWin/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsWin/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Desktop/GlymsWin/GlymsWin/_lims/Interface_Lista.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsWin/GlymsWin/_lims/Interface_Lista.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsWin/GlymsWin/_lims/Interface_Lista.cs",
           "proposito": "Punto de lectura de la gestión de interfaces del escritorio.",
           "simbolos": [
             {
@@ -407,30 +407,30 @@
       "nombre": "Web y módulos de aplicación",
       "proposito": "Bundle .NET Linux; contiene GlymsWeb, GlymsShared y GlymsShared2.",
       "original_relativo": "Original/GlymsWeb/GlymsWeb",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWeb/GlymsWeb",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWeb/GlymsWeb",
       "sha256_original": "22255CA6675FAB763DB48188657243A9F03EC9CB1AB000BC4F73E5486452EC36",
       "bytes": 56848310,
       "ensamblados": [
         {
           "identidad": "GlymsShared, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsShared/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Web/GlymsShared/_extraccion.json"
         },
         {
           "identidad": "GlymsShared2, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsShared2/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Web/GlymsShared2/_extraccion.json"
         },
         {
           "identidad": "GlymsWeb, Version=2.4.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Web/GlymsWeb/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsWeb/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Web/GlymsWeb/_extraccion.json"
         }
       ],
       "fuentes": [
         {
           "ruta_relativa": "Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/Modulos/ModuloIngresos.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/Modulos/ModuloIngresos.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/Modulos/ModuloIngresos.cs",
           "proposito": "Ingreso de órdenes y coordinación de reglas/persistencia de la web.",
           "simbolos": [
             {
@@ -444,7 +444,7 @@
         },
         {
           "ruta_relativa": "Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/GlymsContext.cs",
-          "ruta_absoluta": "H:/Github/Glyms/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/GlymsContext.cs",
+          "ruta_absoluta": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Web/GlymsShared2/GlymsShared2/GlymsContext.cs",
           "proposito": "Adaptación PostgreSQL y ejecución de consultas de los módulos.",
           "simbolos": [
             {
@@ -463,14 +463,14 @@
       "nombre": "Utilidades propias",
       "proposito": "Helpers propios y convenciones transversales; revisar consumidores antes de portar.",
       "original_relativo": "Original/GlymsWin/GlymsUtils.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsUtils.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsUtils.dll.deploy",
       "sha256_original": "C1D11134DF89E88AC3931230B607BEB667D95D3337684CFE589345F9C5B40F1C",
       "bytes": 270336,
       "ensamblados": [
         {
           "identidad": "GlymsUtils, Version=1.0.0.1, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsUtils/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsUtils/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsUtils/_extraccion.json"
         }
       ],
       "fuentes": []
@@ -480,14 +480,14 @@
       "nombre": "Servicios administrativos",
       "proposito": "Contexto de proveedores y circuitos empresariales fuera del transporte ASTM.",
       "original_relativo": "Original/GlymsWin/GlymsFact.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/GlymsFact.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/GlymsFact.dll.deploy",
       "sha256_original": "7B0C7E4ECC383A9C1159AAE20ED64F8586780254C6D2AA677ADD491D17FE057D",
       "bytes": 323584,
       "ensamblados": [
         {
           "identidad": "GlymsFact, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Desktop/GlymsFact/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Desktop/GlymsFact/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Desktop/GlymsFact/_extraccion.json"
         }
       ],
       "fuentes": []
@@ -497,14 +497,14 @@
       "nombre": "Utilidades QR",
       "proposito": "Contexto auxiliar de publicación/informes; no es parte del motor ASTM.",
       "original_relativo": "Original/GlymsWin/CryptoQrUtilities.dll.deploy",
-      "original_absoluto": "H:/Github/Glyms/Original/GlymsWin/CryptoQrUtilities.dll.deploy",
+      "original_absoluto": "H:/Github/EDC/LIMS/LEGACY/Original/GlymsWin/CryptoQrUtilities.dll.deploy",
       "sha256_original": "D61D558CFEC178D3B36E0FC8C5D23011962DD98DDF7D32112F310FCD689FA926",
       "bytes": 14336,
       "ensamblados": [
         {
           "identidad": "CryptoQrUtilities, Version=0.9.1.0, Culture=neutral, PublicKeyToken=null",
           "manifiesto_relativo": "Decompilado/Codigo/Integraciones/CryptoQrUtilities/_extraccion.json",
-          "manifiesto_absoluto": "H:/Github/Glyms/Decompilado/Codigo/Integraciones/CryptoQrUtilities/_extraccion.json"
+          "manifiesto_absoluto": "H:/Github/EDC/LIMS/LEGACY/Decompilado/Codigo/Integraciones/CryptoQrUtilities/_extraccion.json"
         }
       ],
       "fuentes": []

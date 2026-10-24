@@ -2,7 +2,7 @@
 
 Copiar el texto siguiente junto con el paquete documental y acceso al material de referencia necesario.
 
-> Implementar el módulo de integración de instrumentos bajo EDC/LIMS/ATSM, adaptando nombres a la solución real. Leer primero README, ARQUITECTURA, CONTRATOS, TRAZAS-Y-RECUPERACION, IMPLEMENTACION y REFERENCIAS-GLYMS de este paquete. Inspeccionar las instrucciones y las cuatro capas del repositorio EDC antes de modificarlo.
+> ATSM es un repositorio propio y neutral (agente, motor genérico, plugins); EDC lo consume como paquetes mediante un adaptador `ILabWorkflowHost` en `LIMS.Infrastructure.Atsm`, sin que Domain/Application vean tipos ATSM. Leer primero README, INTEGRACION-EDC, MODELO-CANONICO, INTERFAZ-COMUNICACION, MOTOR-GENERICO, PLUGINS, ARQUITECTURA, CONTRATOS, TRAZAS-Y-RECUPERACION, IMPLEMENTACION, DATOS-DE-PRUEBA y REFERENCIAS-GLYMS de este paquete. Inspeccionar las instrucciones y las cuatro capas del repositorio EDC antes de modificarlo; adoptar ATSM y sus paquetes requiere un Issue de decisión con aprobación de dependencias. Las trazas reales contienen datos de pacientes: usar sólo corpus anonimizado. El legado Glyms está en `EDC/LIMS/LEGACY`.
 >
 > La decisión acordada es agente C++ nativo para RS232–TCP, TLS configurable por endpoint y arbitraje exclusivo por instrumento. No hay UDP. Las plataformas objetivo incluyen XP/7/8/10/11, Linux, Raspberry y un primer perfil ESP32; requieren builds y comprobaciones por plataforma.
 >
