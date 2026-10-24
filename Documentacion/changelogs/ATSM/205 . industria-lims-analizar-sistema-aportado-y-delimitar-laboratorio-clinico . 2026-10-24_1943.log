@@ -1,0 +1,49 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (el repositorio modificado es kalyx-ar/ATSM).
+Alcance previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6390140976
+Autorización humana: GUI Windows; priorizar Bio-Rad CFX y otros modelos con evidencia, ampliar Sysmex y luego QWALYS, favoreciendo presencia argentina. Las trazas pertenecen a la aplicación; EDC conserva su decisión SQLCipher/UI.
+Commit de implementación: 616377d0e4292a933f9271a1cabca3d3099da059
+Mensaje: feat: diagnóstico Windows y perfiles CFX Sysmex y Qwalys (#205)
+Tipos: feat, test, build, docs. Sin push, PR ni release remoto.
+
+Entrega:
+- GUI WPF .NET 10 de mantenimiento independiente de EDC, con 11 perfiles integrados. Lee exportaciones, mensajes, bytes, logs Sysmex/Glyms y trazas ATSM; trama/mensaje/observación/hallazgo/evento y detalle.
+- Captura propia TCP cliente/servidor o SerialTunnel, TLS opcional sin degradación, PFX efímero. Captura sin respuestas predeterminada o simulación de host explícita, sin órdenes ni publicación en LIMS. No es observador de otra sesión; SerialTunnel toma control exclusivo.
+- Aplicación prepara journal protegido antes de conectar. DPAPI CurrentUser, registros cifrados autenticados y cadena por caso/secuencia/hash, flush durable antes de aceptar custodia. Recuperación de registros previos a corte final, incompletitud conservada al guardar, corrupción/reordenamiento rechazados. Límites 32 MiB/100.000 entradas; UI 2.000 filas/64 KiB de detalle.
+- Plugin Bio-Rad CFX: CSV de cuantificación Maestro (columnas/cultura configurables por API; GUI predeterminada en inglés) y RDML 1.0/1.1 XML/ZIP, referencias/exclusiones/sentinelas conservados. Sin .pcrd, control directo, cálculo de Cq ni positividad.
+- Sysmex XN-L y CS-2500: recepción ASTM según manuales locales. Componentes de muestra/prueba/dilución y estados crudos; R.9 XN-L no se confunde con validación clínica. No consultas/órdenes; aviso explícito si llegan consultas.
+- QWALYS 3: recepción ASTM ASCII, O.4/R.4.7/C.3, estado R/M y soporte R.5 preservados; sin consultas/órdenes ni interpretación clínica de grupos.
+- Catálogo de aplicación compartido con CLI, sin cargar DLL arbitrarias ni modificar confianza. IInstrumentContentPlugin recibe contenido puro: no añade gestión de archivos al motor.
+- Documentados presencia argentina (CFX Connect instalado en IMEX; XN-1000/XN-L ofrecidos por Müller), formatos y evidencia exacta. Presencia/oferta no acredita stock ni equivalencia/homologación de interfaces.
+- CFX exporta archivos; QWALYS puede usar append. EDC Scheduler/ETL debe custodiar originales, verificar cierre de escritura, identificar recepciones y mantener cursor/checkpoint; ordenar por creación no sustituye idempotencia. ATSM no añade filedrop ni spool de SerialTunnel.
+
+Rutas:
+- dotnet/plugins/Atsm.Plugin.{BioRad.Cfx,Sysmex.XnL,Sysmex.Cs2500,Diagast.Qwalys}.
+- dotnet/src/Atsm.Plugins/ContentPluginContracts.cs; dotnet/tools/Atsm.Diagnostics.{Core,Windows}; dotnet/tools/Atsm.Tools.Trace; dotnet/tests/Atsm.Tests/Diagnostics; dotnet/Atsm.slnx.
+- README.md; Documentacion/{DIAGNOSTICO-MANTENIMIENTO,DEPENDENCIAS,ESTADO,CONTINUACION,PLUGINS,README}.md.
+
+Dependencias oficiales:
+- Sin paquetes externos nuevos de terceros. WPF/ProtectedData del framework oficial Microsoft.WindowsDesktop.App 10.0.13 instalado con SDK 10.0.402; consumidores Windows solamente, motor/Core en net10.0.
+- Origen, términos binarios MICROSOFT .NET LIBRARY y MIT de las fuentes, consumidores, ausencia de transitivas NuGet nuevas, tokens/hashes y Authenticode Valid del runtime registrados en DEPENDENCIAS.md. Aprobación implícita de librería oficial dentro del alcance GUI Windows solicitado; complemento documental del registro previo.
+- No se alteraron GetKey/DeriveSessionKeyAsync, SNK, baselines ni listas de confianza EDC.
+
+Verificación:
+- dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true --verbosity quiet: 142 aprobadas, 0 omitidas, ~1 s de pruebas; incluye las 7 cruzadas contra el agente nativo, 5 TLS.
+- Repetición --no-build --no-restore: 142 aprobadas, 0 omitidas, ~1 s. No pasan por esperar un timeout.
+- ctest --test-dir native/build/win-x64 -C Release --verbose, dos veces: 542 checks, 0 failures, ~0,26 s. Agente nativo existente, sin cambios de fuente.
+- dotnet build dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true: 0 advertencias/errores. CLI plugins comprueba las nuevas entradas.
+- dotnet publish dotnet/tools/Atsm.Diagnostics.Windows/Atsm.Diagnostics.Windows.csproj -c Release --no-restore -p:AtsmRequireStrongName=true: correcto.
+- EXE publicado --smoke-test: salida 0, ida/vuelta DPAPI del usuario real y render sintético fuera de pantalla inspeccionado. No implica pruebas de interacción con hardware real.
+- 19 DLL de la carpeta publish con token Strong Name 066190a23251f202; apphost Authenticode NotSigned, pendiente del release (no es un ensamblado administrado).
+- git diff --cached --check sin errores. Sin corpus real, manuales, claves ni binarios en el commit. Eliminados sólo extractos temporales locales propios de manuales; originales conservados.
+
+Entrega local:
+- dotnet/tools/Atsm.Diagnostics.Windows/bin/Release/net10.0-windows/publish/atsm-diagnostics.exe, con toda la carpeta y README.txt. Framework-dependent: requiere Windows Desktop Runtime .NET 10.
+- dotnet/tools/Atsm.Diagnostics.Windows/bin/Release/net10.0-windows/ATSM-Diagnostics-Windows.zip
+- SHA-256 ZIP: 6e7a93ca5e324139822e8c0eae30223f4e7c2752023917bfe2eee175f50fbff4
+- Build/ZIP locales ignorados por Git; no se publicó release ni se aplicó Authenticode.
+
+Estado final y límites:
+- Herramienta de mantenimiento y primer repertorio ampliado entregados, sin homologación de los nuevos perfiles en hardware; falta corpus real anonimizado/revisado por modelo/firmware (P-03).
+- Prioridad siguiente: validar CFX/XN-L, completar extensiones demostradas, ampliar XN-1000/XN/SUIT con su evidencia y luego QWALYS. No declarar soporte de toda una marca por compartir protocolo.
+- Pendientes principales: actor LAW completo P-02, outbox P-04, admisión dinámica P-05, observadores/captura protegida del agente P-09, LocalSerial P-10, integración EDC/SQLCipher/UI P-13 y empaquetado/CI/AuthentiCode P-14.
+- EDC#205 sigue abierto por el alcance mayor de LIMS; Project propietario #12 en curso. Checkout externo EDC conserva su situación inicial (LIMS/ sin seguimiento); sólo se commitea en ATSM.
