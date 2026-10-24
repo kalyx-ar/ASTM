@@ -2,6 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/Atsm.Abstractions/Atsm.Abstractions.csproj" />
     <Project Path="src/Atsm.Protocol.Lis01/Atsm.Protocol.Lis01.csproj" />
+    <Project Path="src/Atsm.Protocol.Lis02/Atsm.Protocol.Lis02.csproj" />
+    <Project Path="src/Atsm.Protocol.Mllp/Atsm.Protocol.Mllp.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Atsm.Tests/Atsm.Tests.csproj" />

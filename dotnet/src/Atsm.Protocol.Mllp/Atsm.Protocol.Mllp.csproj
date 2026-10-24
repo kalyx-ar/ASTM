@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>HL7 Minimal Lower Layer Protocol (MLLP) framing.</Description>
+  </PropertyGroup>
+</Project>

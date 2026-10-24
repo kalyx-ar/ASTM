@@ -13,5 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Atsm.Protocol.Lis01\Atsm.Protocol.Lis01.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Protocol.Lis02\Atsm.Protocol.Lis02.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Protocol.Mllp\Atsm.Protocol.Mllp.csproj" />
   </ItemGroup>
 </Project>
