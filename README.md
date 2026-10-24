@@ -2,7 +2,7 @@
 
 Neutral integration of clinical laboratory instruments: a native serial ↔ TCP agent, a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
 
-Documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
+Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](Documentacion/CONTINUACION.md) · documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
 
 ## Layout
 

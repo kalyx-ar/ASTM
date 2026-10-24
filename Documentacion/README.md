@@ -39,6 +39,7 @@ flowchart LR
 | [TRAZAS-Y-RECUPERACION](TRAZAS-Y-RECUPERACION.md) | Niveles de traza, checkpoints, herramientas y recuperación por operación |
 | [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
 | [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
+| [CONTINUACION](CONTINUACION.md) | Pendientes con alcance y criterios de aceptación, para retomar el trabajo |
 | [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |

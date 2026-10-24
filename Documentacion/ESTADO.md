@@ -49,6 +49,8 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 
 ## Pendiente
 
+Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CONTINUACION.md).
+
 | Tema | Bloqueo |
 |---|---|
 | Build Windows XP | Toolset `v141_xp` y prueba en XP real; el código ya prevé la entropía propia (`-DATSM_WINDOWS_XP=ON`) |

@@ -1,0 +1,182 @@
+# Continuación del trabajo
+
+Guía para retomar ATSM desde otra sesión o agente. Estado al 24 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
+
+## Cómo retomar
+
+```bash
+dotnet test dotnet/Atsm.slnx
+```
+
+```bash
+cmake -S native -B native/build/win-x64 -G "Visual Studio 18 2026" -A x64
+```
+
+```bash
+cmake --build native/build/win-x64 --config Release
+```
+
+```bash
+ctest --test-dir native/build/win-x64 -C Release
+```
+
+Al cerrar: 77 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+
+Verificación local con trazas reales (no se publican; imprimir sólo agregados):
+
+```bash
+dotnet run --project dotnet/tools/Atsm.Tools.Trace -- plugins
+```
+
+```bash
+dotnet run --project dotnet/tools/Atsm.Tools.Trace -- extract sysmex.port-monitor "Documentacion/trazas_externas/Sysmex/20251105_AMS .txt" ams.atsmtrace --recorded-by instrument
+```
+
+```bash
+dotnet run --project dotnet/tools/Atsm.Tools.Trace -- metrics ams.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry
+```
+
+Los mismos pasos sirven con `glyms.interface-log` (logs `Documentacion/trazas_externas/glyms/Logs/*.log`) y los perfiles `abbott.architect.asi-rs232` o `abbott.celldyn-ruby.lis2a`. `theoretical` y `compare` construyen la traza teórica y la comparan con la real. Las cifras de referencia están en ESTADO § Verificación.
+
+## Mapa rápido
+
+| Pieza | Dónde |
+|---|---|
+| Contratos neutrales | `dotnet/src/Atsm.Abstractions` |
+| LIS01-A2 (enlace activo y observador pasivo) | `dotnet/src/Atsm.Protocol.Lis01` |
+| LIS02-A2 / MLLP | `dotnet/src/Atsm.Protocol.Lis02`, `Atsm.Protocol.Mllp` |
+| SDK de plugins, dialecto estándar, adaptador regex de logs | `dotnet/src/Atsm.Plugins` |
+| Sesión ASTM | `dotnet/src/Atsm.Runtime/Sessions/AstmInstrumentSession.cs` |
+| Canales (Stream, TCP, Replay, SerialTunnel) | `dotnet/src/Atsm.Channels` |
+| Trazas real/teórica, pila, métricas, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `dotnet/tools/Atsm.Tools.Trace` |
+| Plugins | `dotnet/plugins/*` (Architect, CELL-DYN Ruby, U-WAM, Glyms de pruebas) |
+| Agente nativo | `native/core`, `native/platform`, `native/tls`, `native/app` |
+| Protocolo agente ↔ host | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` |
+| Legado Glyms (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md)) |
+
+## Pendientes
+
+Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas, `ESTADO.md` actualizado y esta tabla corregida.
+
+| ID | Tema | Bloqueo |
+|---|---|---|
+| P-01 | Canal FileDrop | Ninguno |
+| P-02 | HL7 v2.5.1 / IHE LAW y plugin ARCHITECT HL7 | Ninguno (manual disponible) |
+| P-03 | Kits de conformidad por plugin y corpus anonimizado | Revisión humana del corpus antes de publicarlo |
+| P-04 | Outbox durable del runtime | Ninguno |
+| P-05 | Carga dinámica de plugins | Ninguno |
+| P-06 | Build Windows XP | Instalar toolset `v141_xp`; equipo o VM XP |
+| P-07 | Build Linux / Raspberry Pi | Distro WSL o equipo Linux/ARM |
+| P-08 | Firmware ESP32 | ESP-IDF y hardware con interfaz RS232 |
+| P-09 | Agente: rol cliente TLS, captura y lectura de traza, observadores | Ninguno |
+| P-10 | Canal LocalSerial .NET | Aprobación del paquete oficial `System.IO.Ports` |
+| P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
+| P-12 | Robustez del agente | Ninguno |
+| P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
+| P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
+
+### P-01 Canal FileDrop
+
+**Qué es.** Algunos equipos y sistemas intermedios no hablan por puerto ni por socket: escriben un archivo por mensaje en una carpeta, y leen de otra carpeta las órdenes que les deja el LIS. Las exportaciones del ARCHITECT (`trazas_externas/glyms/Logs/Importar/`, archivos LIS02 completos) y el intercambio de pedidos y resultados por archivo (`glyms/Pedidos`, `glyms/Resultados`) son ese caso. FileDrop presenta esa carpeta al motor como un `IInstrumentChannel` más: cada archivo es un mensaje completo, sin capa LIS01, y queda en la traza igual que el tráfico de un puerto.
+
+**Alcance.**
+- `dotnet/src/Atsm.Channels/FileDrop/`: vigilar una carpeta de entrada (`FileSystemWatcher` más barrido periódico, porque el watcher pierde eventos) y leer sólo archivos estables (tamaño sin cambios, o renombrado atómico por convención del perfil). Después de interpretarlo, mover cada archivo a `processed/` o `rejected/` con su hash.
+- Escritura de órdenes: archivo temporal en la carpeta de salida y renombrado atómico.
+- Para la sesión: `ReadOutcome.IsMessageBoundary = true`. Agregar `WholeMessage` como capa baja alternativa (MOTOR-GENERICO § Capa baja); hoy la sesión asume LIS01.
+- Trazas: registrar cada archivo como contenido de mensaje (`TraceReconstruction.MessageCode`) con nombre y hash en el detalle.
+- Perfil: patrón de nombres, codificación, separador de registros y política de archivos rechazados, todo en el plugin.
+
+**Aceptación.** Un archivo de exportación ARCHITECT sintético produce las mismas observaciones que el mismo contenido recibido por LIS01. Un archivo a medio escribir no se procesa. Un archivo inválido va a `rejected/` con diagnóstico. No hay pérdida ni duplicación al reiniciar a mitad del procesamiento (marcador por hash).
+
+**Decisión abierta.** Si el intercambio por archivo con el laboratorio de derivación (`H|DeltaLab…`) entra en ATSM como plugin propio o queda en EDC. Su formato no es LIS02-A2 estándar.
+
+### P-02 HL7 v2.5.1 / IHE LAW
+
+- Codec HL7 v2 en `dotnet/src/Atsm.Protocol.Hl7v2`: MSH con caracteres de codificación, segmentos, campos, componentes y subcomponentes, escapes, ACK original y mejorado. Existe el framing MLLP (`Atsm.Protocol.Mllp`).
+- Sesión HL7 sobre MLLP (análoga a `AstmInstrumentSession`) y flujos LAW: OUL^R22 (resultados), QBP^Q11/RSP^K11 (consulta), OML^O33 (órdenes), ACK. Hacen falta contratos de dialecto HL7 en el SDK (`IHl7Dialect`).
+- Plugin `abbott.architect.hl7` con el manual `Documentacion/manuales/ASTM Alinity 206797-101.pdf`, que es el *ARCHITECT System HL7 Interface Manual* (el nombre del archivo no corresponde al contenido).
+- **Aceptación:** el mismo resultado llega igual al modelo canónico por ASTM y por HL7 (MODELO-CANONICO § Equivalencia con LAW).
+
+### P-03 Kits de conformidad por plugin
+
+- PLUGINS § Kit de conformidad está propuesto pero no implementado: `conformance/<plugin>/corpus/*.atsmtrace` anonimizado, `expected/*.json` con la salida canónica, `scenarios.json` y `CONFORMANCE.md`.
+- `Atsm.Testing.ConformanceRunner`: reproduce cada traza con el plugin y compara contra `expected/`.
+- **Orden:** Architect, U-WAM, CELL-DYN Ruby. Los corpus salen de las trazas locales mediante `atsm-trace anonymize`. **No publicar sin revisión humana**, aunque el informe sea limpio.
+
+### P-04 Outbox durable del runtime
+
+Si `ILabWorkflowHost.IngestAsync` falla, hoy el lote sólo queda como diagnóstico. Hace falta un buzón local durable (orden e identidad por `ObservationId`), reenvío con espera, y un lugar en la traza para lo que se reenvió. Ver MODELO-CANONICO § Puertos.
+
+### P-05 Carga dinámica de plugins
+
+- Manifiesto `atsm-plugin.json` (id, versión, `engineApi`, hash de perfiles) y un `AssemblyLoadContext` coleccionable por plugin que comparta sólo `Atsm.Abstractions`/`Atsm.Plugins`.
+- Verificación de firma (Strong Name y, si corresponde, Authenticode) y lista de editores admitidos.
+- `atsm-trace` debe usar este catálogo en lugar del estático (`Catalog` en `Program.cs`).
+
+### P-06 Build Windows XP
+
+- Instalar el componente "C++ Windows XP Support for VS 2017 (v141) tools" y configurar con `-T v141_xp -A Win32 -DATSM_WINDOWS_XP=ON`.
+- Verificar que compilen Mbed TLS 4.1.1 y el agente. Riesgos: APIs posteriores a XP dentro de Mbed TLS más allá de la entropía, `std::filesystem` en el STL de v141, `getaddrinfo` y `select`.
+- Probar en XP real: puerto serial, TLS 1.2/1.3 contra el host .NET y entropía (`entropy_win32_xp.c`). Documentar exactamente qué se probó.
+
+### P-07 Build Linux / Raspberry Pi
+
+`native/platform/posix/serial_posix.cpp` está escrito pero nunca se compiló. Compilar con GCC/Clang (`-Werror`), correr `ctest`, probar con un adaptador USB-serial real y generar el binario ARM (Raspberry). En POSIX, `threading_alt.cpp` funciona igual; no hace falta `MBEDTLS_THREADING_PTHREAD`.
+
+### P-08 Firmware ESP32
+
+Crear `native/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae su propia versión de Mbed TLS: verificar compatibilidad con la API 4.x usada en `native/tls` o adaptar, y registrar la versión en DEPENDENCIAS. Hay que dimensionar la memoria (buffers, sesiones TLS simultáneas) y anunciar `traceCapture = 0` o RAM.
+
+### P-09 Agente: lo reservado en Link v1
+
+- **Rol cliente TLS:** el agente conecta hacia el host, para sitios sin puertos entrantes. La configuración y la autorización se mantienen iguales.
+- **Traza en el agente:** captura RAM/disco por puerto, `TraceRead`/`TraceChunk` (0x30/0x31) y `traceCapture` real en `Capabilities`.
+- **Observadores:** copias de diagnóstico para candidatos en espera, sin capacidad de escribir.
+- Actualizar `spec/link-v1.md`, los vectores y ambas implementaciones.
+
+### P-10 Canal LocalSerial .NET
+
+Requiere `System.IO.Ports` (paquete oficial de Microsoft que no estaba en la caché). Implementar sobre `StreamInstrumentChannel` con la configuración serial del perfil y registrar la dependencia.
+
+### P-11 Confirmación del CELL-DYN Ruby
+
+Sin manual, el plugin se apoya en trazas. Quedan por confirmar:
+- **Encuadre del host:** si el equipo acepta el mensaje completo en un frame. Es la hipótesis actual, porque los 1.316 mensajes enviados un registro por frame fueron rechazados con `Parsing Error^RecordID`.
+- **Respuesta negativa:** el formato que espera el equipo.
+- **Valores:** timers, página de códigos, semántica de `W` en R.9 y forma de pedir órdenes (código de panel o de parámetro).
+
+Con el manual o un equipo de prueba, actualizar el perfil y quitar las marcas de hipótesis.
+
+### P-12 Robustez del agente
+
+- `dispatch()` envía con `mutex_` tomado: un controlador que no lee puede frenar la arbitración. Conviene pasar los envíos a una cola por conexión.
+- Falta un límite de conexiones simultáneas y de handshakes TLS en curso (un hilo por conexión).
+- `pendingTxBytes` en `Granted` siempre es 0; `uncertainTx` sólo detecta escrituras en curso.
+- Faltan pruebas de estrés: muchos controladores, desconexiones durante escrituras y reinicio del agente con controladores conectados (T05–T09 de IMPLEMENTACION).
+
+### P-13 Integración con EDC
+
+Seguir [INTEGRACION-EDC](INTEGRACION-EDC.md) y las reglas del repositorio EDC (`Documentacion/agente.md` de EDC: Issue antes de editar, changelog y aprobación de dependencias):
+1. Issue de decisión en EDC para adoptar ATSM como paquetes.
+2. Especificación mínima del módulo LIMS.
+3. `LIMS.Infrastructure.Atsm` implementando `ILabWorkflowHost`.
+4. Prueba punta a punta con `Replay` y el corpus de P-03.
+
+El módulo LIMS de EDC todavía no existe.
+
+### P-14 Empaquetado, API pública y CI
+
+Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.Shipped.txt`), build de release con `AtsmRequireStrongName=true` y firma Authenticode. CI cuando se decida dónde corre: el agente necesita MSVC y, más adelante, GCC y ESP-IDF.
+
+## Hipótesis y decisiones abiertas
+
+- **CELL-DYN Ruby:** encuadre del host y respuesta negativa (P-11).
+- **DeltaLab** por archivo: ATSM o EDC (P-01).
+- **ARCHITECT:** 309 exportaciones de control llegan sin registro P y generan `ATSM-L02-UNEXPECTED-RECORD-ORDER`. Decidir si el perfil lo admite como variante documentada o si sigue como aviso.
+- **U-WAM:** el modo E1381-95 (sin timeouts según R315168 5.2.5) no tiene perfil propio.
+
+## Deuda conocida
+
+- El commit `a932694` no compila solo (la solución ya referenciaba el plugin, que llegó en el commit siguiente). No afecta a `main`.
+- Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado; el consumible es `agente-tls.json`.
+- `atsm-trace` registra los plugins de forma estática (P-05).
