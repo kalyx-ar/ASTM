@@ -44,6 +44,7 @@ public sealed class QualityPresentationTests
         var second = first.Replace("208.60^208.6^UNASSIGNED^OTHER^META", "210.00^210.0^UNASSIGNED^OTHER^META", StringComparison.Ordinal);
         var records = Read(first + second); var observation = records[0];
         Assert.Equal("CONTROL-SYN", observation.Specimen.SpecimenId); Assert.Equal("CONTROL-SYN", observation.Quality!.Material!.Identifier);
+        Assert.Null(observation.Quality.Method); Assert.Equal("", observation.VendorIdentity["analysis.method"]);
         Assert.Null(observation.ResultKind); Assert.Equal("Numérico", ProtocolExplainer.ResultKind(observation, Profile));
         Assert.Equal("/uL", ProtocolExplainer.Unit(observation, Profile)); Assert.Equal("/uL^/uL", observation.Value.RawUnit);
         Assert.Equal("208.60^208.6^UNASSIGNED^OTHER^META", observation.VendorIdentity["result.value.raw"]);

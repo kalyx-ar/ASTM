@@ -163,7 +163,7 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
         // R315168 pp.39-40: identifier combines lot/level/method and qualitative output can omit level.
         // Keep it whole until external lot metadata supplied by the host resolves the components.
         return order.Role != SpecimenRole.Control ? observation : observation with { Quality = new(
-            new(QualityMaterialKind.Control, order.SpecimenId), ModuleId: NullIfEmpty(result.Text(14)), Method: NullIfEmpty(result.Text(3, 5)))
+            new(QualityMaterialKind.Control, order.SpecimenId), ModuleId: NullIfEmpty(result.Text(14)), Method: AnalysisMethod(result))
         { SourceFields = new Dictionary<string, string> { ["O.12"] = "Q", ["O.3"] = order.SpecimenId, ["R.3"] = result.Field(3), ["R.4"] = result.Field(4), ["R.14"] = result.Field(14) } } };
     }
 
@@ -184,7 +184,7 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
     protected override Dictionary<string, string> Identity(Lis02Record result, OrderContext order)
     {
         var identity = base.Identity(result, order);
-        identity["analysis.method"] = result.Text(3, 5);
+        identity["analysis.method"] = AnalysisMethod(result) ?? "";
         identity["result.identifier.raw"] = result.Field(3);
         identity["result.value.raw"] = result.Field(4);
         identity["result.unit.raw"] = result.Field(5);
@@ -193,6 +193,7 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
             identity["ud10.cell"] = result.Field(9);
         return identity;
     }
+    private static string? AnalysisMethod(Lis02Record result) => result.Text(3, 5) is "A" or "M" ? result.Text(3, 5) : null;
 
     protected override OrderQuery? ReadQuery(InstrumentRef instrument, Lis02Record record, TraceRef trace)
     {
