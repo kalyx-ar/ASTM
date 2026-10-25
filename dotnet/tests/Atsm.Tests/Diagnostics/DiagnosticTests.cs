@@ -266,7 +266,7 @@ public class DiagnosticTests
         while (offset < bytes.Length) { var size = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(offset)); blocks.Add(bytes.AsSpan(offset, size + 4).ToArray()); offset += size + 4; }
         return blocks;
     }
-    private sealed class TestProtection : IDiagnosticCaseProtection
+    internal sealed class TestProtection : IDiagnosticCaseProtection
     {
         private readonly byte[] _key = RandomNumberGenerator.GetBytes(32);
         public byte[] Protect(byte[] plain)

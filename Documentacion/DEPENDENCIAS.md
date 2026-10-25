@@ -26,7 +26,7 @@ ESP32: ESP-IDF trae su propia versión de Mbed TLS. El firmware del agente usar�
 
 Las bibliotecas de ejecución .NET usan sólo la BCL de .NET 10: `System.Net.Security` (TLS del host), `System.Text.Json`, `System.Threading.Channels` y `System.Text.Encoding.CodePages`.
 
-### Herramienta gráfica Windows (2026-10-24, EDC#205)
+### Antecedente WPF retirado (2026-10-24; sustituido por MAUI el 2026-10-25)
 
 La GUI solicitada incorpora WPF y `System.Security.Cryptography.ProtectedData` desde **Microsoft.WindowsDesktop.App 10.0.13**, instalado con el SDK oficial 10.0.402 en `C:\Program Files\dotnet`. Es una referencia de framework (`UseWPF`), no un paquete NuGet adicional ni una DLL tomada de terceros. Consumidor: `Atsm.Diagnostics.Windows`; `Atsm.Diagnostics.Core` y el motor siguen en `net10.0` sin dependencia de Windows. Las referencias entre proyectos son internas a ATSM.
 
@@ -48,3 +48,11 @@ No se añade editor/hash a listas de confianza EDC. Los ensamblados propios se v
 | Microsoft.NET.Test.Sdk | 18.11.0 | MIT | Oficial de Microsoft |
 | xunit | 2.9.3 | Apache-2.0 | Misma versión que usa EDC; no se distribuye |
 | xunit.runner.visualstudio | 4.0.1 | Apache-2.0 | Misma versión que usa EDC; no se distribuye |
+
+## Diagnostics MAUI y NativeAOT (2026-10-25, EDC#205)
+
+Presentación oficial Microsoft.Maui.Controls 10.0.110, SDK MAUI instalado por Visual Studio, mismo que EDC; licencia MIT. Windows App SDK 1.8.260529003 y transitivas oficiales según el grafo resuelto; System.Security.Cryptography.ProtectedData 10.0.13 preserva DPAPI anterior. Runtime .NET incluido 10.0.13; compilador NativeAOT Microsoft.DotNet.ILCompiler/runtime.win-x64.Microsoft.DotNet.ILCompiler 10.0.13 del SDK oficial (herramienta de compilación, no dependencia distribuida). Licencias de Windows App SDK/SDK nativo y .NET conservadas por la distribución.
+
+Inventario exacto de las 37 dependencias NuGet de MAUI con versión, autor, licencia, repositorio, SHA-256 y SHA-512: [diagnostics-maui-dependencies.json](diagnostics-maui-dependencies.json). Todas verificaron `dotnet nuget verify --all`, salida 0. Origen/nuspec/repositorio oficial y firmas se comprobaron antes de la distribución. Aprobación: solicitud humana expresa de MAUI y aprobación implícita de bibliotecas oficiales dentro de ese alcance; registro previo [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395906842). Sin nuevos paquetes de terceros, Syncfusion o toolkits; consumidores MAUI separados del motor neutral.
+
+**Alerta:** Microsoft.Maui.Controls, Microsoft.Maui, Microsoft.Maui.Graphics y Microsoft.Maui.Controls.Xaml tienen PublicKeyToken nulo. Firma NuGet verificada no equivale a Strong Name de DLL o Authenticode. CS8002 sigue visible exclusivamente como advertencia del EXE MAUI, con alcance registrado [antes del ajuste](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395998752). Ensamblados propios firmados con token de distribución; ejecutables NativeAOT nativos sin Strong Name CLR. Authenticode propio pendiente del release. No se re-firman bibliotecas oficiales ni se alteran baselines, listas de confianza o derivaciones EDC. Ver [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md).

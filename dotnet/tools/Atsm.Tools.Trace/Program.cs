@@ -1,3 +1,4 @@
+using Atsm.Tools.Trace;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -13,6 +14,8 @@ using Atsm.Tracing;
 
 const string Usage = """
     atsm-trace plugins
+    atsm-trace self-test
+    atsm-trace verify-publication <directory>
     atsm-trace extract <adapter> <log> <out.atsmtrace> [--recorded-by host|instrument] [--filter <text>] [--utc-offset <+hh:mm>]
     atsm-trace from-text <lis02.txt> <out.atsmtrace> [--direction received|transmitted]
     atsm-trace from-binary <capture.bin> <out.atsmtrace> [--direction received|transmitted]
@@ -42,6 +45,8 @@ try
     return args[0] switch
     {
         "plugins" => ListPlugins(),
+        "self-test" => NativeSelfTest.Run(),
+        "verify-publication" when args.Length == 2 => VerifyPublication(args[1]),
         "extract" when args.Length >= 4 => Extract(args[1], args[2], args[3]),
         "from-text" when args.Length >= 3 => FromText(args[1], args[2]),
         "from-binary" when args.Length >= 3 => FromBinary(args[1], args[2]),
@@ -59,6 +64,14 @@ catch (Exception exception) when (exception is IOException or InvalidDataExcepti
 {
     Console.Error.WriteLine(exception.Message);
     return 1;
+}
+
+int VerifyPublication(string directory)
+{
+    var issues = Atsm.Diagnostics.PublicationAudit.MissingOwnReferences(directory);
+    foreach (var issue in issues) Console.Error.WriteLine(issue);
+    if (issues.Count > 0) return 1;
+    Console.WriteLine("ATSM_PUBLICATION_DEPENDENCIES_OK"); return 0;
 }
 
 int ListPlugins()
@@ -144,14 +157,14 @@ int Stack(string input)
     var path = Option("--out");
     using var writer = path is null ? Console.Out : new StreamWriter(path);
     foreach (var stackEvent in stack.Events.Where(e => e.Level != StackLevel.Technical || e.Direction == TraceDirection.Event))
-        writer.WriteLine(JsonSerializer.Serialize(stackEvent, TraceJson.Options));
+        writer.WriteLine(JsonSerializer.Serialize(stackEvent, TraceToolJsonContext.Default.StackEvent));
     return 0;
 }
 
 int Metrics(string input)
 {
     var (_, entries) = Read(input);
-    Console.WriteLine(JsonSerializer.Serialize(TraceMetrics.Of(Builder().Build(entries)), new JsonSerializerOptions(TraceJson.Options) { WriteIndented = true }));
+    Console.WriteLine(JsonSerializer.Serialize(TraceMetrics.Of(Builder().Build(entries)), TraceToolJsonContext.Default.TraceMetrics));
     return 0;
 }
 
@@ -179,7 +192,7 @@ int Anonymize(string input, string output)
     var (anonymized, report) = new TraceAnonymizer(options).Anonymize(entries);
     var limitations = (header.Limitations ?? []).Append($"Anonymized: personal fields pseudonymized, dates shifted by a constant, checksums recalculated{(keepComments ? ", comments kept" : ", comments replaced")}.").ToList();
     Write(output, header with { TraceId = Guid.CreateVersion7(), Limitations = limitations, Properties = new Dictionary<string, string> { ["anonymized"] = "true" } }, anonymized);
-    Console.WriteLine(JsonSerializer.Serialize(report with { Residual = report.Residual.Take(20).ToList() }, new JsonSerializerOptions { WriteIndented = true }));
+    Console.WriteLine(JsonSerializer.Serialize(report with { Residual = report.Residual.Take(20).ToList() }, AnonymizationJsonContext.Default.AnonymizationReport));
     if (report.IsClean)
         return 0;
     Console.Error.WriteLine("Anonymization is not clean: review the residual findings before sharing.");

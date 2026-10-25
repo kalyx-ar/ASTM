@@ -1,0 +1,20 @@
+ATSM Diagnóstico · MAUI · Windows x64
+
+Ejecutar atsm-diagnostics.exe conservando toda esta carpeta.
+Incluye .NET 10 y Windows App SDK; no requiere instalarlos por separado.
+Publicación self-contained/ReadyToRun, no NativeAOT de MAUI Windows .NET 10.
+
+Fuente / conexión muestra los ajustes en ventanas pequeñas. Ejemplo CFX carga
+datos sintéticos. Las vistas conservan trama, mensajes, observaciones, hallazgos,
+calidad, eventos y catálogo. Seleccionar una fila muestra el detalle.
+
+Los casos .atsmcase mantienen DPAPI CurrentUser y compatibilidad con los casos
+Windows anteriores. No son portables entre usuarios por copiar la carpeta.
+Antes de conectar se prepara el caso protegido. SerialTunnel toma control
+exclusivo; no es un observador de otra sesión. Sin órdenes ni publicación LIMS.
+Los originales no se modifican ni se generan trazas sensibles en texto plano.
+
+MAUI es la presentación vigente. WPF está retirado. Núcleo/plugins neutrales
+reutilizables por EDC y catálogo estático de mantenimiento. Otras plataformas
+requieren su anfitrión y adaptador de archivos/custodia; no están verificadas.
+Authenticode e instalador corresponden al release.

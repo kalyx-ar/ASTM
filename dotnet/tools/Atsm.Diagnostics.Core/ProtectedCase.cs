@@ -41,7 +41,8 @@ public sealed class ProtectedCaseJournal : IDisposable
         lock (_gate)
         {
             EnsureReady();
-            var plain = JsonSerializer.SerializeToUtf8Bytes(new Envelope(_caseId, _recordSequence, _previousHash, kind, JsonSerializer.SerializeToElement(value, TraceJson.Options)), TraceJson.Options);
+            var plain = JsonSerializer.SerializeToUtf8Bytes(new Envelope(_caseId, _recordSequence, _previousHash, kind,
+                JsonSerializer.SerializeToElement(value, DiagnosticCaseJson.TypeInfo<T>())), DiagnosticCaseJson.TypeInfo<Envelope>());
             byte[] encrypted;
             try { encrypted = _protection.Protect(plain); }
             catch { _failed = true; throw; }
@@ -87,27 +88,27 @@ public sealed class ProtectedCaseJournal : IDisposable
             var plain = protection.Unprotect(ciphertext);
             try
             {
-                var record = JsonSerializer.Deserialize<Envelope>(plain, TraceJson.Options) ?? throw new InvalidDataException("ATSM-CASE-INVALID-RECORD");
+                var record = JsonSerializer.Deserialize(plain, DiagnosticCaseJson.TypeInfo<Envelope>()) ?? throw new InvalidDataException("ATSM-CASE-INVALID-RECORD");
                 if (record.RecordSequence != expectedRecord || record.PreviousHash != previousHash) throw new InvalidDataException("ATSM-CASE-BROKEN-CHAIN");
                 if (record.Kind == "header" && header is null && expectedRecord == 0)
                 {
-                    header = record.Value.Deserialize<TraceHeader>(TraceJson.Options) ?? throw new InvalidDataException("ATSM-CASE-INVALID-HEADER");
+                    header = record.Value.Deserialize(TraceJson.TypeInfo<TraceHeader>()) ?? throw new InvalidDataException("ATSM-CASE-INVALID-HEADER");
                     if (record.CaseId != header.TraceId) throw new InvalidDataException("ATSM-CASE-HEADER-MISMATCH");
                 }
                 else if (header is null) throw new InvalidDataException("ATSM-CASE-MISSING-HEADER");
                 else if (record.CaseId != header.TraceId) throw new InvalidDataException("ATSM-CASE-IDENTITY-MISMATCH");
                 else if (record.Kind == "entry")
                 {
-                    var entry = (record.Value.Deserialize<TraceLine>(TraceJson.Options) ?? throw new InvalidDataException("ATSM-CASE-INVALID-ENTRY")).ToEntry();
+                    var entry = (record.Value.Deserialize(TraceJson.TypeInfo<TraceLine>()) ?? throw new InvalidDataException("ATSM-CASE-INVALID-ENTRY")).ToEntry();
                     if (entry.Sequence <= previous) throw new InvalidDataException("ATSM-CASE-INVALID-SEQUENCE");
                     totalBytes += entry.Data.Length;
                     if (entries.Count >= 100000 || totalBytes > DiagnosticReader.MaxInputBytes) throw new InvalidDataException("ATSM-CASE-CAPTURE-LIMIT");
                     previous = entry.Sequence; entries.Add(entry);
                 }
-                else if (record.Kind == "batch") batches.Add(record.Value.Deserialize<InstrumentObservationBatch>(TraceJson.Options) ?? throw new InvalidDataException("ATSM-CASE-INVALID-BATCH"));
+                else if (record.Kind == "batch") batches.Add(record.Value.Deserialize(TraceJson.TypeInfo<InstrumentObservationBatch>()) ?? throw new InvalidDataException("ATSM-CASE-INVALID-BATCH"));
                 else if (record.Kind == "end")
                 {
-                    var closure = record.Value.Deserialize<Closure>(TraceJson.Options) ?? throw new InvalidDataException("ATSM-CASE-INVALID-END");
+                    var closure = record.Value.Deserialize(DiagnosticCaseJson.TypeInfo<Closure>()) ?? throw new InvalidDataException("ATSM-CASE-INVALID-END");
                     if (closure.RecordCount != expectedRecord) throw new InvalidDataException("ATSM-CASE-INVALID-END");
                     complete = closure.CaptureComplete;
                     // A sealed incomplete case still forbids records after its footer.
@@ -121,8 +122,8 @@ public sealed class ProtectedCaseJournal : IDisposable
         }
         return new(header ?? throw new InvalidDataException("ATSM-CASE-MISSING-HEADER"), entries, batches, complete);
     }
-    private sealed record Envelope(Guid CaseId, long RecordSequence, string PreviousHash, string Kind, JsonElement Value);
-    private sealed record Closure(long RecordCount, bool CaptureComplete);
+    internal sealed record Envelope(Guid CaseId, long RecordSequence, string PreviousHash, string Kind, JsonElement Value);
+    internal sealed record Closure(long RecordCount, bool CaptureComplete);
 }
 
 public sealed class DiagnosticTraceSink(TraceHeader header, ProtectedCaseJournal? journal = null) : TraceSinkBase(header.TraceId, null)

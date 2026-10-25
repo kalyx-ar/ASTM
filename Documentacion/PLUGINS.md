@@ -1,6 +1,6 @@
 # Plugins específicos
 
-Estado: contratos de motor implementados; manifiestos/carga dinámica y kits formales de conformidad pendientes. Los ejemplos declarativos siguientes siguen siendo propuesta (contratos reales en `dotnet/src/Atsm.Plugins`). Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico. Repertorio vigente y aplicación Windows: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
+Estado: contratos de motor implementados; kits formales de conformidad pendientes; catálogo compilado por decisión humana del 2026-10-25. Los ejemplos declarativos siguientes siguen siendo propuesta (contratos reales en `dotnet/src/Atsm.Plugins`). Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico. Repertorio vigente y aplicación Windows: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 ## Qué hace y qué no hace
 
@@ -69,7 +69,7 @@ public interface IDialect
 ## Empaquetado y aislamiento
 
 - Paquete NuGet `Atsm.Plugin.<Fabricante>.<Familia>` con manifiesto `atsm-plugin.json` (id, versión SemVer, `engineApi` compatible, hash de perfiles, licencia).
-- El runtime carga cada plugin en su propio `AssemblyLoadContext` coleccionable; sólo comparte `Atsm.Abstractions`.
+- Decisión humana 2026-10-25: ATSM/Diagnostics componen los plugins en compilación y no usan AssemblyLoadContext. La carga/admisión en caliente corresponde al anfitrión EDC; la propuesta previa de loader propio queda retirada.
 - Firma: el host puede exigir Strong Name y/o Authenticode y una lista de editores admitidos.
 - Versionado: cambiar la interpretación de un campo incrementa la versión del plugin; la traza registra qué versión interpretó cada mensaje para reprocesar si hace falta.
 

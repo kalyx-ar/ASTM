@@ -25,13 +25,13 @@ Instantánea del 24 de octubre de 2026. Describe lo que existe y lo que se compr
 | Bio-Rad CFX Maestro, CSV/RDML 1.0/1.1 | `dotnet/plugins/Atsm.Plugin.BioRad.Cfx` | Exportaciones sintéticas; referencias/exclusiones/Cq original, sin control directo ni homologación de modelos |
 | Sysmex XN-L y CS-2500 | `dotnet/plugins/Atsm.Plugin.Sysmex.XnL`, `Atsm.Plugin.Sysmex.Cs2500` | Perfiles de recepción según manual; componentes de prueba/muestra y estados crudos; consultas/órdenes sin implementar |
 | DIAGAST QWALYS 3 | `dotnet/plugins/Atsm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |
-| Diagnóstico Windows WPF independiente | `dotnet/tools/Atsm.Diagnostics.Windows`, `Atsm.Diagnostics.Core` | 12 perfiles integrados, logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; render sintético inspeccionado |
+| Diagnóstico MAUI Windows independiente | `dotnet/tools/Atsm.Diagnostics.Maui`, `Atsm.Diagnostics.Core` | 12 perfiles integrados, logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; ventana/handler, runtime privado y DPAPI comprobados por self-test |
 | Agente nativo C++17 con TLS (Mbed TLS 4.1.1) | `native/` | 542 verificaciones nativas (CBOR, Link v1, árbitro, configuración, TLS sin archivos válidos, sesión completa por TCP); pruebas cruzadas mTLS desde .NET |
 | Especificación ATSM Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
 | Datos QC/calibración y consulta | `AnalyticalQualityContext`, `IQualityDataSource`, `ObservationQualityDataSource`, `IQualityResourceContent` | Lote/material/módulo, INV/ZCL, estadísticas/curva CSV CFX y referencias S.7 U-WAM con custodia del lote completo. Sin reglas QC, descarga de archivos ni informe R24. Ver [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md) |
 | Firma Strong Name con la SNK de la distribución | `dotnet/Directory.Build.targets` | Mismo token que EDC (`066190a23251f202`); la clave no está en el repositorio |
 
-Pruebas de esta entrega: `dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true` → 159 correctas, 0 omitidas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Ambas repetidas sin intermitencias. GUI: publicación Release sin advertencias, DPAPI de usuario Windows y render fuera de pantalla (`--smoke-test`), sin homologación de hardware. Repertorio, fuentes argentinas, uso y límites: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
+Pruebas de esta entrega: `dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true` → 162 correctas, 0 omitidas (incluye 7 contra el `atsm-agent.exe` compilado, 5 de ellas por TLS con certificados de prueba); `ctest` → 542 verificaciones, 0 fallos. Dos corridas finales completas correctas; una corrida previa mostró un fallo TLS intermitente, no reproducido al aislarla ni en las dos corridas finales (ver changelog). GUI: publicación MAUI autónoma y prueba de ventana/handler/runtime privado/DPAPI (`--self-test`); cuatro advertencias CS8002 de MAUI oficiales sin Strong Name conservadas visibles, sin homologación de hardware. Repertorio, fuentes argentinas, uso y límites: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 ## Verificación con datos reales (sólo local)
 
@@ -54,7 +54,7 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 - El agente v1 no implementa `TraceRead`, observadores ni rol de conexión invertido; anuncia `traceCapture = 0`.
 - Los bytes recibidos sin dueño se cuentan y se informan en `Granted`; no se entregan.
 - TLS del agente con Mbed TLS 4.1.1: servidor TLS 1.2/1.3 con certificado de cliente obligatorio por defecto. El rol de cliente TLS del agente (conexión saliente) no está implementado.
-- Catálogo integrado compartido por `atsm-trace` y la GUI; la carga/admisión de DLL desde una carpeta queda pendiente. CFX se analiza desde GUI/API, no con los comandos ASTM de la CLI.
+- Catálogo integrado compartido por `atsm-trace` y la GUI; la carga/admisión de DLL en caliente corresponde sólo a EDC (decisión 2026-10-25). CFX se analiza desde GUI/API, no con los comandos ASTM de la CLI.
 
 ## Pendiente
 
@@ -69,7 +69,7 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 | HL7 / LAW restante | Actor AWOS/LAB-28/LAB-29 y conformidad; R24/estado/inventario del fabricante, traza/anonimización HL7; ver P-02 |
 | Manual del CELL-DYN Ruby | El plugin se apoya en trazas; confirmar timers, encuadre del host y respuesta negativa |
 | Outbox durable del runtime | Sin implementar |
-| Carga dinámica de plugins | Catálogo estático por ahora |
+| Carga dinámica ATSM | Retirada 2026-10-25: sólo EDC carga en caliente; catálogo compilado en ATSM/Diagnostics |
 
 ## Decisiones registradas
 
@@ -85,3 +85,7 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 ## Ampliación humana del 2026-10-24
 
 P-01 y la independencia de LIS01 se entregan mediante mensajes completos. Las trazas pertenecen a la aplicación orquestante; para EDC, Application debe hospedar SQLCipher estándar antes de conectar y la futura UI ofrecerá diagnóstico autorizado, sin fallback plano de datos sensibles. No se implementó esa UI/almacén EDC en la biblioteca neutral. No se agrega spool de disco a SerialTunnel; la captura remota requiere diseño específico. Fuentes, autorización, casos y límites: [MENSAJES-TRAZAS-HL7](MENSAJES-TRAZAS-HL7.md).
+
+## Corrección de GUI y distribución del 2026-10-25
+
+MAUI reemplaza WPF por pedido humano. La publicación anterior fallaba por una referencia faltante al plugin previo al renombrado legacy, con .NET instalado. Ahora se publica en directorio limpio y se valida dependencia/arranque antes de promoverlo. `atsm-trace` se compiló y ejecutó con NativeAOT; la GUI MAUI Windows .NET 10 usa self-contained/ReadyToRun. Alcance, advertencias y límites en [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md).

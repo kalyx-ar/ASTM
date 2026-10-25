@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Atsm.Abstractions.Tracing;
 
 namespace Atsm.Runtime.Tracing;
@@ -74,7 +75,7 @@ public sealed class JsonLinesTraceWriter : TraceSinkBase, IDisposable
         : base(header.TraceId, clock)
     {
         _writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
-        _writer.WriteLine(JsonSerializer.Serialize(header with { Format = Format }, TraceJson.Options));
+        _writer.WriteLine(JsonSerializer.Serialize(header with { Format = Format }, TraceJson.TypeInfo<TraceHeader>()));
     }
 
     public override void EnsureReady()
@@ -87,7 +88,7 @@ public sealed class JsonLinesTraceWriter : TraceSinkBase, IDisposable
     public void Dispose() { _disposed = true; _writer.Dispose(); }
 
     protected override void Append(TraceEntry entry) =>
-        _writer.WriteLine(JsonSerializer.Serialize(TraceLine.From(entry), TraceJson.Options));
+        _writer.WriteLine(JsonSerializer.Serialize(TraceLine.From(entry), TraceJson.TypeInfo<TraceLine>()));
 }
 
 public sealed record TraceHeader(
@@ -128,7 +129,9 @@ public static class TraceJson
     public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        TypeInfoResolver = AtsmJsonContext.Default,
     };
+    public static JsonTypeInfo<T> TypeInfo<T>() => (JsonTypeInfo<T>)Options.GetTypeInfo(typeof(T));
 }
 
 public static class TraceFile
@@ -136,7 +139,7 @@ public static class TraceFile
     public static (TraceHeader Header, List<TraceEntry> Entries) Read(TextReader reader)
     {
         var first = reader.ReadLine() ?? throw new InvalidDataException("Empty trace.");
-        var header = JsonSerializer.Deserialize<TraceHeader>(first, TraceJson.Options)
+        var header = JsonSerializer.Deserialize(first, TraceJson.TypeInfo<TraceHeader>())
             ?? throw new InvalidDataException("Invalid trace header.");
         if (header.Format != JsonLinesTraceWriter.Format)
             throw new InvalidDataException($"Unsupported trace format '{header.Format}'.");
@@ -145,7 +148,7 @@ public static class TraceFile
         {
             if (line.Length == 0)
                 continue;
-            var parsed = JsonSerializer.Deserialize<TraceLine>(line, TraceJson.Options)
+            var parsed = JsonSerializer.Deserialize(line, TraceJson.TypeInfo<TraceLine>())
                 ?? throw new InvalidDataException($"Invalid trace line {entries.Count + 2}.");
             entries.Add(parsed.ToEntry());
         }
@@ -154,11 +157,11 @@ public static class TraceFile
 
     public static void Write(TextWriter writer, TraceHeader header, IEnumerable<TraceEntry> entries)
     {
-        writer.Write(JsonSerializer.Serialize(header with { Format = JsonLinesTraceWriter.Format }, TraceJson.Options));
+        writer.Write(JsonSerializer.Serialize(header with { Format = JsonLinesTraceWriter.Format }, TraceJson.TypeInfo<TraceHeader>()));
         writer.Write('\n');
         foreach (var entry in entries)
         {
-            writer.Write(JsonSerializer.Serialize(TraceLine.From(entry), TraceJson.Options));
+            writer.Write(JsonSerializer.Serialize(TraceLine.From(entry), TraceJson.TypeInfo<TraceLine>()));
             writer.Write('\n');
         }
     }
