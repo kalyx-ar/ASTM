@@ -33,6 +33,10 @@ public static partial class DiagnosticInputDetector
         {
             if (matchingLogs.Length > 1) return new(formats);
             var extraction = matchingLogs[0].Extract(bytes, new(RecordedBy.Host));
+            var traceProfiles = catalog.Profiles.Where(p => p.TracePlugin?.Recognizes(extraction.Segments) == true).ToArray();
+            if (traceProfiles.Length == 1)
+                return new(formats, traceProfiles[0].Id, traceProfiles[0].TracePlugin!.InferRecorder(extraction.Segments));
+            if (traceProfiles.Length > 1) throw new InvalidDataException("ATSM-DIAG-AMBIGUOUS-INPUT");
             var hl7 = HasHl7Header(extraction.Segments);
             var compatible = HasAstmHeader(extraction.Segments) || hl7 || selected.IsHl7;
             var controlOnly = extraction.Segments.Where(s => s.Direction != TraceDirection.Event).All(s => s.Data.Span.IndexOfAnyExcept((byte)4, (byte)5, (byte)6) < 0 || s.Data.Span.SequenceEqual(new byte[] { 21 }));
@@ -67,6 +71,9 @@ public static partial class DiagnosticInputDetector
             return new([DiagnosticInputFormat.AstmMessage], selected.AstmProfile is not null ? selected.Id : StandardAstmPlugin.ProfileId);
         if (bytes.Contains((byte)2) && IsAstmHeader(text))
             return new([DiagnosticInputFormat.WireBytes], selected.AstmProfile is not null ? selected.Id : StandardAstmPlugin.ProfileId);
+        var wire = new TraceSegment(null, TraceDirection.Received, SegmentContent.Wire, bytes);
+        var protocols = catalog.Profiles.Where(p => p.TracePlugin?.Recognizes([wire]) == true).ToArray();
+        if (protocols.Length == 1) return new([DiagnosticInputFormat.WireBytes], protocols[0].Id);
         return new(formats);
     }
 

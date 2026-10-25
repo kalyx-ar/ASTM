@@ -120,7 +120,7 @@ public sealed class DiagnosticUsabilityTests
     public void Uwam_is_one_instrument_with_two_query_deadlines_in_the_same_plugin()
     {
         var catalog = new DiagnosticCatalog(); var uwam = Assert.Single(catalog.Instruments, i => i.Id == UwamPlugin.PluginId);
-        Assert.Equal(8, catalog.Instruments.Count); Assert.Equal(2, uwam.Profiles.Count);
+        Assert.Equal(9, catalog.Instruments.Count); Assert.Equal(2, uwam.Profiles.Count);
         Assert.Same(uwam.Profiles[0].AstmPlugin, uwam.Profiles[1].AstmPlugin);
         Assert.Equal(new[] { 6d, 15d }, uwam.Profiles.Select(p => p.AstmProfile!.QueryAnswerBudget.TotalSeconds));
         Assert.Equal(uwam.Profiles[0].AstmProfile!.Link, uwam.Profiles[1].AstmProfile!.Link);

@@ -23,6 +23,11 @@ public static class ProtocolExplainer
         .Where(r => r.Meaning is not null).Select(r => r.Code + ": " + r.Meaning!.Evidence).Distinct(StringComparer.Ordinal));
     public static string MessageKind(DecodedMessage message, DiagnosticProfile profile)
     {
+        if (profile.TracePlugin is { } plugin)
+        {
+            var code = message.Type.StartsWith("ER", StringComparison.Ordinal) ? "ER" : message.Type;
+            return plugin.DiagnosticVocabulary.TryGetValue("kind." + code, out var kind) ? DiagnosticText.Plugin(plugin, kind) : DiagnosticText.Format("Unknown.Command", message.Type);
+        }
         if (profile.ContentPlugin is not null) return DiagnosticText.Text("Message.Export");
         if (message.Type.Contains("incompleto", StringComparison.Ordinal)) return DiagnosticText.Text("Message.Incomplete");
         if (profile.IsHl7)
@@ -38,6 +43,7 @@ public static class ProtocolExplainer
     }
     public static string MessageContent(DecodedMessage message, DiagnosticProfile profile, IReadOnlyList<InstrumentObservation> observations)
     {
+        if (message.Explanation is { } explanation && profile.TracePlugin is { } plugin) return DiagnosticText.Explanation(plugin, explanation);
         var results = observations.Where(o => o.Trace.LastSequence == message.Sequence).ToArray();
         if (results.Length > 0) return string.Join(" · ", results.Select(o => DiagnosticText.Format("Message.Result", o.Specimen.SpecimenId,
             o.Test.Vendor.Display ?? o.Test.Vendor.Code, o.Value.RawText, o.Value.RawUnit ?? "")));
@@ -63,6 +69,7 @@ public static class ProtocolExplainer
     {
         var raw = observation.ResultKind ?? "";
         if (raw.Length == 0) return "";
+        if (profile.TracePlugin is { } trace && trace.DiagnosticVocabulary.TryGetValue("resultKind." + raw, out var traceKind)) return DiagnosticText.Plugin(trace, traceKind);
         if ((profile.AstmPlugin as IInstrumentDiagnosticVocabulary)?.DiagnosticVocabulary is { } vocabulary)
         {
             if (vocabulary.TryGetValue("resultKind." + raw, out var kind)) return DiagnosticText.Plugin(profile.AstmPlugin!, kind);

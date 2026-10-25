@@ -4,7 +4,7 @@ Entrega del 2026-10-24, trazada en [kalyx-ar/EDC#205](https://github.com/kalyx-a
 
 ## Aplicación Windows
 
-`dotnet/tools/Atsm.Diagnostics.Maui` es la presentación MAUI vigente desde el 2026-10-25, alineada con EDC; WPF está retirado. Núcleo/catálogo en `Atsm.Diagnostics.Core`, sin dependencia de EDC. Doce perfiles compilados, sin carga en caliente.
+`dotnet/tools/Atsm.Diagnostics.Maui` es la presentación MAUI vigente desde el 2026-10-25, alineada con EDC; WPF está retirado. Núcleo/catálogo en `Atsm.Diagnostics.Core`, sin dependencia de EDC. Trece perfiles compilados, sin carga en caliente.
 
 Compilar con dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true. Ejecutable: dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe. Conservar sus dependencias de la misma carpeta; incluye .NET y Windows App SDK. No se generan ZIP ni se usa un publicador PowerShell. MAUI Windows .NET 10 es self-contained/ReadyToRun; NativeAOT corresponde a la CLI.
 
@@ -69,4 +69,7 @@ Validación de esta entrega: suite .NET con casos CSV/RDML, posiciones/estados d
 
 ## Mejoras de uso del 2026-10-25
 
-La lista contiene 8 equipos/familias, con 12 perfiles técnicos en el selector de configuración. Interpretación y grupos activados por defecto; original disponible en detalle y modo técnico. Detección automática por contenido, lado del registrador configurable, columnas automáticas a ventana/contenido con arrastre opcional, controles contrastados y publicación con idiomas limitados. Seeds español neutral y Lang opcional por anfitrión. Uso, diferencia de U-WAM con/sin química y límites de enlaces internos en [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md).
+La lista contiene 9 equipos/familias, con 13 perfiles técnicos en el selector de configuración. Interpretación y grupos activados por defecto; original disponible en detalle y modo técnico. Detección automática por contenido, lado del registrador configurable, columnas automáticas a ventana/contenido con arrastre opcional, controles contrastados y publicación con idiomas limitados. Seeds español neutral y Lang opcional por anfitrión. Uso, diferencia de U-WAM con/sin química y límites de enlaces internos en [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md).
+
+
+UC-3500 directo: intérprete serial propio y captura sin respuestas; simulación activa deshabilitada para ese perfil. No confundirlo con U-WAM ASTM. Las etiquetas y celdas MAUI permiten seleccionar/copiar texto. Véanse códigos ER, resultados y límites en [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).

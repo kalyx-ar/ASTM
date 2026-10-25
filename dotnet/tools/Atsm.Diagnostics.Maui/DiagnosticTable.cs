@@ -26,6 +26,7 @@ internal sealed class DiagnosticTable : ContentView
         if (_state is null || Width <= 0 || _list.Handler?.PlatformView is null || _surface.Width < Width - 1)
             throw new InvalidOperationException("ATSM-TABLE-NOT-REALIZED");
         if (_surface.X > 1) throw new InvalidOperationException("ATSM-TABLE-NOT-LEFT-ALIGNED");
+        foreach (var row in _surface.Children.OfType<TableRow>()) row.VerifySelectableText();
     }
 
     public DiagnosticTable(IDiagnosticPlatformServices platform)
@@ -139,6 +140,11 @@ internal sealed class DiagnosticTable : ContentView
             state.Register(this);
         }
         public void ApplyWidths(double[] widths) { for (var i = 0; i < widths.Length; i++) ColumnDefinitions[i + 1].Width = new(widths[i]); }
+        public void VerifySelectableText()
+        {
+            if (_labels.Any(label => label.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.TextBlock { IsTextSelectionEnabled: true }))
+                throw new InvalidOperationException("ATSM-TABLE-TEXT-NOT-SELECTABLE");
+        }
         protected override void OnBindingContextChanged()
         {
             base.OnBindingContextChanged(); if (BindingContext is not VisibleRow row) return;

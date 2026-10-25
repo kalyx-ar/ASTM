@@ -92,3 +92,8 @@ Para un servicio estadístico del anfitrión hacen falta series homogéneas por 
 En EDC corresponde implementar los puertos en Application/Infrastructure sobre SQLCipher, transacción del lote completo, autorización UI y exposición deliberada a ETL/DataSets/API según alcance. Un contrato CLR no crea automáticamente una API remota, herramienta IA ni sincronización. No se crea un módulo EDC nuevo, ni se alteran Identidades, derivación, firma o baselines de confianza. No hay dependencias nuevas.
 
 Validación: casos sintéticos de CFX/roles/estadísticas, mapeos QC por fabricante, INV/ZCL por orden, referencias U-WAM sin observaciones e identidad al reintentar, serialización, filtros y cancelación del lector; build y regresión .NET/nativa repetidos, DPAPI/arranque MAUI (WPF retirado el 2026-10-25). Conteos/commits en ESTADO y changelog. Sin equipo físico, históricos completos ni corpus real QC validado.
+
+
+## UC-3500 directo (2026-10-25)
+
+El nuevo intérprete pasivo conserva las representaciones cualitativa/concentración y reflectancias R%(1)/R%(2), estados, flags, tira utilizada y serie/número de análisis. Serie C identifica control; no se inventan lote, nivel, vencimiento, unidades de concentración ni medias/DE/CV. La reflectancia conserva unidad %, tipo de representación y valor crudo. Quality.SourceFields mantiene el contexto; el anfitrión puede consultar las observaciones custodiadas mediante el puerto de calidad existente. Códigos ER y errores de resultado se diagnostican por separado; no son una aceptación QC ni validación clínica. Evidencia, encuadre y limitaciones: [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).

@@ -118,7 +118,7 @@ public sealed class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=12, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=9, profiles=13, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
             });
         }
@@ -142,6 +142,7 @@ public sealed class MainPage : ContentPage
     {
         if (!_ready || _selecting || _profiles.SelectedIndex < 0 || _configurations.SelectedIndex < 0) return;
         _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect;
+        _mode.IsEnabled = Profile.CanSimulateHost; if (!Profile.CanSimulateHost) _mode.SelectedIndex = 0;
         _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
         if (_case is not null && !IsCapturing) Analyze();
     }
@@ -152,6 +153,7 @@ public sealed class MainPage : ContentPage
         _configurations.Items.Clear(); foreach (var profile in model.Profiles) _configurations.Items.Add(profile.Configuration);
         _configurations.SelectedIndex = model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
         _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
+        _mode.IsEnabled = Profile.CanSimulateHost; if (!Profile.CanSimulateHost) _mode.SelectedIndex = 0;
     }
     private RecordedBy? Recorder => _recorder.SelectedIndex switch { 1 => RecordedBy.Host, 2 => RecordedBy.Instrument, _ => null };
     private TimeSpan LogOffset()
@@ -324,14 +326,21 @@ public sealed class MainPage : ContentPage
         string[] headers; IEnumerable<DiagnosticRow> rows;
         string D(string raw) => interpreted ? DiagnosticText.Direction(raw) : raw;
         string Detail(string meaning, string raw) => meaning + "\n\n" + DiagnosticText.Text("Original") + "\n" + raw;
-        var unsupported = _case?.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true";
+        var unsupported = Profile.TracePlugin is null && _case?.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true";
         switch (_tab)
         {
             case 0:
                 headers = [T("Column.Sequence"), T("Column.Milliseconds"), T("Column.Direction"), T("Column.Bytes"), T("Column.Command")];
+                var protocolMessages = (_analysis?.Messages ?? []).Where(m => m.Explanation is not null).ToLookup(m => m.FirstSequence);
+                var protocolEvents = (_analysis?.Events ?? []).Where(e => e.Explanation is not null && e.Level == Atsm.Tracing.StackLevel.Link).ToLookup(e => e.Sequence);
                 rows = (_case?.Entries ?? []).Select(entry =>
                 {
                     var meaning = unsupported ? DiagnosticText.Format("Message.Wire", entry.Data.Length) : ProtocolExplainer.Entry(entry, Profile);
+                    if (Profile.TracePlugin is { } plugin)
+                    {
+                        var explanations = protocolMessages[entry.Sequence].Select(m => m.Explanation!).Concat(protocolEvents[entry.Sequence].Select(e => e.Explanation!)).ToArray();
+                        if (explanations.Length > 0) meaning = string.Join(" · ", explanations.Select(e => DiagnosticText.Explanation(plugin, e)));
+                    }
                     var raw = DiagnosticReader.DescribeBytes(entry.Data, _hex.IsChecked);
                     return Row([entry.Sequence.ToString(), entry.Elapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture), D(entry.Direction.ToString()), entry.Data.Length.ToString(), interpreted ? meaning : entry.Code ?? raw],
                         Detail(meaning, "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), meaning);
@@ -344,7 +353,8 @@ public sealed class MainPage : ContentPage
                     var kind = ProtocolExplainer.MessageKind(message, Profile);
                     var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
                     return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
-                        Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + ProtocolExplainer.RecordEvidence(message.Text, Profile), message.Text), message.Direction, kind);
+                        Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + (message.Explanation?.Text.Evidence ?? ProtocolExplainer.RecordEvidence(message.Text, Profile))
+                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, kind);
                 }); break;
             case 2:
                 headers = [T("Column.Specimen"), T("Column.Position"), T("Column.Test"), T("Column.Type"), T("Column.Value"), T("Column.Unit"), T("Column.Status")];
@@ -356,7 +366,7 @@ public sealed class MainPage : ContentPage
                 headers = interpreted ? [T("Column.Severity"), T("Column.Finding"), T("Column.Sequence")] : [T("Column.Severity"), T("Column.Code"), T("Column.Finding"), T("Column.Sequence")];
                 rows = (_analysis?.Diagnostics ?? []).Select(finding =>
                 {
-                    var meaning = DiagnosticText.Finding(finding);
+                    var meaning = DiagnosticText.Finding(finding, Profile);
                     return Row(interpreted ? [DiagnosticText.Text("Severity." + finding.Severity), meaning, finding.Location ?? ""] : [DiagnosticText.Text("Severity." + finding.Severity), finding.Code, finding.Message, finding.Location ?? ""],
                         Detail(meaning, finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
                 }); break;
@@ -368,7 +378,8 @@ public sealed class MainPage : ContentPage
                 headers = interpreted ? [T("Column.Layer"), T("Column.Sequence"), T("Column.Detail")] : [T("Column.Layer"), T("Column.Sequence"), T("Column.Code"), T("Column.Detail")];
                 rows = (_analysis?.Events ?? []).Select(item =>
                 {
-                    var meaning = item.Code == "lis02.message" && item.Detail is { } records
+                    var meaning = item.Explanation is { } explanation && Profile.TracePlugin is { } tracePlugin ? DiagnosticText.Explanation(tracePlugin, explanation)
+                        : item.Code == "lis02.message" && item.Detail is { } records
                         ? ProtocolExplainer.RecordNames(string.Join("\r", records.Select(code => code + "|")), Profile)
                         : DiagnosticText.Event(item.Code, item.Detail);
                     return Row(interpreted ? [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), meaning] : [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), item.Code, item.Detail ?? ""],
@@ -377,7 +388,7 @@ public sealed class MainPage : ContentPage
             default:
                 headers = [T("Column.Profile"), T("Column.Configuration"), T("Column.Evidence")];
                 rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration)), string.Join(" · ", instrument.Profiles.Select(p => p.Evidence).Distinct(StringComparer.Ordinal))],
-                    string.Join("\n\n", instrument.Profiles.Select(p => p.Id + "\n" + p.DisplayName + "\n" + p.Evidence + "\n" + string.Join("\n", p.AstmProfile?.Evidence ?? p.ContentProfile?.Evidence ?? []))), instrument.Id)); break;
+                    string.Join("\n\n", instrument.Profiles.Select(p => p.Id + "\n" + p.DisplayName + "\n" + p.Evidence + "\n" + string.Join("\n", p.AstmProfile?.Evidence ?? p.ContentProfile?.Evidence ?? p.TraceProfile?.Evidence ?? []))), instrument.Id)); break;
         }
         var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 2 };
         _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible);
@@ -386,7 +397,7 @@ public sealed class MainPage : ContentPage
     {
         var context = observation.Quality; var material = context?.Material;
         var label = (material?.Identifier ?? observation.Specimen.SpecimenId) + (material?.Lot is { } lot ? " / " + lot : ""); var detail = Json(observation);
-        if (observation.Value.RawText.Length > 0) yield return Row([label, observation.Test.Vendor.Code, F("Quality.Measurement", observation.ResultKind), observation.Value.RawText, T("Quality.Individual"), T("Quality.Observation")], detail, label, observation.Test.Vendor.Code, "measurement");
+        if (observation.Value.RawText.Length > 0) yield return Row([label, observation.Test.Vendor.Code, F("Quality.Measurement", ProtocolExplainer.ResultKind(observation, Profile)), observation.Value.RawText, T("Quality.Individual"), T("Quality.Observation")], detail, label, observation.Test.Vendor.Code, observation.ResultKind);
         foreach (var statistic in context?.Statistics ?? []) yield return Row([label, observation.Test.Vendor.Code, T("Statistic." + statistic.Kind), statistic.Value.RawText,
             T("Scope." + statistic.Scope), statistic.SourceField], detail, label, observation.Test.Vendor.Code, statistic.Kind.ToString(), statistic.Scope.ToString());
     }
@@ -406,7 +417,7 @@ public sealed class MainPage : ContentPage
         {
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
-            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == "sysmex.uwam") != 1 || _catalog.Profiles.Count != 12 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
+            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 9 || _catalog.Instruments.Count(i => i.Id == "sysmex.uwam") != 1 || _catalog.Profiles.Count != 13 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
             if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("ATSM-UNPROTECTED-CASE");
         }
         finally { File.Delete(path); }
@@ -415,6 +426,8 @@ public sealed class MainPage : ContentPage
             _interpret.IsChecked = interpreted;
             for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
         }
+        if (_title.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.TextBlock { IsTextSelectionEnabled: true })
+            throw new InvalidOperationException("ATSM-MAUI-TEXT-NOT-SELECTABLE");
         _tab = 4; ShowTable();
     }
     private void ShowError(Exception error)

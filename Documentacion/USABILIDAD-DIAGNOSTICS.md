@@ -22,7 +22,7 @@ Encabezados con fondo claro, regla inferior y agarre de redimensionado discreto 
 
 ## Una entrada U-WAM y configuraciones de comunicación
 
-La lista presenta **8 equipos/familias**, que conservan **12 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
+La lista presenta **9 equipos/familias**, que conservan **13 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
 
 | Configuración | Límite de consulta según R315168 §5.2.5 | Presupuesto del anfitrión ATSM |
 |---|---|---|
@@ -46,7 +46,7 @@ Regresión local, sólo agregados y sin publicar los archivos:
 | Fuente | Resultado de la nueva lectura |
 |---|---|
 | Log UF-5000 mostrado por el usuario | 7.089 entradas, 425 mensajes, 5.006 observaciones; registrador inferido: anfitrión. Antes la GUI invertía su sentido y mostraba cero observaciones. |
-| Log UC-3500 mostrado por el usuario | 2.006 entradas conservadas; sin mensajes/observaciones ASTM inferidos. 6 hallazgos en 2 grupos: límites de la fuente y protocolo sin intérprete; desaparece la cascada de falsos registros/errores. |
+| Log UC-3500 mostrado por el usuario | 2.006 entradas, 501 mensajes del protocolo propio y 2.251 observaciones; 501 BCC correctos. RQ02/CM00/ER y resultados interpretados sin pasar por ASTM. Ver UC3500-PROTOCOLO. |
 
 `atsm-trace inspect-input <archivo> [--profile <id>]` utiliza el mismo detector/lector y emite únicamente cantidades y perfil; no imprime nombres de archivo, muestras, pacientes ni resultados. No abre casos DPAPI sin su lector específico. No crea archivos de intercambio ni vigila directorios.
 
@@ -70,7 +70,7 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 ## Verificación y límites
 
-181 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; 19 pruebas nuevas de detección/dirección, ambigüedad, agrupación sin pérdida, vocabulario y columnas automáticas. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+201 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 
@@ -79,3 +79,6 @@ Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El
 Decisión humana posterior: sólo se mantiene legacy por traspaso activo o fuerza mayor (ejemplo Windows XP). La salida única es dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe. Se eliminaron el alias Windows, salidas anteriores, los comprimidos de entrega y tools/Publish-Diagnostics.ps1. Se compila directamente con .NET y se verifica el ejecutable resultante; sin mover, duplicar ni comprimir salidas. No se eliminan datos de usuario ni se reescribe el historial de changelogs.
 
 La detección preserva también HL7/MLLP dentro de un log: infiere el lado del registrador por OUL/QBP cuando hay evidencia, conserva el perfil HL7 seleccionado y nunca lo reemplaza por U-WAM por encontrar un nombre de equipo. Reconocer MSH no elige una marca: sin configuración HL7 compatible del equipo se solicita seleccionarla, en vez de interpretar con otro fabricante. La prueba adicional cubre ambas direcciones y el rechazo de esa suposición.
+
+
+Selección de texto: LabelHandler configura IsTextSelectionEnabled en el TextBlock nativo Windows para etiquetas/celdas. El self-test de la salida real comprueba título y cabeceras, además de alineación/handlers. El detalle de sólo lectura mantiene la selección y copia del editor nativo. Botones de expansión, casillas y arrastre de columnas conservan su función.

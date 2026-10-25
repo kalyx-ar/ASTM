@@ -17,7 +17,10 @@ public sealed record StackEvent(
     TraceDirection Direction,
     string Code,
     string? Detail = null,
-    long FirstSequence = -1);
+    long FirstSequence = -1)
+{
+    public ProtocolExplanation? Explanation { get; init; }
+}
 
 /// <summary>A complete LIS02 message as reassembled from the trace, with the range of entries that carried it.</summary>
 public sealed record StackMessage(TraceDirection Direction, long FirstSequence, long LastSequence, TimeSpan Start, TimeSpan End, IReadOnlyList<string> Records, bool Complete);

@@ -12,6 +12,7 @@ public static class LiveDiagnostic
         Func<CancellationToken, ValueTask<IInstrumentChannel>> connect, bool simulateHost, string controllerId, CancellationToken token)
     {
         if (!profile.CanConnect) throw new NotSupportedException("ATSM-DIAG-FILE-PROFILE");
+        if (simulateHost && !profile.CanSimulateHost) throw new NotSupportedException("ATSM-DIAG-PASSIVE-PROFILE");
         return InstrumentCommunicationHost.RunAsync(trace, connect, async (channel, stop) =>
         {
             if (!simulateHost)

@@ -4,6 +4,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Diagnostics;
 using Atsm.Plugin.BioRad.Cfx;
+using Atsm.Plugin.Sysmex.Uc3500;
 using Atsm.Runtime.Tracing;
 using Atsm.Runtime.Sessions;
 using Atsm.Testing;
@@ -32,7 +33,7 @@ internal static class NativeSelfTest
         if (Encoding.UTF8.GetString(encrypted).Contains(Convert.ToBase64String(data), StringComparison.Ordinal)) throw new InvalidDataException("Unprotected self-test payload.");
         var read = ProtectedCaseJournal.Read(new MemoryStream(encrypted), protection);
         var stored = read.Batches!.Single().Observations.Single();
-        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 12)
+        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 13)
             throw new InvalidDataException("Native self-test mismatch.");
         using var text = new StringWriter(); TraceFile.Write(text, input.Header, input.Entries);
         if (TraceFile.Read(new StringReader(text.ToString())).Entries.Count != 1) throw new InvalidDataException("Native trace JSON mismatch.");
@@ -42,7 +43,12 @@ internal static class NativeSelfTest
         var message = "H|\\^&\rP|1\rO|1|SYN\rR|1|^^^0021^SYN^UNDILUTED^P^LOT^PACK^^F|1.2|u||||F||||20261025120000\rL|1\r";
         processor.ProcessAsync(selected.AstmProfile!.Encoding.GetBytes(message), Guid.NewGuid()).AsTask().GetAwaiter().GetResult();
         if (host.Batches.Single().Observations.Single().Value.Numeric != 1.2m) throw new InvalidDataException("Native ASTM host mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=12 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok");
+        var ucInput = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, profile, "synthetic", TimeSpan.Zero);
+        var ucProfile = catalog.Resolve(Uc3500Plugin.ProfileId);
+        var uc = DiagnosticReader.Analyze(ucInput, ucProfile, timing);
+        if (ucInput.Header.Profile != ucProfile.Id || uc.Messages.Count != 1 || !ProtocolExplainer.MessageContent(uc.Messages[0], ucProfile, []).Contains("Consulta", StringComparison.Ordinal))
+            throw new InvalidDataException("Native UC-3500 mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

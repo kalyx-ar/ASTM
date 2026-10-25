@@ -5,6 +5,7 @@
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.CellDynRuby\Atsm.Plugin.Abbott.CellDynRuby.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uc3500\Atsm.Plugin.Sysmex.Uc3500.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.XnL\Atsm.Plugin.Sysmex.XnL.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Cs2500\Atsm.Plugin.Sysmex.Cs2500.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.BioRad.Cfx\Atsm.Plugin.BioRad.Cfx.csproj" />

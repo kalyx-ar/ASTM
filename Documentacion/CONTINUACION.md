@@ -20,7 +20,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 181 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 201 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -191,3 +191,10 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 Entregados agrupación sin pérdida, interpretación por defecto, tabla automática/redimensionable, contraste de controles, catálogo de 8 equipos con 12 configuraciones técnicas, detección de formato y del lado del registrador, y filtro de idiomas WinUI. Revisión local UF-5000: 425 mensajes/5.006 observaciones; UC-3500 interno: 2.006 entradas conservadas sin falsa interpretación ASTM. [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md) describe el modo técnico y el adaptador Lang opcional. No confundir detector de formato de log con soporte de un protocolo propietario. Extender vocabulario y firmas por plugin con evidencia/corpus; inspección manual de arrastre pendiente tras Esc del usuario, sin ampliar homologación física.
 
 P-12: investigar la intermitencia de Certificate_must_identify_the_declared_controller. En esta sesión reapareció una vez; pasó aislada en 749 ms y en las dos corridas completas finales (181/181, 0 omitidas). No se modificaron el test, el agente ni los timeouts.
+
+
+### UC-3500 y selección de texto (2026-10-25)
+
+Resuelta la brecha del protocolo directo que la entrega de usabilidad conservaba como incompatible: plugin sysmex.uc3500.serial, puerto neutral IInstrumentTracePlugin, 9 equipos/13 perfiles. Mensajes RQ02/CM00/ER y resultados/reflectancias/serie C, comprobación del checksum separado del monitor, correlación y diagnósticos en español. Captura directa sin envío; simulación activa rechazada antes de conectar. MAUI habilita selección nativa en etiquetas y celdas; detalle conserva copia. Ver [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).
+
+Dos corridas finales 201/201, 0 omitidas; nativo 542/542 repetido, GUI self-test seleccionable y CLI NativeAOT correctos; Lang opcional 1 correcta. No afirmar host activo UC-3500, homologación física, estadística QC calculada ni interpretación de siglo/orden de fechas abreviadas. Revisar tabla original para significados específicos de errores cuya extracción pierde columnas; 8010 sólo tiene familia de tira. La prueba HL7 Fragmented_MLLP_and_coalesced_blocks_are_acknowledged_individually falló una vez, pasó aislada (122 ms) y en las corridas finales; causa sin confirmar, sin cambiar timeouts.

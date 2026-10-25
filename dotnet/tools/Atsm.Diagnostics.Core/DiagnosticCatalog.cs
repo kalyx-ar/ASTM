@@ -5,6 +5,7 @@ using Atsm.Plugin.Diagast.Qwalys;
 using Atsm.Plugin.Legacy.Testing;
 using Atsm.Plugin.Sysmex.Cs2500;
 using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Uc3500;
 using Atsm.Plugin.Sysmex.XnL;
 using Atsm.Plugins;
 using Atsm.Abstractions.Tracing;
@@ -20,7 +21,7 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public string Name { get; } = name;
     public string Protocol { get; } = protocol;
     public string Evidence => DiagnosticText.Localize("Profile." + Id + ".Evidence", evidence);
-    public string InstrumentId => AstmPlugin?.Describe().Id ?? ContentPlugin?.Describe().Id ?? (IsHl7 ? "abbott.architect" : Id);
+    public string InstrumentId => AstmPlugin?.Describe().Id ?? ContentPlugin?.Describe().Id ?? TracePlugin?.Describe().Id ?? (IsHl7 ? "abbott.architect" : Id);
     public string Configuration => Id switch
     {
         UwamPlugin.WithChemistryProfile => DiagnosticText.Text("Configuration.WithChemistry"),
@@ -32,8 +33,11 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public AstmProfile? AstmProfile { get; init; }
     public IInstrumentContentPlugin? ContentPlugin { get; init; }
     public InstrumentContentProfile? ContentProfile { get; init; }
+    public IInstrumentTracePlugin? TracePlugin { get; init; }
+    public InstrumentTraceProfile? TraceProfile { get; init; }
     public bool IsHl7 { get; init; }
-    public bool CanConnect => AstmProfile is not null || IsHl7;
+    public bool CanSimulateHost => AstmProfile is not null || IsHl7;
+    public bool CanConnect => CanSimulateHost || TracePlugin is not null;
     public IHl7Dialect Hl7Dialect(TimeZoneInfo zone) => IsHl7
         ? new ArchitectHl7Dialect(new(new("diagnostic"), TimeProvider.System), zone)
         : throw new InvalidOperationException("Not an HL7 profile.");
@@ -51,12 +55,18 @@ public sealed class DiagnosticCatalog
 {
     public IReadOnlyList<IInstrumentPlugin> AstmPlugins { get; } = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), new UwamPlugin(), new XnLPlugin(), new Cs2500Plugin(), new QwalysPlugin()];
     public IReadOnlyList<IInstrumentContentPlugin> ContentPlugins { get; } = [new CfxPlugin()];
+    public IReadOnlyList<IInstrumentTracePlugin> TracePlugins { get; } = [new Uc3500Plugin()];
     public IReadOnlyList<ITraceLogAdapter> LogAdapters { get; }
     public IReadOnlyList<DiagnosticProfile> Profiles { get; }
     public IReadOnlyList<DiagnosticInstrument> Instruments { get; }
     public DiagnosticCatalog()
     {
         var profiles = new List<DiagnosticProfile>();
+        foreach (var plugin in TracePlugins)
+        foreach (var profile in plugin.Profiles)
+            profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, string.Join(", ", plugin.Describe().Models), profile.Protocol,
+                "Manual y captura local; intérprete pasivo de órdenes, respuestas y resultados. Sin envío de órdenes ni homologación en hardware.")
+            { TracePlugin = plugin, TraceProfile = profile });
         foreach (var plugin in ContentPlugins)
         foreach (var profile in plugin.Profiles)
             profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, "CFX Maestro", profile.Format, "Manual + pruebas sintéticas; exportación, sin control directo")
@@ -69,7 +79,7 @@ public sealed class DiagnosticCatalog
             {
                 "abbott.celldyn-ruby" => "Trazas locales; hipótesis pendientes de manual",
                 "abbott.architect" => "Manual y trazas locales; sin homologación en hardware",
-                "sysmex.uwam" => "Manual y trazas de la interfaz U-WAM ↔ LIS; el enlace interno UC-3500 requiere otro perfil. Sin homologación en hardware.",
+                "sysmex.uwam" => "Manual y trazas de la interfaz U-WAM ↔ LIS. Para el enlace directo del analizador, seleccione UC-3500. Sin homologación en hardware.",
                 "clsi.lis02" => "Estándar genérico; no valida un equipo particular",
                 _ => "Manual + pruebas sintéticas; sólo recepción de resultados",
             };

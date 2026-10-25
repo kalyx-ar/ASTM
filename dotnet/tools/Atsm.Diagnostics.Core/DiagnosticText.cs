@@ -93,8 +93,9 @@ public static class DiagnosticText
     public static string Localize(string key, string fallback) => lang.GetValueOrDefault(key, fallback);
     public static bool IsLocalized(string text) => lang.Values.Contains(text, StringComparer.Ordinal);
     public static string Format(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, Text(key), args);
-    public static string Finding(AtsmDiagnostic finding)
+    public static string Finding(AtsmDiagnostic finding, DiagnosticProfile? profile = null)
     {
+        if (profile?.TracePlugin is { } plugin && plugin.DiagnosticVocabulary.TryGetValue("finding." + finding.Code, out var meaning)) return Plugin(plugin, meaning);
         if (finding.Code == "ATSM-DIAG-LIS01-INVALID-FRAME" && finding.Message == "STX inside a frame") return Text("Finding.STXInside");
         if (lang.TryGetValue("Finding." + finding.Code, out var text)) return text;
         var key = finding.Code switch
@@ -117,13 +118,14 @@ public static class DiagnosticText
         var source = plugin.GetType().Assembly.GetName().Name!;
         return pluginSeeds.TryGetValue(source, out var seed) ? seed.GetValueOrDefault(value.Key, value.Fallback) : value.Fallback;
     }
+    public static string Explanation(object plugin, ProtocolExplanation value) => string.Format(CultureInfo.CurrentCulture, Plugin(plugin, value.Text), value.Arguments.Cast<object>().ToArray());
     public static async Task InitializeAsync(DbConnection database, DiagnosticCatalog catalog, string target = "es-AR", CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(database);
 #if KALYX_LANG
         foreach (var profile in catalog.Profiles) lang.TryAdd("Profile." + profile.Id + ".Evidence", profile.Evidence);
         await InitializeSeedAsync(lang, typeof(DiagnosticText).Assembly.GetName().Name!, database, target, cancellationToken);
-        foreach (var assembly in catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().GroupBy(p => p.GetType().Assembly.GetName().Name!, StringComparer.Ordinal))
+        foreach (var assembly in catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().Concat(catalog.TracePlugins).GroupBy(p => p.GetType().Assembly.GetName().Name!, StringComparer.Ordinal))
         {
             var seed = assembly.SelectMany(p => p.DiagnosticVocabulary.Values).GroupBy(v => v.Key, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Fallback, StringComparer.Ordinal);

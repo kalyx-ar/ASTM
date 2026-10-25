@@ -12,7 +12,12 @@ using Atsm.Tracing;
 namespace Atsm.Diagnostics;
 
 public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace, ProtectedCase, Auto = -1 }
-public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text);
+public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text)
+{
+    public long FirstSequence { get; init; } = Sequence;
+    public ProtocolExplanation? Explanation { get; init; }
+    public IReadOnlyDictionary<string, string> Fields { get; init; } = new Dictionary<string, string>();
+}
 public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IReadOnlyList<StackEvent> Events,
     IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
 {
@@ -49,14 +54,14 @@ public static class DiagnosticReader
             var adapter = new DiagnosticCatalog().LogAdapters.Single(a => a.Id == adapterId);
             var original = adapter.Extract(bytes, new(RecordedBy.Host) { UtcOffset = utcOffset });
             if (!profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(original.Segments)) throw new InvalidDataException("ATSM-DIAG-HL7-PROFILE-REQUIRED");
-            var inferred = format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments);
+            var inferred = profile.TracePlugin?.InferRecorder(original.Segments) ?? (format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments));
             var recorder = recordedBy ?? inferred ?? RecordedBy.Instrument;
             var extracted = recorder == RecordedBy.Host ? original : adapter.Extract(bytes, new(recorder) { UtcOffset = utcOffset });
             if (extracted.Segments.Count == 0) throw new InvalidDataException("ATSM-DIAG-NO-LOG-ENTRIES");
             segments = extracted.Segments;
             properties["recordedBy"] = recorder.ToString();
             if (recordedBy is null && inferred is null) properties["directionUncertain"] = "true";
-            if (!profile.IsHl7 && !DiagnosticInputDetector.HasAstmHeader(segments) && !DiagnosticInputDetector.HasHl7Header(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
+            if (profile.TracePlugin is null && !profile.IsHl7 && !DiagnosticInputDetector.HasAstmHeader(segments) && !DiagnosticInputDetector.HasHl7Header(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
             limitations.AddRange(adapter.Limitations);
             limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
             limitations.AddRange(extracted.Findings);
@@ -71,6 +76,17 @@ public static class DiagnosticReader
         var values = new List<InstrumentObservation>(); var findings = new List<AtsmDiagnostic>(); var messages = new List<DecodedMessage>();
         if (!input.IsComplete) findings.Add(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "The case was interrupted or its final closure is missing; data may be incomplete."));
         findings.AddRange((input.Header.Limitations ?? []).Select(l => new AtsmDiagnostic("ATSM-DIAG-SOURCE-LIMITATION", AtsmSeverity.Information, l)));
+        if (profile.TracePlugin is { } tracePlugin)
+        {
+            var interpreted = tracePlugin.Interpret(profile.TraceProfile!, input.Entries, new("diagnostic"), input.Header.TraceId, timing.InstrumentTimeZone);
+            findings.AddRange(interpreted.Diagnostics);
+            if (input.Header.Properties?.GetValueOrDefault("directionUncertain") == "true")
+                findings.Add(new("ATSM-DIAG-DIRECTION-UNCERTAIN", AtsmSeverity.Warning, "Recorder side could not be inferred; confirm instrument or host."));
+            messages.AddRange(interpreted.Messages.Select(m => new DecodedMessage(m.LastSequence, m.Direction.ToString(), m.Code, m.Text)
+            { FirstSequence = m.FirstSequence, Explanation = m.Explanation, Fields = m.Fields }));
+            return new(input.Entries, interpreted.Events.Select(e => new StackEvent(Enum.Parse<StackLevel>(e.Level.ToString()), e.LastSequence,
+                e.Elapsed, e.Direction, e.Code, e.Code, e.FirstSequence) { Explanation = e.Explanation }).ToArray(), messages, interpreted.Observations, findings);
+        }
         if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true")
         {
             findings.Add(new("ATSM-DIAG-UNSUPPORTED-PROTOCOL", AtsmSeverity.Warning, "Recorded bytes do not match a supported message protocol; raw input retained."));

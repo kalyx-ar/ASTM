@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/plugins/">
+    <Project Path="plugins/Atsm.Plugin.Sysmex.Uc3500/Atsm.Plugin.Sysmex.Uc3500.csproj" />
     <Project Path="plugins/Atsm.Plugin.BioRad.Cfx/Atsm.Plugin.BioRad.Cfx.csproj" />
     <Project Path="plugins/Atsm.Plugin.Sysmex.XnL/Atsm.Plugin.Sysmex.XnL.csproj" />
     <Project Path="plugins/Atsm.Plugin.Sysmex.Cs2500/Atsm.Plugin.Sysmex.Cs2500.csproj" />

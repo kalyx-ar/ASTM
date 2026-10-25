@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Passive interpreter of the Sysmex UC-3500 proprietary serial host protocol.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" /></ItemGroup>
+</Project>
