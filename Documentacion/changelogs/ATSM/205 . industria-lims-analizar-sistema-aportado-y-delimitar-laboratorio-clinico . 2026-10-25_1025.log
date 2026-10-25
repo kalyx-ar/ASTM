@@ -1,0 +1,55 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (repositorio modificado: kalyx-ar/ATSM)
+Tipo: fix / build / documentación
+Fecha local: 2026-10-25 10:25 (America/Buenos_Aires)
+Commit de implementación y origen de los binarios: e0543f4ad92781451a17662b5f350670462f472b
+
+Autorización y alcance registrados antes de editar:
+- https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395906842
+  Pedido humano: Diagnostics debe usar MAUI como EDC; ATSM/Diagnostics sin carga en caliente, sólo EDC la necesita. Preparar NativeAOT donde la plataforma lo permita y resolver el EXE que no iniciaba.
+- https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395998752
+  Procedencia oficial de MAUI y alerta de DLL sin Strong Name, antes de delimitar CS8002 a advertencia visible en el ejecutable MAUI. No autoriza cambios de claves, baselines ni admisión en EDC.
+
+Problema reproducido y corrección:
+- La publicación WPF anterior terminaba con FileNotFoundException: el Core publicado conservaba una referencia al plugin previo al renombrado legacy y faltaba esa DLL. El equipo tiene .NET 10.0.13 y Windows Desktop Runtime; no se atribuye el fallo a runtime ausente.
+- Se conserva el renombrado humano de 0e0c4c7. PublicationAudit inspecciona metadatos PE sin ejecutar DLL y detectó la dependencia ausente de la publicación anterior. La publicación nueva pasa el mismo verificador.
+- Se retira el proyecto WPF y se implementa dotnet/tools/Atsm.Diagnostics.Maui: controles MAUI, catálogo compilado de 12 perfiles, archivos/logs/exportaciones, TCP/TLS/SerialTunnel, cancelación, siete vistas de diagnóstico y datos QC, casos protegidos DPAPI y custodia anterior a conectar.
+- IDiagnosticPlatformServices separa archivos, protección y ventana nativa de la página MAUI. Windows es la plataforma implementada/verificada; no se acreditan Android, iOS, macOS o Linux por adoptar MAUI.
+- Se mantiene Diagnostics.Core neutral y los plugins de marca separados del motor. Se retira P-05 de carga dinámica ATSM: sólo el anfitrión EDC la administra.
+
+Distribución y NativeAOT:
+- tools/Publish-Diagnostics.ps1 genera un candidato limpio, aísla la compilación, verifica referencias y componentes privados, ejecuta una prueba real de ventana/custodia y sólo después promueve la carpeta y crea el ZIP. No se interrumpió la instancia de GUI que estaba abierta: la compilación aislada evita el bloqueo del apphost.
+- Los enlaces EXE/ZIP anteriores ahora contienen MAUI. Sus carpetas completas previas y archivos añadidos por el usuario se conservan en artifacts/diagnostics-retired-wpf-*. No se borraron datos del usuario.
+- GUI: MAUI 10.0.110, Windows App SDK 1.8.260529003, .NET 10.0.13, Windows x64, self-contained y ReadyToRun de Release. Incluye CLR y WinUI privados; no requiere instalarlos aparte. No se declara NativeAOT de la GUI Windows MAUI .NET 10.
+- CLI atsm-trace: perfil NativeAot, generación de código nativo observada y EXE ejecutado. Bibliotecas ATSM administradas se conservan para EDC; un EXE AOT no sustituye su contrato CLR por una DLL nativa incompatible.
+- Metadatos JSON generados para runtime, casos y CLI; sin fallback por reflexión en los ejecutables verificados. Se conservan camelCase/enums numéricos del formato de traza y PascalCase del informe de anonimización. Una prueba independiente escribe el formato anterior por reflexión y comprueba lectura del caso con los metadatos nuevos.
+
+Verificación:
+- dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true: dos corridas finales de 162 correctas, 0 omitidas, duración aproximada 1 s cada una. Incluyen 7 pruebas contra agente nativo, 5 de ellas TLS.
+- Una corrida previa: 161 correctas y fallo en Certificate_must_identify_the_declared_controller. Repetición aislada correcta (627 ms) y las dos corridas completas posteriores correctas, sin modificar agente, prueba ni timeouts. No se estableció la causa de la intermitencia.
+- ctest --test-dir native/build/win-x64 -C Release --verbose: dos corridas, 542 verificaciones y 0 fallos, aproximadamente 0,24/0,25 s. Sin cambios de código nativo.
+- Publicación MAUI final desde e0543f4: exit 0; cuatro CS8002 oficiales visibles, sin errores. Verificador: ATSM_PUBLICATION_DEPENDENCIES_OK.
+- Prueba del propio ejecutable publicado: crea ventana/handler MAUI, valida HWND propietario de diálogos y carga real de CLR y Microsoft.UI.Xaml.dll desde su carpeta; catálogo 12, observaciones CFX 3, estadísticas QC 6, guardado/reapertura DPAPI. Salida constante: PASS: MAUI window, file-dialog-owner, private-runtime, catalog=12, CFX=3, protected-case-roundtrip, QC=6.
+- La autorización del control visual asistido venció; no se afirma inspección visual manual del diseño ni interacción manual con los diálogos. La prueba automática anterior no equivale a esa inspección.
+- CLI NativeAOT final: exit 0; ATSM_NATIVE_SELFTEST_OK catalog=12 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok. Incluye catálogo, CFX/QC, traza JSON, journal cifrado y procesador ASTM con anfitrión en memoria. El journal AES-GCM y la clave desechable son sólo un recurso sintético de la prueba.
+- CLI nativa: from-text, metrics, anonymize y stack ejecutados con contenido sintético; esquema/casing verificados. La CLI nativa final vuelve a verificar las referencias del paquete MAUI.
+- No hay homologación adicional de instrumentos físicos ni validación de cada canal/API en todos los destinos AOT.
+
+Dependencias y firmas:
+- Documentacion/diagnostics-maui-dependencies.json registra 37 paquetes Microsoft, versiones, autores, licencias, repositorios, SHA512 de restauración y SHA256 de nupkg. dotnet nuget verify --all correcto para los 37.
+- Microsoft.Maui.Controls, Microsoft.Maui, Microsoft.Maui.Graphics y Microsoft.Maui.Controls.Xaml no tienen Strong Name. Firma NuGet verificada no equivale a firma de DLL. CS8002 sigue visible mediante WarningsNotAsErrors sólo en GUI, sin NoWarn.
+- Los 19 ensamblados propios publicados conservan el token 066190a23251f202 con la SNK existente. No se generan claves nuevas. Apphost propio Authenticode NotSigned; firma de release pendiente. El EXE NativeAOT es nativo y no tiene Strong Name CLR.
+
+Artefactos locales (ignorados por Git; sin publicación remota ni push):
+- GUI: artifacts/diagnostics/windows-x64/atsm-diagnostics.exe. Mantener toda la carpeta, que incluye SHA256SUMS.txt y publication-self-test.txt.
+- ZIP GUI: artifacts/ATSM-Diagnostics-MAUI-Windows-x64.zip
+  Tamaño: 111522247 bytes.
+  SHA256: 80befc278e7a1fedc9fe154fac62faf48f2a902077e91a954fd8a1464a2a8e7a
+- CLI: dotnet/tools/Atsm.Tools.Trace/bin/Release/net10.0/win-x64/publish/atsm-trace.exe
+  Tamaño: 11570176 bytes; sin runtimeconfig externo.
+  SHA256: 3a81de1137f04b143030f4d7b2f544778b2eb4876cb8783b7b47c18121b29267
+- ProductVersion GUI/CLI: 0.1.0+e0543f4ad92781451a17662b5f350670462f472b.
+- SHA256SUMS facilita integridad accidental; no sustituye firma/admisión.
+
+Rutas principales: dotnet/tools/Atsm.Diagnostics.Maui/, Atsm.Diagnostics.Core/, Atsm.Tools.Trace/, dotnet/src/Atsm.Runtime/Tracing/, dotnet/tests/Atsm.Tests/Diagnostics/, tools/Publish-Diagnostics.ps1, Documentacion/MAUI-Y-NATIVEAOT.md y actualizaciones de ESTADO/CONTINUACION/DEPENDENCIAS/PLUGINS/README/AGENTS.
+
+Estado final: alcance MAUI/distribución entregado localmente. EDC#205 permanece abierto y su Project propietario en In Progress por el alcance LIMS más amplio. No se modificaron Identidades, GetKey, DeriveSessionKeyAsync, SNK, admisión de editores/hashes ni baselines de EDC; no se agrega filedrop ni buffer de disco plano. Application sigue siendo responsable de la custodia; la integración SQLCipher/UI propia de EDC queda fuera de esta biblioteca neutral.
