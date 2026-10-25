@@ -6,7 +6,7 @@ Entrega del 2026-10-24, trazada en [kalyx-ar/EDC#205](https://github.com/kalyx-a
 
 `dotnet/tools/Atsm.Diagnostics.Maui` es la presentación MAUI vigente desde el 2026-10-25, alineada con EDC; WPF está retirado. Núcleo/catálogo en `Atsm.Diagnostics.Core`, sin dependencia de EDC. Doce perfiles compilados, sin carga en caliente.
 
-Publicar con `.\tools\Publish-Diagnostics.ps1` desde la raíz ATSM. Ejecutable en `artifacts/diagnostics/windows-x64/atsm-diagnostics.exe`; ZIP `artifacts/ATSM-Diagnostics-MAUI-Windows-x64.zip`. Conservar toda la carpeta: incluye .NET 10 y Windows App SDK, sin instalación separada. Es self-contained/ReadyToRun, no NativeAOT Windows de MAUI .NET 10. Fuente, causa del fallo anterior, NativeAOT CLI y verificaciones en [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md). Windows XP corresponde al agente nativo pendiente de verificación, no a esta GUI.
+Publicar con `.\tools\Publish-Diagnostics.ps1` desde la raíz ATSM. Ejecutable en `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/atsm-diagnostics.exe`; ZIP `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/ATSM-Diagnostics-MAUI-Windows-x64.zip`. Conservar toda la carpeta: incluye .NET 10 y Windows App SDK, sin instalación separada. Es self-contained/ReadyToRun, no NativeAOT Windows de MAUI .NET 10. Fuente, causa del fallo anterior, NativeAOT CLI y verificaciones en [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md). Windows XP corresponde al agente nativo pendiente de verificación, no a esta GUI.
 
 Uso:
 

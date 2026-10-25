@@ -5,27 +5,38 @@ $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $artifacts = Join-Path $repository 'artifacts'
 $staging = Join-Path $artifacts ('diagnostics-stage-' + [Guid]::NewGuid().ToString('N'))
 $buildRoot = Join-Path $artifacts ('diagnostics-build-' + [Guid]::NewGuid().ToString('N'))
-$destination = Join-Path $artifacts 'diagnostics\windows-x64'
-$project = Join-Path $repository 'dotnet\tools\Atsm.Diagnostics.Maui\Atsm.Diagnostics.Maui.csproj'
+$projectRoot = Join-Path $repository 'dotnet\tools\Atsm.Diagnostics.Maui'
+$binRoot = Join-Path $projectRoot 'bin'
+$publishBase = Join-Path $binRoot 'Release\net10.0-windows10.0.19041.0\win-x64'
+$destination = Join-Path $publishBase 'publish'
+$project = Join-Path $projectRoot 'Atsm.Diagnostics.Maui.csproj'
 $cli = Join-Path $repository 'dotnet\tools\Atsm.Tools.Trace\Atsm.Tools.Trace.csproj'
-function Confirm-ArtifactPath([string] $path) {
+function Confirm-PublicationPath([string] $path, [string] $ownerRoot) {
     $resolved = [IO.Path]::GetFullPath($path)
-    if (-not $resolved.StartsWith($artifacts + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Publication path is outside artifacts.' }
+    if (-not $resolved.StartsWith($ownerRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Publication path is outside its owning directory.' }
+    $ancestor = $resolved
+    while ($ancestor.Length -gt $repository.Length) {
+        if ((Test-Path -LiteralPath $ancestor) -and ((Get-Item -LiteralPath $ancestor).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Publication path traverses a reparse point.' }
+        $ancestor = Split-Path -Parent $ancestor
+    }
 }
-Confirm-ArtifactPath $staging
-Confirm-ArtifactPath $buildRoot
-Confirm-ArtifactPath $destination
+function Remove-TemporaryBuild([string] $path) {
+    Confirm-PublicationPath $path $artifacts
+    if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
+}
+Confirm-PublicationPath $staging $artifacts
+Confirm-PublicationPath $buildRoot $artifacts
+Confirm-PublicationPath $destination $binRoot
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 Push-Location $repository
 try {
-    # A new directory prevents stale DLLs/deps.json after a plugin rename. Preserve the previous
-    # working publication until the candidate has passed dependency and real-window self-tests.
+    # A clean candidate prevents stale plugin references. Only the current MAUI publication is kept.
     & dotnet publish $project -c Release -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -p:AtsmRequireStrongName=true --artifacts-path $buildRoot -o $staging --verbosity minimal
-    if ($LASTEXITCODE -ne 0) { throw 'MAUI publication failed; previous package preserved.' }
+    if ($LASTEXITCODE -ne 0) { throw 'MAUI publication failed; current package untouched.' }
     $unusedLanguages = @(Get-ChildItem -LiteralPath $staging -Recurse -File -Filter '*.mui' | Where-Object {
         [IO.Path]::GetRelativePath($staging, $_.FullName) -notmatch '^(es(-AR|-ES)?|en-US)[\\/]'
     })
-    if ($unusedLanguages.Count -ne 0) { throw 'Publication contains unrequested WinUI languages; previous package preserved.' }
+    if ($unusedLanguages.Count -ne 0) { throw 'Publication contains unrequested WinUI languages.' }
     & dotnet build $cli -c Release -p:AtsmRequireStrongName=true --verbosity quiet
     if ($LASTEXITCODE -ne 0) { throw 'Publication verifier build failed.' }
     & dotnet (Join-Path $repository 'dotnet\tools\Atsm.Tools.Trace\bin\Release\net10.0\atsm-trace.dll') verify-publication $staging
@@ -42,35 +53,22 @@ try {
         (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetRelativePath($staging, $_.FullName)
     }
     $manifest | Set-Content -LiteralPath (Join-Path $staging 'SHA256SUMS.txt') -Encoding utf8
-    New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+    New-Item -ItemType Directory -Path $publishBase -Force | Out-Null
     if (Test-Path -LiteralPath $destination) {
-        $previous = Join-Path $artifacts ('diagnostics-previous-' + [Guid]::NewGuid().ToString('N'))
-        Confirm-ArtifactPath $previous
-        Move-Item -LiteralPath $destination -Destination $previous
+        # A generated output may be replaced; it is never an archive of user cases.
+        $userData = @(Get-ChildItem -LiteralPath $destination -Recurse -File | Where-Object { $_.Extension -in @('.atsmcase','.pfx','.p12','.log','.csv','.rdml','.rdm','.db','.sqlite','.sqlite3') })
+        if ($userData.Count -ne 0) { throw 'Publication folder contains user data; keep it outside generated outputs before publishing.' }
+        Confirm-PublicationPath $destination $binRoot
+        Remove-Item -LiteralPath $destination -Recurse -Force
     }
     Move-Item -LiteralPath $staging -Destination $destination
-    # Keep the executable link from the earlier delivery useful. Archive that complete directory
-    # first (including any user-added files) and replace it with the verified MAUI publication.
-    $legacy = [IO.Path]::GetFullPath((Join-Path $repository 'dotnet\tools\Atsm.Diagnostics.Windows\bin\Release\net10.0-windows\publish'))
-    $expectedLegacy = $repository + '\dotnet\tools\Atsm.Diagnostics.Windows\bin\Release\net10.0-windows\publish'
-    if ($legacy -ne $expectedLegacy) { throw 'Unexpected legacy publication target.' }
-    if (Test-Path -LiteralPath $legacy) {
-        $retired = Join-Path $artifacts ('diagnostics-retired-wpf-' + [Guid]::NewGuid().ToString('N'))
-        Confirm-ArtifactPath $retired
-        Move-Item -LiteralPath $legacy -Destination $retired
-    }
-    New-Item -ItemType Directory -Path $legacy -Force | Out-Null
-    Copy-Item -Path (Join-Path $destination '*') -Destination $legacy -Recurse
-    $zip = Join-Path $artifacts 'ATSM-Diagnostics-MAUI-Windows-x64.zip'
+    $zip = Join-Path $publishBase 'ATSM-Diagnostics-MAUI-Windows-x64.zip'
     Compress-Archive -Path (Join-Path $destination '*') -DestinationPath $zip -Force
-    $legacyZip = Join-Path (Split-Path -Parent $legacy) 'ATSM-Diagnostics-Windows.zip'
-    if (Test-Path -LiteralPath $legacyZip) {
-        $retiredZip = Join-Path $artifacts ('diagnostics-retired-wpf-' + [Guid]::NewGuid().ToString('N') + '.zip')
-        Confirm-ArtifactPath $retiredZip
-        Move-Item -LiteralPath $legacyZip -Destination $retiredZip
-    }
-    Copy-Item -LiteralPath $zip -Destination $legacyZip
     Write-Output "Executable: $destination\atsm-diagnostics.exe"
     Get-FileHash -LiteralPath $zip -Algorithm SHA256
 }
-finally { Pop-Location }
+finally {
+    Pop-Location
+    Remove-TemporaryBuild $staging
+    Remove-TemporaryBuild $buildRoot
+}

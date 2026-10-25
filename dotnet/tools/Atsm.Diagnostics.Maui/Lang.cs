@@ -70,6 +70,7 @@ internal static class Globals
         ["Validation.Profile"] = "El perfil guardado no está disponible en este catálogo.", ["Validation.Offset"] = "Offset UTC inválido (±hh:mm).",
         ["Validation.InputLimit"] = "Límite de entrada: 32 MiB.", ["Validation.Port"] = "Ingrese el puerto TCP configurado en el instrumento o agente.",
         ["Validation.Host"] = "Complete el host y la identidad del controlador.", ["Validation.Certificate"] = "El servidor TLS requiere un PFX con clave privada.",
+        ["Error.ATSM-DIAG-HL7-PROFILE-REQUIRED"] = "Se reconoció contenido HL7. Seleccione una configuración HL7 compatible con el equipo; no se asume la marca por el formato del archivo.",
     };
     public static string T(string key) => lang.GetValueOrDefault(key, key);
     public static string F(string key, params object?[] values) => string.Format(CultureInfo.CurrentCulture, T(key), values);

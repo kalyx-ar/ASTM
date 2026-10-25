@@ -421,6 +421,7 @@ public sealed class MainPage : ContentPage
     {
         var code = error.Message.StartsWith("ATSM-", StringComparison.Ordinal) ? error.Message : error.GetType().Name;
         _status.Text = F("App.Error", code); _detail.Text = error.Message;
+        if (lang.TryGetValue("Error." + error.Message, out var explanation)) _status.Text = explanation;
         if (lang.Values.Contains(error.Message, StringComparer.Ordinal) || DiagnosticText.IsLocalized(error.Message)) _status.Text = error.Message;
     }
     private static Entry Input(string text) => new() { Text = text, FontSize = 13, TextColor = Ink, BackgroundColor = Colors.Transparent, MinimumHeightRequest = 36 };

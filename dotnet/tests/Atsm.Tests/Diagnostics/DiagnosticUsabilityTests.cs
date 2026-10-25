@@ -42,6 +42,26 @@ public sealed class DiagnosticUsabilityTests
     }
 
     [Fact]
+    public void HL7_inside_a_monitor_log_keeps_its_protocol_and_infers_the_instrument_result_direction()
+    {
+        foreach (var direction in new[] { 'R', 'S' })
+        {
+            var log = Encoding.ASCII.GetBytes($"2026/10/25 10:00:00.000 {direction} 000{{[VT]MSH|^~\\&|UF-5000||||20261025100000||OUL^R22|SYN-ID|P|2.5.1[CR][FS][CR]}}\r\n");
+            var catalog = new DiagnosticCatalog(); var selected = catalog.Resolve("abbott.architect.hl7-2.5.1");
+            var detection = DiagnosticInputDetector.Detect(log, selected, catalog);
+            Assert.Equal("abbott.architect.hl7-2.5.1", detection.ProfileId); Assert.False(detection.UnsupportedProtocol);
+            var capture = DiagnosticReader.Read(log, DiagnosticInputFormat.Auto, selected, "opaque.log", TimeSpan.Zero);
+            Assert.Equal(TraceDirection.Received, Assert.Single(capture.Entries).Direction);
+            var analysis = DiagnosticReader.Analyze(capture, catalog.Resolve(detection.ProfileId!), Timing);
+            Assert.Equal("OUL^R22", Assert.Single(analysis.Messages).Type);
+            Assert.DoesNotContain(analysis.Diagnostics, d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL");
+            var unrelated = catalog.Resolve(CfxPlugin.CsvProfileId);
+            Assert.Null(DiagnosticInputDetector.Detect(log, unrelated, catalog).ProfileId);
+            Assert.Throws<InvalidDataException>(() => DiagnosticReader.Read(log, DiagnosticInputFormat.Auto, unrelated, "opaque.log", TimeSpan.Zero));
+        }
+    }
+
+    [Fact]
     public void Unsupported_internal_binary_log_keeps_bytes_without_inventing_ASTM_records()
     {
         var bytes = Encoding.Latin1.GetBytes("2026/10/25 10:00:00.000 S 007{[STX]Y<8~\\[ETX]}\r\n");
@@ -70,8 +90,8 @@ public sealed class DiagnosticUsabilityTests
     [InlineData("Target,Efficiency %,Slope,Y-intercept,R^2\nT1,99,-3,40,0.99\n", DiagnosticInputFormat.Export, CfxPlugin.CurveProfileId)]
     [InlineData("<rdml version=\"1.1\"/>", DiagnosticInputFormat.Export, CfxPlugin.RdmlProfileId)]
     [InlineData("H|\\^&\rP|1\rL|1\r", DiagnosticInputFormat.AstmMessage, StandardAstmPlugin.ProfileId)]
-    [InlineData("MSH|^~\\&|SYN||||20261025100000||OUL^R22|1|P|2.5.1\r", DiagnosticInputFormat.Hl7Message, "abbott.architect.hl7-2.5.1")]
-    public void Detects_by_content_independently_of_extension(string content, DiagnosticInputFormat format, string profileId)
+    [InlineData("MSH|^~\\&|SYN||||20261025100000||OUL^R22|1|P|2.5.1\r", DiagnosticInputFormat.Hl7Message, null)]
+    public void Detects_by_content_independently_of_extension(string content, DiagnosticInputFormat format, string? profileId)
     {
         var catalog = new DiagnosticCatalog(); var detection = DiagnosticInputDetector.Detect(Encoding.UTF8.GetBytes(content), catalog.Profiles[0], catalog);
         Assert.Equal(format, detection.Format); Assert.Equal(profileId, detection.ProfileId);

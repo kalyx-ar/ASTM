@@ -20,7 +20,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 180 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 181 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: `.\tools\Publish-Diagnostics.ps1`; no forma parte del build multiplataforma `Atsm.slnx`. Ver [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) para uso, catálogo y evidencia por modelo.
 
@@ -189,3 +189,5 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 ### Usabilidad y Lang (2026-10-25)
 
 Entregados agrupación sin pérdida, interpretación por defecto, tabla automática/redimensionable, contraste de controles, catálogo de 8 equipos con 12 configuraciones técnicas, detección de formato y del lado del registrador, y filtro de idiomas WinUI. Revisión local UF-5000: 425 mensajes/5.006 observaciones; UC-3500 interno: 2.006 entradas conservadas sin falsa interpretación ASTM. [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md) describe el modo técnico y el adaptador Lang opcional. No confundir detector de formato de log con soporte de un protocolo propietario. Extender vocabulario y firmas por plugin con evidencia/corpus; inspección manual de arrastre pendiente tras Esc del usuario, sin ampliar homologación física.
+
+P-12: investigar la intermitencia de Certificate_must_identify_the_declared_controller. En esta sesión reapareció una vez; pasó aislada en 749 ms y en las dos corridas completas finales (181/181, 0 omitidas). No se modificaron el test, el agente ni los timeouts.

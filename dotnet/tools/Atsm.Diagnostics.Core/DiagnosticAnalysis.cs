@@ -33,6 +33,8 @@ public static class DiagnosticReader
             recordedBy ??= detected.Recorder;
         }
         if (format == DiagnosticInputFormat.ProtectedCase) throw new InvalidDataException("ATSM-DIAG-PROTECTED-READER-REQUIRED");
+        if (!profile.IsHl7 && (format == DiagnosticInputFormat.Hl7Message || format == DiagnosticInputFormat.WireBytes && DiagnosticInputDetector.HasHl7Header(bytes)))
+            throw new InvalidDataException("ATSM-DIAG-HL7-PROFILE-REQUIRED");
         if (format == DiagnosticInputFormat.AtsmTrace)
         {
             using var reader = new StringReader(new UTF8Encoding(false, true).GetString(bytes));
@@ -46,6 +48,7 @@ public static class DiagnosticReader
             var adapterId = format == DiagnosticInputFormat.SysmexLog ? "sysmex.port-monitor" : "legacy.interface-log";
             var adapter = new DiagnosticCatalog().LogAdapters.Single(a => a.Id == adapterId);
             var original = adapter.Extract(bytes, new(RecordedBy.Host) { UtcOffset = utcOffset });
+            if (!profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(original.Segments)) throw new InvalidDataException("ATSM-DIAG-HL7-PROFILE-REQUIRED");
             var inferred = format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments);
             var recorder = recordedBy ?? inferred ?? RecordedBy.Instrument;
             var extracted = recorder == RecordedBy.Host ? original : adapter.Extract(bytes, new(recorder) { UtcOffset = utcOffset });
@@ -53,7 +56,7 @@ public static class DiagnosticReader
             segments = extracted.Segments;
             properties["recordedBy"] = recorder.ToString();
             if (recordedBy is null && inferred is null) properties["directionUncertain"] = "true";
-            if (!DiagnosticInputDetector.HasAstmHeader(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
+            if (!profile.IsHl7 && !DiagnosticInputDetector.HasAstmHeader(segments) && !DiagnosticInputDetector.HasHl7Header(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
             limitations.AddRange(adapter.Limitations);
             limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
             limitations.AddRange(extracted.Findings);
