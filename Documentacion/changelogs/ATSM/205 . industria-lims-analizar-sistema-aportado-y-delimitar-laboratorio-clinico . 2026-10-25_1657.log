@@ -1,0 +1,87 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 16:57 America/Buenos_Aires
+Tipo: fix / docs
+Commit de implementación: a9ee096d587340c9a6947730a299ce7e72784bc1
+Commit del registro: el commit docs que incorpora este archivo.
+Registro previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6402188638
+Informe remoto final: no enviado; revisión automática exige autorización explícita.
+Borrador revisable local: artifacts/issue-205-modelos.md (ignorado).
+
+Solicitud y alcance
+- Cambiar «sin lote informado» por «-» y abreviar «Valor sin formato del equipo».
+- Revisar el aviso de protocolo sin intérprete en UF-5000 y ampliar reconocimiento
+  documentado de modelos sin separar artificialmente la familia U-WAM.
+- La importación nueva del UF-5000 ya recuperaba 425 mensajes/5.006 resultados.
+  Se comprobaron brechas de marca persistida unsupportedProtocol y lecturas
+  fragmentadas; no se atribuye a todos los casos un fallo reproducible de importación.
+
+Cambios
+- Seed MAUI Quality.NoLot: «-». Vocabulario Sysmex: RAW «Original»,
+  MAINFORMAT «Formateado», sin repetir el identificador técnico en la tabla.
+- RevalidateProtocol revisa un rechazo antiguo con el intérprete actual y
+  conserva originales, otras propiedades y avisos de protocolos desconocidos.
+  Analyze lo aplica; MAUI también actualiza la clasificación al reanalizar/guardar.
+- Sondeo de cabeceras y origen por líneas reconstruidas por dirección;
+  no mezcla RX/TX ni consulta etiquetas de eventos/nombres de archivo.
+- El monitor Sysmex conserva Wire en continuaciones hasta EOT/FS para no
+  pasar fragmentos de trama por el parser de registros de aplicación.
+- Puerto opcional neutral IInstrumentHeaderProbe; firmas en cada plugin:
+  U-WAM/UF-3000/3000x/4000/5000/UC-1000/3500/UD-10, XN-350/450/550,
+  CS-2500, ASI y CDRuby. Identifica dialecto; no firmware ni opciones instaladas.
+- Conserva opciones explícitas del mismo dialecto, incluso con catálogos de
+  instancias distintas; más de un dialecto identificado es ambigüedad explícita.
+- Matriz documentada de modelos, cobertura directa frente a middleware y
+  límites. SUIT v8 revisado: OBR/OBX E1238-94, QC S, requiere intérprete propio.
+  No se implementa ni se declara soporte universal XN/XE/XS/XT por compartir marca.
+
+Fuentes
+- R315168 U-WAM Host Interface Specifications rev.22, §5.3.3 y apéndices B/K.
+- XN-L 1273-MKT rev.3 pp.34-38; CS-2500 rev.2.04 §5.3.3.1;
+  ARCHITECT 91407-108 §6; QWALYS 3 Connection Manual; trazas locales Ruby.
+- SUIT Protocol Description v8 pp.7/23/24/27/32 para el alcance pendiente.
+- Manuales y capturas permanecen ignorados; no se publican datos de pacientes.
+
+Archivos
+- dotnet/src/Atsm.Plugins/InstrumentHeaderProbe.cs
+- Plugins Architect, CellDynRuby, Sysmex.Urinalysis, Sysmex.XnL y Sysmex.Cs2500.
+- Diagnostics.Core/{DiagnosticAnalysis,DiagnosticInputDetector,
+  DiagnosticCatalog,ProtocolExplainer}.cs
+- Diagnostics.Maui/{Lang,MainPage}.cs
+- ProtocolRecognitionTests.cs (20 casos adicionales).
+- Documentacion/{DIAGNOSTICO-MANTENIMIENTO,ESTADO,CONTINUACION}.md
+
+Verificación
+- 251/251 .NET, 0 omitidas; dos corridas finales completas de ~1 s.
+  Incluye 7 pruebas contra el agente compilado y 5 por TLS.
+  Firmas por modelo, cada división de la cabecera UF en ambas direcciones,
+  cabecera HL7 fragmentada, no mezcla de direcciones/eventos, ambigüedad,
+  reanálisis inmutable, formato abreviado y trama con checksum incorrecto/NAK.
+- 542 checks nativos correctos, repetidos (~0,25-0,28 s).
+- MAUI build y publish correctos. Self-test de la salida terminada: PASS,
+  salida 0; ventana, runtime privado, DPAPI, siete vistas con/sin interpretación,
+  selección automática/manual U-WAM y calidad, incluido CONTROL-SYN / -.
+- CLI NativeAOT publish/self-test correctos; ATSM_PUBLICATION_DEPENDENCIES_OK.
+- Desde NativeAOT, sólo agregados de corpus local:
+  UF-5000 7.089 entradas / 425 mensajes / 5.006 observaciones;
+  UC-3500 2.006 / 501 / 2.251 (501 controles BCC);
+  U-WAM AMS 20.929 / 118 / 9.572; todos unsupported=False.
+  Los hallazgos de origen/checksum/errores del analizador permanecen visibles.
+- GUI y CLI ProductVersion 0.1.0+a9ee096d587340c9a6947730a299ce7e72784bc1.
+- 19 DLL propias con token 066190A23251F202. Idiomas: es, es-ES, en-us.
+  Cinco CS8002 conocidas de MAUI oficial sin Strong Name; Authenticode NotSigned
+  propio pendiente del release. No se modifican baselines ni se re-firman DLL oficiales.
+- No se repite Lang real: adaptador sin cambios. Sí se verifica seed modificado.
+- Sin cambios de Identidades, nuevas dependencias, ZIP, wrappers, push ni PR.
+
+Bloqueo del informe remoto
+- La revisión automática rechazó gh issue comment 205 --repo kalyx-ar/EDC
+  porque el usuario no autorizó explícitamente el payload del informe y su envío
+  a GitHub. El comando no se ejecutó. No se reintenta por otra herramienta.
+- Queda borrador local sanitizado listo para aprobación; el alcance previo ya
+  estaba registrado en #205 antes de editar. El issue permanece abierto por
+  el trabajo LIMS/LAW/EDC restante; no se simula una actualización remota final.
+
+Entrega local
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- Sin homologación física; no se declara soporte de interfaces directas no verificadas.
