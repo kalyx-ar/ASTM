@@ -1,0 +1,93 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 19:37 America/Buenos_Aires
+Tipo: feat / fix / docs
+Commit de implementación: 4df462fc2266a7b25d83306ab614221621c6cfa3
+Commit del registro: el commit docs que incorpora este archivo.
+Registro previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6404043340
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6404375177
+
+Alcance humano acumulado
+- Interpretar 9902 y trasladar tablas completas del manual al plugin.
+- Mensajes sin cabecera/fin repetitivos; conservar identificación/muestra/solicitud,
+  explicar consultas por número de muestra y señalar el mensaje con error.
+- N significa Normal y debe mostrarse sólo así; no contarlo como alarma.
+- IF y el bloque de imagen deben mostrarse como Imagen en tipo y Calidad.
+- Revisar el aviso UF-5000; el usuario confirmó que se trata de UF-5000Control.
+
+Conocimiento implementado
+- R315168 rev.22 appendix K pp.88-89 completo: 38 códigos U-WAM distintos,
+  incluido 0000, correspondencias y variantes UC-3500/UC-1000. 9902 -> 00CC.
+- Contexto opcional Model y SourceCode en los puertos neutrales existentes.
+  Cambios semánticos por modelo no se resuelven suponiendo un modelo ausente.
+- Tipos R.3.7 S/RC/RP/IF, origen R.3.5 A/M y formatos R.4.2 RAW,
+  MAINFORMAT, RAW_Q, RAW_C, RAW_R1, RAW_R2 expuestos por IInstrumentKnowledge.
+- IInstrumentMessageKnowledge e IInstrumentFlagKnowledge opcionales en SDK;
+  conocimiento de fabricante sólo en Atsm.Plugin.Sysmex.Urinalysis.
+- ExplainFinding permite al plugin interpretar hallazgos también en perfiles
+  ASTM. Códigos químicos diferentes tienen identidades de hallazgo diferentes;
+  el detalle conserva correspondencia, evidencia y original invariante.
+- Tabla de flags del analizador separada de LH y QC; componente vacío no
+  desplaza LH al campo del analizador. N no requiere atención ni cuenta alarma.
+- Estado Normal, sin Final según el equipo ni separador vacío. Estados
+  preliminar/corrección/sin medir y otros indicadores útiles se conservan.
+- IF: Imagen en tipo/valor/Calidad/subfilas; original en detalle/modo técnico.
+  IsStructuredContent excluye sus identificadores de estadísticas numéricas.
+  No se abren ni descargan imágenes ni recursos externos.
+- Mensajes: Q.3 explicado por muestra, H/L omitidos sólo del resumen,
+  P/O conservados, propósito del grupo y contador con originales desplegables.
+  Diagnósticos por mensaje e indicadores documentados permiten Con error sin
+  propagar el error al siguiente mensaje ni confundir N/LH/positivo con fallo.
+- Traducción por seed del ensamblado/Lang; valores y bytes no se traducen.
+
+UF-5000Control
+- 34.058 entradas binarias sin H/MSH ni comandos UC-3500; no es la captura
+  ASTM UF-5000 que entrega 425 mensajes y 5.006 observaciones.
+- Los manuales locales y capítulos públicos de servicio/electrónica consultados
+  no proporcionaron la especificación de ese contenido binario. No se afirma
+  identificar el canal interno exacto por su nombre o por ausencia de cabecera.
+- Aviso explícito Protocolo binario sin intérprete documentado, originales
+  disponibles en Trama. La transición posterior a una entrada compatible
+  limpia el estado anterior. No se fabrican mediciones ni respuestas.
+- Pendiente P-15 en CONTINUACION; #205 permanece abierto.
+
+Verificación
+- 271/271 pruebas .NET, 0 omitidas; dos corridas finales completas de ~1 s.
+  Veinte casos nuevos: tabla K/contextos completos, correspondencias,
+  desconocidos/modelos, N/flags/LH, mensajes/errores locales, IF numérico o
+  textual y binario desconocido sin observaciones inventadas.
+- 542 checks nativos correctos, repetidos (~0,25-0,35 s).
+- Lang real en artifacts/lang-semantic (salida aislada): 1 prueba correcta
+  en 159 ms; traducciones de Normal, Imagen y error 9902 aplicadas.
+- MAUI build/publish correctos. Self-test de la salida final: PASS/salida 0,
+  ventana/runtime privado/DPAPI/siete vistas, Normal/Imagen en Calidad,
+  consulta semántica y transición binario -> compatible, además de controles previos.
+- CLI NativeAOT: self-test correcto, semantic-flags-images-errors=ok.
+  Auditoría GUI ATSM_PUBLICATION_DEPENDENCIES_OK.
+- Corpus local desde NativeAOT, sólo agregados:
+  UF-5000: 7.089 entradas / 425 mensajes / 5.006 observaciones;
+  AMS: 20.929 / 118 / 9.572, incluidos 220 errores 9902/00CC identificados;
+  UF-5000Control: 34.058 entradas / 0 mensajes / 0 observaciones,
+  aviso de protocolo no interpretado conservado.
+- GUI y CLI ProductVersion 0.1.0+4df462fc2266a7b25d83306ab614221621c6cfa3.
+- 19 DLL propias con token 066190A23251F202. Cinco CS8002 MAUI oficiales
+  sin Strong Name conocidas y visibles; Authenticode propio pendiente.
+- Sin nuevas dependencias, ZIP, wrappers, cambios de Identidades, push ni PR.
+  Sin datos de pacientes, capturas ni manuales publicados.
+
+Archivos principales
+- dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis/{UwamChemistryErrors,
+  UrinalysisFlags,UrinalysisKnowledge,UrinalysisValueKnowledge,UwamVocabulary,
+  UwamInterpreter,SysmexUrinalysisPlugin}.cs
+- SDK Atsm.Plugins: InstrumentPresentationKnowledge, InstrumentKnowledgeContracts,
+  InstrumentValueKnowledge y DiagnosticVocabularyContracts.
+- Diagnostics.Core: DiagnosticAnalysis/DiagnosticText/ProtocolExplainer,
+  QualitySeries/QualityReportedRange; MAUI MainPage; CLI NativeSelfTest.
+- Pruebas SemanticPresentationTests y LangIntegrationTests.
+- Documentacion/{ESTADO,CONTINUACION,DIAGNOSTICO-MANTENIMIENTO,
+  CALIDAD-DIAGNOSTICA}.md
+
+Entrega
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- Publicación GitHub del informe autorizada por las instrucciones de trazabilidad
+  y el pedido de publicar #205 en este chat; enlace verificado en la salida de gh.

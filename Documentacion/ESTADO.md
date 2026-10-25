@@ -6,6 +6,8 @@ Incremento de interpretación semántica (2026-10-25): tabla K completa U-WAM en
 
 UF-5000Control: comprobado aparte del log de resultados UF-5000. Sus 34.058 entradas contienen datos binarios sin cabeceras ASTM/HL7; no hay intérprete documentado para ese contenido. Se conserva completo en Trama y se informa como protocolo binario, sin fabricar mensajes/mediciones. El aviso se limpia al analizar después una entrada compatible. No confundir este pendiente con la cobertura ASTM del UF-5000 (425 mensajes/5.006 observaciones).
 
+Entrega semántica verificada: GUI MAUI y CLI NativeAOT 0.1.0+4df462fc2266a7b25d83306ab614221621c6cfa3, self-tests correctos y auditoría de referencias GUI correcta. 271 pruebas .NET y 542 verificaciones nativas repetidas; Lang real: 1 prueba correcta (159 ms) de Normal/Imagen/9902. Corpus AMS: sus 220 registros 9902 se identifican con correspondencia 00CC; se conservan 118 mensajes/9.572 observaciones. 19 DLL propias con token de distribución y cinco advertencias CS8002 MAUI conocidas; Authenticode pendiente. [Resultado en #205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6404375177). Sin nuevas dependencias ni homologación física.
+
 ## Implementado
 
 Ajuste de presentación (2026-10-25): hallazgos genéricos UC-3500 abreviados a «Error relacionado con las tiras reactivas», «Error de análisis» y «Error del sistema óptico»; código y referencia permanecen en detalle.
