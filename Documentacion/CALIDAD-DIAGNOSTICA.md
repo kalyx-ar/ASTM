@@ -54,3 +54,9 @@ El manual UC-3500 distingue estado 0 (analizado) de estado 1 (no analizado, camp
 En las escalas de cruces que declaran − como categoría negativa, el modo interpretado muestra **0** (cero cruces) en observaciones/subfilas y extremos/categoría central. Esto no crea una concentración cero, ni un valor numérico para calcular media/DE. El valor original − permanece en el caso, distribución/detalle y modo técnico. Normal de URO conserva su texto; un guion de concentración, de otro parámetro/protocolo o de un estado no realizado no recibe esta equivalencia. El cambio es de representación ordinal, solicitado por el usuario, no una afirmación de ausencia química absoluta.
 
 Sin medir sigue dependiendo del estado de análisis explícito. Un campo vacío no se convierte en cero; tampoco se reconstruye una medición ausente. El puerto neutral expone DisplayValue como metadato de presentación del plugin, sin modificar RawText ni Numeric.
+
+## Indicadores e imágenes (2026-10-25)
+
+El contador y el resaltado usan IInstrumentFlagKnowledge del plugin. N en U-WAM se interpreta como Normal y no es una alarma. Los indicadores LH conservan su propio contexto, incluso con el componente del analizador vacío; H no se convierte por ello en un error del analizador. Se mantienen los indicadores originales en el caso y el detalle.
+
+IF es una imagen: tipo y resultado compactos «Imagen» en resumen y subfilas, con referencia/contenido original en detalle y modo técnico. IsStructuredContent impide calcular estadísticas numéricas de sus identificadores. No se abre ningún recurso externo ni se lo convierte en una medición. Los parámetros RP se identifican como parámetros de sensibilidad; no se inventan límites u objetivos.

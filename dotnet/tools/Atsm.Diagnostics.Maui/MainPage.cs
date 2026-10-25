@@ -223,7 +223,6 @@ public sealed class MainPage : ContentPage
                 _status.Text = DiagnosticText.Format(_inputFormats[_formats.SelectedIndex] == DiagnosticInputFormat.Auto ? "Detection.Success" : "Detection.Selected", DiagnosticText.Text("Format." + format), Profile.DisplayName);
             }
             Analyze();
-            if (_analysis?.Diagnostics.Any(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") == true) _status.Text = DiagnosticText.Text("Detection.Unsupported");
             if (!_case.IsComplete) _status.Text = T("View.Incomplete");
         }
         catch (Exception error) { ShowError(error); }
@@ -330,6 +329,9 @@ public sealed class MainPage : ContentPage
             }
             _case = DiagnosticReader.RevalidateProtocol(_case, Profile);
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
+            if (_analysis.Diagnostics.FirstOrDefault(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") is { } unsupported) _status.Text = DiagnosticText.Finding(unsupported, Profile);
+            else if (_status.Text == DiagnosticText.Text("Detection.Unsupported") || _status.Text == DiagnosticText.Text("Finding.UnsupportedBinary")
+                || _status.Text == DiagnosticText.Text("Finding.ATSM-DIAG-UNSUPPORTED-PROTOCOL")) _status.Text = T("View.FileRead");
             _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
         }
         catch (Exception error) { ShowError(error); }
@@ -372,13 +374,26 @@ public sealed class MainPage : ContentPage
                     var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
                     return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
                         Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + (message.Explanation?.Text.Evidence ?? ProtocolExplainer.RecordEvidence(message.Text, Profile))
-                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, kind);
-                }); break;
+                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, kind,
+                        ProtocolExplainer.MessageHasError(message, Profile, observations[message.Sequence].ToArray()).ToString());
+                }).ToArray();
+                var messageGroups = DiagnosticGrouping.Build(rows, _group.IsChecked).Select(group =>
+                {
+                    if (!interpreted || group.Count == 1 || group.Children.Select(r => r.Cells[3]).Distinct(StringComparer.Ordinal).Count() == 1) return group;
+                    var first = (_analysis?.Messages ?? []).First(m => m.Sequence.ToString() == group.Children[0].Cells[0]);
+                    var summary = group.Summary(n => DiagnosticText.Format("Group.Values", n));
+                    var content = ProtocolExplainer.MessageSummary(first, Profile);
+                    if (ProtocolExplainer.MessageHasError(first, Profile, observations[first.Sequence].ToArray())) content = DiagnosticText.Format("Message.WithError", content);
+                    var cells = summary.Cells.ToArray(); cells[3] = content;
+                    return group with { SummaryRow = summary with { Cells = cells } };
+                }).ToArray();
+                _table.SetGroups("messages:" + interpreted + ":" + _group.IsChecked, headers, messageGroups, 3);
+                return;
             case 2:
                 headers = [T("Column.Specimen"), T("Column.Position"), T("Column.Test"), T("Column.Type"), T("Column.Value"), T("Column.Unit"), T("Column.Status")];
                 rows = (_analysis?.Observations ?? []).Select(o => Row([o.Specimen.SpecimenId, o.Specimen.Position ?? "", o.Test.Vendor.Display ?? o.Test.Vendor.Code,
                     interpreted ? ProtocolExplainer.ResultKind(o, Profile) : o.ResultKind ?? "", interpreted ? ProtocolExplainer.ResultValue(o, Profile) : o.Value.RawText, o.Value.RawUnit ?? "",
-                    interpreted ? ProtocolExplainer.Status(o) : o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code))], Json(o),
+                    interpreted ? ProtocolExplainer.Status(o, Profile) : o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code))], Json(o),
                     o.Specimen.SpecimenId, o.Test.Vendor.Code, o.ResultKind)); break;
             case 3:
                 headers = interpreted ? [T("Column.Severity"), T("Column.Finding"), T("Column.Sequence")] : [T("Column.Severity"), T("Column.Code"), T("Column.Finding"), T("Column.Sequence")];
@@ -386,7 +401,7 @@ public sealed class MainPage : ContentPage
                 {
                     var meaning = DiagnosticText.Finding(finding, Profile);
                     return Row(interpreted ? [DiagnosticText.Text("Severity." + finding.Severity), meaning, finding.Location ?? ""] : [DiagnosticText.Text("Severity." + finding.Severity), finding.Code, finding.Message, finding.Location ?? ""],
-                        Detail(meaning, finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
+                        Detail(meaning + "\n" + DiagnosticText.FindingEvidence(finding, Profile), finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
                 }); break;
             case 4:
                 headers = [T("Quality.MaterialLot"), T("Column.Test"), T("Quality.DataType"), T("Quality.Minimum"), T("Quality.MedianValue"), T("Quality.Maximum"), T("Quality.SD"), T("Quality.N"), T("Quality.Unperformed"), T("Quality.Signals")];
@@ -449,13 +464,15 @@ public sealed class MainPage : ContentPage
             var children = series.Records.Select(o => new DiagnosticRow([material, series.Test, kind, "", string.IsNullOrWhiteSpace(o.Value.RawText)
                 ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? o.Value.RawText : _interpret.IsChecked ? ProtocolExplainer.ResultValue(o, Profile) : o.Value.RawText,
                 "", "", "1", o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed ? "1" : "",
-                "#" + o.Trace.LastSequence + (o.ResultTime is { } time ? " · " + time.ToString("g") : "") + " · " + ProtocolExplainer.Status(o)
+                "#" + o.Trace.LastSequence + (o.ResultTime is { } time ? " · " + time.ToString("g") : "") + " · " + ProtocolExplainer.Status(o, Profile)
                     + (series.PotentialOutliers.Contains(o.ObservationId) ? " · " + T("Quality.Outlier") : "")], Json(o), series.Key)
-                { Attention = o.Flags.Count > 0 || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
+                { Attention = ProtocolExplainer.RequiresAttention(o, knowledge as Atsm.Plugins.IInstrumentFlagKnowledge) || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
             var measuredValues = series.ValueFrequencies.Where(f => !f.NotPerformed && f.Value.Length > 0).ToArray();
             var modes = measuredValues.Where(f => f.Count == measuredValues.Max(v => v.Count)).ToArray();
+            var displays = series.Records.Select(o => knowledge?.DescribeValue(o)?.DisplayValue is null ? null : ProtocolExplainer.ResultValue(o, Profile)).Distinct(StringComparer.Ordinal).ToArray();
+            var compactValue = _interpret.IsChecked && displays.Length == 1 ? displays[0] : null;
             var result = series.Range.Median ?? (series.NumericCount > 0 ? Number(series.Median)
-                : series.Range.BoundedCount > 0 ? "—" : modes.Length == 1 ? modes[0].Value : modes.Length > 1 ? T("Quality.MixedResults") : "—");
+                : series.Range.BoundedCount > 0 ? "—" : compactValue ?? (modes.Length == 1 ? modes[0].Value : modes.Length > 1 ? T("Quality.MixedResults") : "—"));
             groups.Add(new(series.Key, children) { SummaryRow = new([material, series.Test, kind, series.Range.Minimum ?? "—", result, series.Range.Maximum ?? "—",
                 Approximate(series.StandardDeviation), series.MeasurementCount.ToString(CultureInfo.CurrentCulture), series.NotPerformed.ToString(CultureInfo.CurrentCulture),
                 signals.Count == 0 ? T("Quality.NoSignals") : string.Join(" · ", signals)], detail, series.Key)
@@ -542,6 +559,29 @@ public sealed class MainPage : ContentPage
             _interpret.IsChecked = interpreted;
             for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
         }
+        _tab = 4; ShowTable();
+        VerifySemanticPresentation();
+    }
+    private void VerifySemanticPresentation()
+    {
+        _interpret.IsChecked = true; SelectProfile(SysmexUrinalysisPlugin.WithChemistryProfile);
+        var payload = "H|\\^&|||U-WAM\rP|1\rO|1|SYN-QC|||||||||Q||||||||||||||F\rR|1|^^^SYN-IMAGE^A^1^IF|SYN.png^RAW|||N|||||||UF-5000\rL|1|N\r"u8.ToArray();
+        _case = DiagnosticReader.Read(payload, DiagnosticInputFormat.AstmMessage, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        var observation = _analysis!.Observations.Single(); var summary = QualityGroups().Single().SummaryRow!;
+        if (summary.Cells[2] != "Imagen" || summary.Cells[4] != "Imagen" || summary.Attention || ProtocolExplainer.Status(observation, Profile) != "Normal")
+            throw new InvalidDataException("ATSM-MAUI-SEMANTIC-IMAGE-STATUS-SELFTEST");
+        _tab = 4; ShowTable(); _table.VerifyAutomaticLayout();
+        var query = "H|\\^&\rQ|1|SYN-123\rL|1|N\r"u8.ToArray();
+        _case = DiagnosticReader.Read(query, DiagnosticInputFormat.AstmMessage, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        if (ProtocolExplainer.MessageContent(_analysis!.Messages.Single(), Profile, []) != "Consulta SYN-123 por número de muestra")
+            throw new InvalidDataException("ATSM-MAUI-SEMANTIC-QUERY-SELFTEST");
+        _tab = 1; ShowTable(); _table.VerifyAutomaticLayout();
+        _case = DiagnosticReader.Read("2026/10/25 10:00:00.000 R 006{[STX][NUL][SOH][NUL][ACK][ETX]}\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        if (_status.Text != DiagnosticText.Text("Finding.UnsupportedBinary") || _analysis!.Observations.Count != 0)
+            throw new InvalidDataException("ATSM-MAUI-BINARY-CONTROL-SELFTEST");
+        _case = DiagnosticReader.Read(payload, DiagnosticInputFormat.AstmMessage, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        if (_status.Text == DiagnosticText.Text("Finding.UnsupportedBinary") || _analysis!.Observations.Count != 1)
+            throw new InvalidDataException("ATSM-MAUI-STALE-BINARY-STATUS-SELFTEST");
         _tab = 4; ShowTable();
     }
     private void ShowError(Exception error)

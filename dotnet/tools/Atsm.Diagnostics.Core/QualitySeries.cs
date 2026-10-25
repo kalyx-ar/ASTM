@@ -30,7 +30,7 @@ public static class QualitySeriesBuilder
                 var unique = records.DistinctBy(o => o.ObservationId).ToArray();
                 var measured = unique.Where(o => o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed).ToArray();
                 bool Arithmetic(InstrumentObservation o) => IsNumeric(o)
-                    && knowledge?.DescribeValue(o)?.IsOrdinal != true;
+                    && knowledge?.DescribeValue(o) is not { IsOrdinal: true } and not { IsStructuredContent: true };
                 var numeric = measured.Where(Arithmetic).ToArray();
                 var sorted = numeric.Select(o => o.Value.Numeric!.Value).Order().ToArray();
                 double? mean = null, deviation = null;
@@ -55,7 +55,7 @@ public static class QualitySeriesBuilder
                     first.Quality?.Material?.Lot, first.Quality?.Material?.Level, first.Test.Vendor.Display ?? first.Test.Vendor.Code,
                     first.ResultKind ?? "", first.Value.RawUnit ?? first.Value.Unit?.Code ?? "", records, numeric.Length,
                     measured.Length - numeric.Length, records.Length - unique.Length,
-                    unique.Count(o => o.Flags.Count > 0 || o.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning),
+                    unique.Count(o => ProtocolExplainer.RequiresAttention(o, knowledge as IInstrumentFlagKnowledge)),
                     sorted.Length == 0 ? null : sorted[0], sorted.Length == 0 ? null : Quantile(sorted, 0.5m),
                     sorted.Length == 0 ? null : sorted[^1], deviation, mean, outliers)
                 {

@@ -64,7 +64,13 @@ internal static class NativeSelfTest
         var zero = QualitySeriesBuilder.Build([negative], knowledge).Single();
         if (zero.Range.Minimum != "0" || zero.Range.Median != "0" || zero.NotPerformed != 0 || zero.NumericCount != 0 || negative.Value.RawText != "-")
             throw new InvalidDataException("Native negative category mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok");
+        var uwam = catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile);
+        var semanticInput = DiagnosticReader.Read("H|\\^&|||U-WAM\rP|1\rO|1|SYN\rR|1|^^^SYN-IMAGE^A^1^IF|SYN.png^RAW|||N|||||||UF-5000\rR|2|^^^C-Error Code^A^1^S|9902^RAW|||||||||UC-3500\rL|1\r"u8.ToArray(), DiagnosticInputFormat.AstmMessage, uwam, "synthetic", TimeSpan.Zero);
+        var semantic = DiagnosticReader.Analyze(semanticInput, uwam, timing);
+        if (ProtocolExplainer.Status(semantic.Observations[0], uwam) != "Normal" || ProtocolExplainer.ResultValue(semantic.Observations[0], uwam) != "Imagen"
+            || !semantic.Diagnostics.Any(d => DiagnosticText.Finding(d, uwam) == "Error de solicitud (9902)"))
+            throw new InvalidDataException("Native semantic presentation mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

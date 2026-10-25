@@ -22,6 +22,8 @@ public static class DiagnosticText
         ["Message.Result"] = "Muestra {0} · {1}: {2} {3}",
         ["Message.Incomplete"] = "Mensaje incompleto", ["Message.Hl7Unknown"] = "Mensaje HL7 sin interpretación documentada ({0})",
         ["Message.Export"] = "Exportación de resultados", ["Message.Wire"] = "Fragmento de comunicación ({0} bytes)",
+        ["Message.WithError"] = "{0} - Con error", ["Flag.Unknown"] = "Código sin interpretar: {0}",
+        ["Finding.UnsupportedBinary"] = "Protocolo binario sin intérprete documentado; bytes disponibles en Trama.",
         ["Command.ENQ"] = "Solicitud de inicio de transmisión (ENQ)", ["Command.ACK"] = "Aceptación de la comunicación o trama (ACK)",
         ["Command.NAK"] = "Rechazo; el emisor debe reintentar (NAK)", ["Command.EOT"] = "Fin de transmisión (EOT)",
         ["Command.STX"] = "Inicio de trama (STX)", ["Command.ETX"] = "Fin de mensaje (ETX)",
@@ -29,11 +31,11 @@ public static class DiagnosticText
         ["Direction.Received"] = "Equipo → anfitrión", ["Direction.Transmitted"] = "Anfitrión → equipo", ["Direction.Event"] = "Evento",
         ["Direction.RX"] = "Equipo → anfitrión", ["Severity.Information"] = "Información", ["Severity.Warning"] = "Advertencia", ["Severity.Error"] = "Error",
         ["Level.Technical"] = "Captura", ["Level.Link"] = "Enlace", ["Level.Message"] = "Mensaje", ["Level.Operation"] = "Interpretación",
-        ["State.Unknown"] = "Estado sin equivalencia documentada", ["State.Final"] = "Final según el equipo",
+        ["State.Unknown"] = "—", ["State.Final"] = "Final",
         ["State.Preliminary"] = "Preliminar", ["State.Correction"] = "Corrección", ["State.PreviouslyTransmitted"] = "Transmitido anteriormente",
-        ["State.NotPerformed"] = "No realizado", ["State.Canceled"] = "Cancelado",
-        ["State.Repeat"] = "Repetición", ["State.Warning"] = "Advertencia del instrumento",
-        ["Raw.Kind"] = "Tipo informado por el equipo: {0}", ["Raw.Flags"] = "Alarmas/códigos del equipo: {0}",
+        ["State.NotPerformed"] = "Sin medir", ["State.Canceled"] = "Cancelado",
+        ["State.Repeat"] = "Repetición", ["State.Warning"] = "Advertencia",
+        ["Raw.Kind"] = "Tipo informado por el equipo: {0}", ["Raw.Flags"] = "Indicadores del equipo: {0}",
         ["Original"] = "Contenido original", ["Evidence"] = "Referencia de interpretación", ["Sequence"] = "Entrada {0}",
         ["Finding.Unknown"] = "Diagnóstico del sistema ({0}); consulte el detalle original.",
         ["Finding.ATSM-DIAG-INCOMPLETE-CASE"] = "El caso fue interrumpido o no tiene cierre; los datos pueden estar incompletos.",
@@ -56,7 +58,6 @@ public static class DiagnosticText
         ["Finding.Timestamp"] = "La fecha u hora informada no es válida para el perfil.",
         ["Finding.QueryUnsupported"] = "Se preservó la consulta; este perfil sólo recibe resultados y no genera una respuesta.",
         ["Finding.ATSM-ARC-QUERY-CANCELLED"] = "El equipo canceló la consulta de solicitudes.",
-        ["Finding.ATSM-UWAM-CHEMISTRY-ERROR"] = "El analizador químico informó un error; consulte el código del equipo.",
         ["Finding.ATSM-RUBY-ALARM"] = "CELL-DYN Ruby informó una alarma.",
         ["Finding.ATSM-RUBY-REJECTED"] = "CELL-DYN Ruby rechazó el mensaje del anfitrión.",
         ["Finding.ATSM-CFX-INVALID-EXPORT"] = "La exportación CFX no es válida o no coincide con el perfil CSV/RDML seleccionado.",
@@ -95,7 +96,9 @@ public static class DiagnosticText
     public static string Format(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, Text(key), args);
     public static string Finding(AtsmDiagnostic finding, DiagnosticProfile? profile = null)
     {
-        if (profile?.TracePlugin is { } plugin && plugin.DiagnosticVocabulary.TryGetValue("finding." + finding.Code, out var meaning)) return Plugin(plugin, meaning);
+        var plugin = (object?)profile?.TracePlugin ?? profile?.AstmPlugin;
+        if (plugin is IInstrumentDiagnosticVocabulary vocabulary && vocabulary.ExplainFinding(finding) is { } explanation) return Explanation(plugin, explanation);
+        if (finding.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL" && finding.Message == DiagnosticReader.UnsupportedBinaryMessage) return Text("Finding.UnsupportedBinary");
         if (finding.Code == "ATSM-DIAG-LIS01-INVALID-FRAME" && finding.Message == "STX inside a frame") return Text("Finding.STXInside");
         if (lang.TryGetValue("Finding." + finding.Code, out var text)) return text;
         var key = finding.Code switch
@@ -110,6 +113,8 @@ public static class DiagnosticText
         };
         return Format(key, finding.Code);
     }
+    public static string FindingEvidence(AtsmDiagnostic finding, DiagnosticProfile profile) =>
+        (((object?)profile.TracePlugin ?? profile.AstmPlugin) as IInstrumentDiagnosticVocabulary)?.ExplainFinding(finding)?.Text.Evidence ?? "";
     public static string Direction(string code) => lang.GetValueOrDefault("Direction." + code, code);
     public static string Event(string code, string? original = null) => lang.GetValueOrDefault("Event." + code)
         ?? Finding(new(code, AtsmSeverity.Information, original ?? ""));

@@ -12,7 +12,7 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Sysmex.Urinalysis;
 
-internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdapterProvider
+internal sealed partial class UwamInterpreter(IInstrumentKnowledge knowledge) : IInstrumentPlugin, ITraceLogAdapterProvider
 {
     public const string PluginId = "sysmex.uwam";
     public const string WithChemistryProfile = "sysmex.uwam.lis2a2.with-chemistry";
@@ -48,7 +48,7 @@ internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdap
     {
         if (profile.Id is not (WithChemistryProfile or WithoutChemistryProfile))
             throw new ArgumentException($"Unknown profile {profile.Id}.", nameof(profile));
-        return new UwamDialect(context);
+        return new UwamDialect(context, profile.Id, knowledge);
     }
 
     private static AstmProfile Profile(string id, TimeSpan budget) => new(
@@ -113,11 +113,11 @@ public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogForm
 /// R.4 is value^format (RAW / MAINFORMAT, one record each), R.7 is analyzer flag^LH flag, R.9 carries the UD-10 cell,
 /// R.14 names the analyzer, Q.3 is the sample number alone, Q.13 the device type, and O.26 is always F (final).
 /// </summary>
-public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor(UwamInterpreter.PluginId))
+public sealed class UwamDialect(DialectContext context, string profile = SysmexUrinalysisPlugin.WithChemistryProfile, IInstrumentKnowledge? knowledge = null) : StandardAstmDialect(context, CodeSystems.Vendor(UwamInterpreter.PluginId))
 {
     /// <summary>Parameter through which U-WAM reports errors of the urine chemistry analyzer (UC-3500 / UC-1000), R315168 appendix B.1.</summary>
     public const string ChemistryErrorParameter = "C-Error Code";
-    public const string ChemistryError = "ATSM-UWAM-CHEMISTRY-ERROR";
+    private readonly IInstrumentKnowledge chemistryKnowledge = knowledge ?? new UrinalysisKnowledge();
 
     public override AstmInterpretation Interpret(Lis02Message message, TraceRef trace)
     {
@@ -128,8 +128,15 @@ public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(co
         // A chemistry error may leave the results of that sample blank (R315168 B.1 note *2); the code maps through appendix K.
         var errors = interpretation.Observations
             .Where(o => o.Test.Vendor.Code == ChemistryErrorParameter && o.Value.RawText.Trim() is { Length: > 0 } code && code != "0000")
-            .Select(o => new Atsm.Abstractions.Diagnostics.AtsmDiagnostic(ChemistryError, Atsm.Abstractions.Diagnostics.AtsmSeverity.Warning,
-                $"Urine chemistry analyzer error {o.Value.RawText.Trim()} (R315168 appendix K)", o.Specimen.SpecimenId))
+            .Select(o =>
+            {
+                var code = o.Value.RawText.Trim();
+                var fact = chemistryKnowledge.Lookup(new(profile, "R", ChemistryErrorParameter, o.VendorIdentity["instrument.id"] ?? o.Instrument.Model), code);
+                return new Atsm.Abstractions.Diagnostics.AtsmDiagnostic(fact?.FindingCode ?? UwamChemistryErrors.Prefix + code,
+                    Atsm.Abstractions.Diagnostics.AtsmSeverity.Warning,
+                    $"Urine chemistry analyzer error {code}" + (fact?.SourceCode is { } original && original != code ? $"; analyzer code {original}" : "")
+                    + " (R315168 appendix K)", o.Specimen.SpecimenId);
+            })
             .ToList();
         return errors.Count == 0 ? interpretation : interpretation with { Diagnostics = [.. interpretation.Diagnostics, .. errors] };
     }
@@ -161,8 +168,8 @@ public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(co
     protected override string InstrumentStatus(Lis02Record result, OrderContext order) => order.ReportType;
 
     protected override IReadOnlyList<CodedValue> Flags(Lis02Record result) =>
-        result.Components(7).Where(f => f.Trim().Length > 0)
-            .Select((f, i) => new CodedValue(f.Trim(), null, VendorSystem + (i == 0 ? ":analyzer-flag" : ":lh-flag")))
+        result.Components(7).Select((f, i) => new CodedValue(f.Trim(), null, VendorSystem + (i == 0 ? ":analyzer-flag" : ":lh-flag")))
+            .Where(f => f.Code.Length > 0)
             .ToList();
 
     protected override Dictionary<string, string> Identity(Lis02Record result, OrderContext order)

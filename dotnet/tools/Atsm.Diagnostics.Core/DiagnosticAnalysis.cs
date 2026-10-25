@@ -17,6 +17,7 @@ public sealed record DecodedMessage(long Sequence, string Direction, string Type
     public long FirstSequence { get; init; } = Sequence;
     public ProtocolExplanation? Explanation { get; init; }
     public IReadOnlyDictionary<string, string> Fields { get; init; } = new Dictionary<string, string>();
+    public IReadOnlyList<AtsmDiagnostic> Diagnostics { get; init; } = [];
 }
 public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IReadOnlyList<StackEvent> Events,
     IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
@@ -28,6 +29,7 @@ public sealed record DiagnosticCase(TraceHeader Header, IReadOnlyList<TraceEntry
 public static class DiagnosticReader
 {
     public const int MaxInputBytes = 32 * 1024 * 1024;
+    internal const string UnsupportedBinaryMessage = "Recorded binary payload has no documented interpreter; raw input retained.";
     public static DiagnosticCase Read(byte[] bytes, DiagnosticInputFormat format, DiagnosticProfile profile, string sourceName, TimeSpan utcOffset, RecordedBy? recordedBy = null)
     {
         if (bytes.Length == 0 || bytes.Length > MaxInputBytes) throw new InvalidDataException("ATSM-DIAG-INPUT-LIMIT");
@@ -61,7 +63,11 @@ public static class DiagnosticReader
             segments = extracted.Segments;
             properties["recordedBy"] = recorder.ToString();
             if (recordedBy is null && inferred is null) properties["directionUncertain"] = "true";
-            if (profile.TracePlugin is null && !profile.IsHl7 && !DiagnosticInputDetector.HasAstmHeader(segments) && !DiagnosticInputDetector.HasHl7Header(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
+            if (profile.TracePlugin is null && !profile.IsHl7 && !DiagnosticInputDetector.HasAstmHeader(segments) && !DiagnosticInputDetector.HasHl7Header(segments) && segments.Any(s => s.Data.Length > 1))
+            {
+                properties["unsupportedProtocol"] = "true";
+                if (segments.Any(s => s.Data.Span.Contains((byte)0))) properties["unsupportedPayload"] = "binary";
+            }
             limitations.AddRange(adapter.Limitations);
             limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
             limitations.AddRange(extracted.Findings);
@@ -84,13 +90,15 @@ public static class DiagnosticReader
             if (input.Header.Properties?.GetValueOrDefault("directionUncertain") == "true")
                 findings.Add(new("ATSM-DIAG-DIRECTION-UNCERTAIN", AtsmSeverity.Warning, "Recorder side could not be inferred; confirm instrument or host."));
             messages.AddRange(interpreted.Messages.Select(m => new DecodedMessage(m.LastSequence, m.Direction.ToString(), m.Code, m.Text)
-            { FirstSequence = m.FirstSequence, Explanation = m.Explanation, Fields = m.Fields }));
+            { FirstSequence = m.FirstSequence, Explanation = m.Explanation, Fields = m.Fields,
+                Diagnostics = interpreted.Diagnostics.Where(d => InMessage(d, m.FirstSequence, m.LastSequence)).ToArray() }));
             return new(input.Entries, interpreted.Events.Select(e => new StackEvent(Enum.Parse<StackLevel>(e.Level.ToString()), e.LastSequence,
                 e.Elapsed, e.Direction, e.Code, e.Code, e.FirstSequence) { Explanation = e.Explanation }).ToArray(), messages, interpreted.Observations, findings);
         }
         if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true")
         {
-            findings.Add(new("ATSM-DIAG-UNSUPPORTED-PROTOCOL", AtsmSeverity.Warning, "Recorded bytes do not match a supported message protocol; raw input retained."));
+            findings.Add(new("ATSM-DIAG-UNSUPPORTED-PROTOCOL", AtsmSeverity.Warning, input.Header.Properties.GetValueOrDefault("unsupportedPayload") == "binary"
+                ? UnsupportedBinaryMessage : "Recorded bytes do not match a supported message protocol; raw input retained."));
             return new(input.Entries, [], [], [], findings);
         }
         if (input.Header.Properties?.GetValueOrDefault("directionUncertain") == "true")
@@ -122,12 +130,13 @@ public static class DiagnosticReader
                 {
                     var text = encoding.GetString(payload); var parsed = Hl7Codec.Parse(text); findings.AddRange(parsed.Diagnostics);
                     if (parsed.Message is not { } message) continue;
-                    messages.Add(new(entry.Sequence, entry.Direction.ToString(), message.Type + "^" + message.Trigger, text));
+                    var scoped = parsed.Diagnostics.ToList();
                     if (entry.Direction == TraceDirection.Received && message.Type is "OUL" or "QBP")
                     {
                         var interpreted = dialect.Interpret(message, new(input.Header.TraceId, entry.Sequence, entry.Sequence));
-                        values.AddRange(interpreted.Observations); findings.AddRange(interpreted.Diagnostics);
+                        values.AddRange(interpreted.Observations); findings.AddRange(interpreted.Diagnostics); scoped.AddRange(interpreted.Diagnostics);
                     }
+                    messages.Add(new(entry.Sequence, entry.Direction.ToString(), message.Type + "^" + message.Trigger, text) { Diagnostics = scoped });
                 }
             }
             foreach (var decoder in decoders.Values.Where(d => d.HasIncompleteBlock)) findings.Add(new("ATSM-MLLP-INCOMPLETE-BLOCK", AtsmSeverity.Warning, "Capture ends inside an MLLP block."));
@@ -141,19 +150,30 @@ public static class DiagnosticReader
         foreach (var message in stack.Messages)
         {
             var text = string.Concat(message.Records.Select(r => r + "\r"));
-            messages.Add(new(message.LastSequence, message.Direction.ToString(), message.Complete ? "LIS02" : "LIS02 incompleto", text));
-            if (!message.Complete) findings.Add(new("ATSM-DIAG-INCOMPLETE-MESSAGE", AtsmSeverity.Warning, "Incomplete message excluded from canonical observations.", $"entry:{message.LastSequence}"));
-            if (!message.Complete || message.Direction != TraceDirection.Received) continue;
-            var parsed = Lis02Codec.Parse(text); findings.AddRange(parsed.Diagnostics);
-            foreach (var item in parsed.Messages)
+            var scoped = findings.Where(d => InMessage(d, message.FirstSequence, message.LastSequence)).ToList();
+            if (!message.Complete)
             {
-                var interpreted = astm.Interpret(item, new(input.Header.TraceId, message.FirstSequence, message.LastSequence));
-                values.AddRange(interpreted.Observations); findings.AddRange(interpreted.Diagnostics);
-                resources.AddRange(interpreted.QualityResources);
+                var incomplete = new AtsmDiagnostic("ATSM-DIAG-INCOMPLETE-MESSAGE", AtsmSeverity.Warning, "Incomplete message excluded from canonical observations.", $"entry:{message.LastSequence}");
+                findings.Add(incomplete); scoped.Add(incomplete);
             }
+            else
+            {
+                var parsed = Lis02Codec.Parse(text); findings.AddRange(parsed.Diagnostics); scoped.AddRange(parsed.Diagnostics);
+                if (message.Direction == TraceDirection.Received)
+                foreach (var item in parsed.Messages)
+                {
+                    var interpreted = astm.Interpret(item, new(input.Header.TraceId, message.FirstSequence, message.LastSequence));
+                    values.AddRange(interpreted.Observations); findings.AddRange(interpreted.Diagnostics); scoped.AddRange(interpreted.Diagnostics);
+                    resources.AddRange(interpreted.QualityResources);
+                }
+            }
+            messages.Add(new(message.LastSequence, message.Direction.ToString(), message.Complete ? "LIS02" : "LIS02 incompleto", text)
+            { FirstSequence = message.FirstSequence, Diagnostics = scoped });
         }
         return new(input.Entries, stack.Events, messages, values, findings) { QualityResources = resources };
     }
+    private static bool InMessage(AtsmDiagnostic finding, long first, long last) => finding.Location?.StartsWith("entry:", StringComparison.Ordinal) == true
+        && long.TryParse(finding.Location.AsSpan(6), out var sequence) && sequence >= first && sequence <= last;
 
     /// <summary>Recompute a previous detection failure using today's interpreter. Raw entries are immutable evidence;
     /// an import-time classification must not permanently block their reanalysis.</summary>
@@ -166,7 +186,7 @@ public static class DiagnosticReader
             || profile.AstmProfile is not null && DiagnosticInputDetector.HasAstmHeader(segments)
             || profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(segments);
         if (!recognized) return input;
-        var properties = new Dictionary<string, string>(input.Header.Properties); properties.Remove("unsupportedProtocol");
+        var properties = new Dictionary<string, string>(input.Header.Properties); properties.Remove("unsupportedProtocol"); properties.Remove("unsupportedPayload");
         properties["protocol"] = profile.Protocol;
         return input with { Header = input.Header with { Properties = properties } };
     }

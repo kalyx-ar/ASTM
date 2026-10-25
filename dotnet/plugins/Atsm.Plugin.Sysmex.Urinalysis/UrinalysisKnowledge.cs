@@ -14,6 +14,20 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
         foreach (var (key, value) in Uc3500Interpreter.CreateVocabulary()) vocabulary.Add(key, value);
         Vocabulary = vocabulary;
         foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
+        foreach (var entry in UwamChemistryErrors.Definitions)
+        {
+            var finding = UwamChemistryErrors.FindingCode(entry);
+            facts.Add((new(profile, "R", UwamDialect.ChemistryErrorParameter, entry.Model), entry.Code),
+                new(vocabulary["finding." + finding], entry.Code == "0000" ? null : finding,
+                    entry.Code == "0000" ? AtsmSeverity.Information : AtsmSeverity.Warning, entry.SourceCode));
+        }
+        foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
+        {
+            foreach (var code in new[] { "A", "M" }) facts.Add((new(profile, "R", "3.5"), code), new(vocabulary["method." + code]));
+            foreach (var code in new[] { "S", "RC", "RP", "IF" }) facts.Add((new(profile, "R", "3.7"), code), new(vocabulary[code == "IF" ? "value.Image" : "resultKind." + code]));
+            foreach (var code in new[] { "RAW", "MAINFORMAT", "RAW_Q", "RAW_C", "RAW_R1", "RAW_R2" }) facts.Add((new(profile, "R", "4.2"), code), new(vocabulary["resultFormat." + code]));
+        }
+        foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
         foreach (var (key, value) in vocabulary.Where(p => p.Key.StartsWith("record.", StringComparison.Ordinal)))
             facts.Add((new(profile, "record", "type"), key[7..]), new(value));
         foreach (var code in new[] { "RQ02", "CM00" })
@@ -33,6 +47,8 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
     }
     public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code)
     {
+        if (context.Record == "R" && context.Field == UwamDialect.ChemistryErrorParameter)
+            context = context with { Model = UwamChemistryErrors.Model(context.Model) };
         if (facts.TryGetValue((context, code), out var exact)) return exact;
         if (context != new InstrumentKnowledgeContext(Uc3500Interpreter.ProfileId, "RESULT", "error") || code == "0000") return null;
         // Table 7-1 categories apply to result errors, never to ER response records or arbitrary text.

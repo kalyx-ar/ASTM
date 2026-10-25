@@ -9,6 +9,8 @@ public sealed record InstrumentValueMeaning(ProtocolText Kind, string Scale, boo
 {
     /// <summary>Contextual presentation only; never replaces RawText or creates a quantitative result.</summary>
     public string? DisplayValue { get; init; }
+    /// <summary>Images/references are not numeric measurements, even if their identifier is all digits.</summary>
+    public bool IsStructuredContent { get; init; }
 }
 public interface IInstrumentValueKnowledge
 {

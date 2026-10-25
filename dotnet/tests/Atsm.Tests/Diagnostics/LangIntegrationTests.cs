@@ -19,6 +19,9 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "record.S")] = "CONTROL TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UC3500-ER04")] = "TIRA TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Crosses")] = "CRUCES TRADUCIDAS";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.N")] = "ESTADO TRADUCIDO";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Image")] = "IMAGEN TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UWAM-CHEMISTRY-UC3500-9902")] = "ERROR TRADUCIDO";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -29,6 +32,13 @@ public sealed class LangIntegrationTests
         Assert.Equal("TIRA TRADUCIDA", DiagnosticText.Finding(new("ATSM-UC3500-ER04", AtsmSeverity.Warning, "Original"), catalog.Resolve("sysmex.uc3500.serial")));
         var plugin = catalog.Resolve("sysmex.uc3500.serial").TracePlugin!;
         Assert.Equal("CRUCES TRADUCIDAS", DiagnosticText.Plugin(plugin, plugin.DiagnosticVocabulary["value.Crosses"]));
+        var profile = catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile);
+        var input = DiagnosticReader.Read("H|\\^&|||U-WAM\rP|1\rO|1|SYN\rR|1|^^^IMAGE^A^1^IF|SYN.png^RAW|||N|||||||UF-5000\rL|1\r"u8.ToArray(), DiagnosticInputFormat.AstmMessage, profile, "synthetic", TimeSpan.Zero);
+        var observation = DiagnosticReader.Analyze(input, profile, new(TimeSpan.Zero, TimeSpan.Zero, TimeZoneInfo.Utc)).Observations.Single();
+        Assert.Equal("ESTADO TRADUCIDO", ProtocolExplainer.Status(observation, profile));
+        Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultKind(observation, profile));
+        Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultValue(observation, profile));
+        Assert.Equal("ERROR TRADUCIDO", DiagnosticText.Finding(new("ATSM-UWAM-CHEMISTRY-UC3500-9902", AtsmSeverity.Warning, "Original"), profile));
         Assert.Equal(ConnectionState.Open, database.State);
     }
 

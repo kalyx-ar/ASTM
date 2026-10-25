@@ -18,6 +18,12 @@ internal static class UrinalysisValueKnowledge
     };
     public static InstrumentValueMeaning? Describe(InstrumentObservation observation, IReadOnlyDictionary<string, ProtocolText> vocabulary)
     {
+        if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
+        {
+            var kind = observation.ResultKind?.Split('/')[0];
+            if (kind == "IF") return new(vocabulary["value.Image"], "image", false) { DisplayValue = vocabulary["value.Image"].Fallback, IsStructuredContent = true };
+            if (kind is "RC" or "RP") return new(vocabulary["resultKind." + kind], "reported:" + kind, false);
+        }
         if (observation.Test.Vendor.System != CodeSystems.Vendor(Uc3500Interpreter.PluginId)) return null;
         var text = observation.Value.RawText.Trim();
         if ((observation.ResultKind == "QUALITATIVE" || observation.ResultKind == "TURBIDITY")

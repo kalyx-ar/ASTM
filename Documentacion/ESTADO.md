@@ -2,6 +2,10 @@
 
 Instantánea del 25 de octubre de 2026. Describe lo que existe y lo que se comprobó; no reemplaza a la propuesta ni a la matriz de [IMPLEMENTACION](IMPLEMENTACION.md).
 
+Incremento de interpretación semántica (2026-10-25): tabla K completa U-WAM en el plugin (38 códigos, incluido 0000; variantes UC-3500/UC-1000), tablas de tipos/formatos/origen y flags contextuales. 9902 muestra «Error de solicitud», con correspondencia 00CC en detalle. N muestra únicamente «Normal» y no cuenta como alarma; IF muestra «Imagen» en tipo/resultado, sin estadísticas numéricas ni apertura de referencias. Mensajes conservan identificación/muestra/solicitud, omiten H/L en el resumen, explican consultas por muestra y añaden «Con error» sólo a los mensajes afectados. 271 pruebas .NET y 542 verificaciones nativas; evidencia de la salida final en el changelog de este incremento. [Conocimiento y límites](DIAGNOSTICO-MANTENIMIENTO.md#conocimiento-y-resúmenes-semánticos-2026-10-25).
+
+UF-5000Control: comprobado aparte del log de resultados UF-5000. Sus 34.058 entradas contienen datos binarios sin cabeceras ASTM/HL7; no hay intérprete documentado para ese contenido. Se conserva completo en Trama y se informa como protocolo binario, sin fabricar mensajes/mediciones. El aviso se limpia al analizar después una entrada compatible. No confundir este pendiente con la cobertura ASTM del UF-5000 (425 mensajes/5.006 observaciones).
+
 ## Implementado
 
 Ajuste de presentación (2026-10-25): hallazgos genéricos UC-3500 abreviados a «Error relacionado con las tiras reactivas», «Error de análisis» y «Error del sistema óptico»; código y referencia permanecen en detalle.

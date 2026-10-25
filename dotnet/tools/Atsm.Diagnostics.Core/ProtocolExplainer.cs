@@ -1,10 +1,12 @@
 using System.Text;
 using Atsm.Abstractions.Model;
+using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
 using Atsm.Runtime.Tracing;
 using Atsm.Tracing;
+using Atsm.Protocol.Lis02;
 
 namespace Atsm.Diagnostics;
 
@@ -45,12 +47,30 @@ public static class ProtocolExplainer
     }
     public static string MessageContent(DecodedMessage message, DiagnosticProfile profile, IReadOnlyList<InstrumentObservation> observations)
     {
-        if (message.Explanation is { } explanation && profile.TracePlugin is { } plugin) return DiagnosticText.Explanation(plugin, explanation);
+        string content;
         var results = observations.Where(o => o.Trace.LastSequence == message.Sequence).ToArray();
-        if (results.Length > 0) return string.Join(" · ", results.Select(o => DiagnosticText.Format("Message.Result", o.Specimen.SpecimenId,
-            o.Test.Vendor.Display ?? o.Test.Vendor.Code, o.Value.RawText, o.Value.RawUnit ?? "")));
-        return profile.IsHl7 ? MessageKind(message, profile) : RecordNames(message.Text, profile);
+        if (message.Explanation is { } explanation && profile.TracePlugin is { } plugin) content = DiagnosticText.Explanation(plugin, explanation);
+        else if (profile.AstmPlugin is IInstrumentMessageKnowledge knowledge && Lis02Codec.Parse(message.Text).Messages
+            .Select(knowledge.ExplainMessage).FirstOrDefault(e => e is not null) is { } semantic) content = DiagnosticText.Explanation(profile.AstmPlugin, semantic);
+        else if (results.Length > 0) content = string.Join(" · ", results.Select(o => DiagnosticText.Format("Message.Result", o.Specimen.SpecimenId,
+            o.Test.Vendor.Display ?? o.Test.Vendor.Code, ResultValue(o, profile), o.Value.RawUnit ?? "")));
+        else content = MessageSummary(message, profile);
+        return MessageHasError(message, profile, results) ? DiagnosticText.Format("Message.WithError", content) : content;
     }
+    public static string MessageSummary(DecodedMessage message, DiagnosticProfile profile)
+    {
+        if (profile.IsHl7 || profile.TracePlugin is not null || profile.ContentPlugin is not null) return MessageKind(message, profile);
+        var names = Records(message.Text, profile).Where(r => r.Code is not ('H' or 'L')).Select(r => r.Meaning is { } meaning
+            ? DiagnosticText.Plugin(profile.AstmPlugin!, meaning) : DiagnosticText.Format("Unknown.Command", r.Code)).Distinct(StringComparer.Ordinal).ToArray();
+        return names.Length == 0 ? DiagnosticText.Text("Message.Empty") : string.Join(" · ", names);
+    }
+    public static bool MessageHasError(DecodedMessage message, DiagnosticProfile profile, IReadOnlyList<InstrumentObservation> observations) =>
+        message.Type.Contains("incompleto", StringComparison.Ordinal) || message.Diagnostics.Any(d => d.Severity is AtsmSeverity.Warning or AtsmSeverity.Error)
+        || observations.Where(o => o.Trace.LastSequence == message.Sequence).Any(o => o.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning
+            || o.Flags.Any(f => FlagKnowledge(profile)?.DescribeFlag(o, f)?.IsError == true));
+    private static IInstrumentFlagKnowledge? FlagKnowledge(DiagnosticProfile? profile) => ((object?)profile?.TracePlugin ?? profile?.AstmPlugin) as IInstrumentFlagKnowledge;
+    public static bool RequiresAttention(InstrumentObservation observation, IInstrumentFlagKnowledge? knowledge = null) =>
+        observation.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning || observation.Flags.Any(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false);
     public static string Entry(TraceEntry entry, DiagnosticProfile profile)
     {
         if (entry.Code == TraceReconstruction.MessageCode)
@@ -86,8 +106,20 @@ public static class ProtocolExplainer
     public static string ResultValue(InstrumentObservation observation, DiagnosticProfile profile)
     {
         var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin;
-        return (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation)?.DisplayValue ?? observation.Value.RawText;
+        var meaning = (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation);
+        return meaning?.DisplayValue is { } display ? display == meaning.Kind.Fallback ? DiagnosticText.Plugin(plugin!, meaning.Kind) : display : observation.Value.RawText;
     }
-    public static string Status(InstrumentObservation observation) => DiagnosticText.Text("State." + observation.InstrumentStatusMeaning)
-        + (observation.Flags.Count == 0 ? "" : " · " + DiagnosticText.Format("Raw.Flags", string.Join(", ", observation.Flags.Select(f => f.Code))));
+    public static string Status(InstrumentObservation observation, DiagnosticProfile? profile = null)
+    {
+        var knowledge = FlagKnowledge(profile);
+        var meaningfulFlags = observation.Flags.Any(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false)
+            ? observation.Flags.Where(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false) : observation.Flags;
+        var flags = meaningfulFlags.Select(f => knowledge?.DescribeFlag(observation, f) is { } meaning
+            ? DiagnosticText.Plugin(((object?)profile!.TracePlugin ?? profile.AstmPlugin)!, meaning.Text) : DiagnosticText.Format("Flag.Unknown", f.Code)).Distinct(StringComparer.Ordinal).ToList();
+        if (observation.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed) return DiagnosticText.Text("State.NotPerformed");
+        // Final/Unknown add no information to a documented analyzer flag such as N = Normal.
+        if (flags.Count > 0 && observation.InstrumentStatusMeaning is InstrumentStatusMeaning.Final or InstrumentStatusMeaning.Unknown) return string.Join(" · ", flags);
+        var state = DiagnosticText.Text("State." + observation.InstrumentStatusMeaning);
+        return flags.Count == 0 ? state : state + " · " + string.Join(" · ", flags);
+    }
 }

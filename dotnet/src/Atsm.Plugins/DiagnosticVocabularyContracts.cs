@@ -1,3 +1,5 @@
+using Atsm.Abstractions.Diagnostics;
+
 namespace Atsm.Plugins;
 
 /// <summary>Presentation metadata, never a protocol decision. Keys are stable; raw values remain unchanged.</summary>
@@ -7,6 +9,7 @@ public sealed record ProtocolText(string Key, string Fallback, string Evidence);
 public interface IInstrumentDiagnosticVocabulary
 {
     IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary { get; }
+    ProtocolExplanation? ExplainFinding(AtsmDiagnostic finding) => DiagnosticVocabulary.TryGetValue("finding." + finding.Code, out var text) ? new(text, []) : null;
 }
 
 public static class StandardDiagnosticVocabulary
