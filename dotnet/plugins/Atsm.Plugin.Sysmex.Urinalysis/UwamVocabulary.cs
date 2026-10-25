@@ -11,6 +11,6 @@ internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
         ("record.O", "Muestra, tipo de análisis y estado de la solicitud"),
         ("record.R", "Resultado urinario, método, dilución y formato del valor"),
         ("record.Q", "Consulta de solicitudes por número de muestra"),
-        ("resultFormat.RAW", "Valor sin formato del equipo"),
-        ("resultFormat.MAINFORMAT", "Valor con el formato principal del equipo"));
+        ("resultFormat.RAW", "Original"),
+        ("resultFormat.MAINFORMAT", "Formateado"));
 }

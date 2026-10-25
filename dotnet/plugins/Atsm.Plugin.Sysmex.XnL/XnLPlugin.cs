@@ -7,8 +7,10 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Sysmex.XnL;
 
-public sealed partial class XnLPlugin : IInstrumentPlugin
+public sealed partial class XnLPlugin : IInstrumentPlugin, IInstrumentHeaderProbe
 {
+    // 1273-MKT rev.3, pp.34-38: H.5.1 carries the sender model.
+    public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().ToUpperInvariant() is "XN-350" or "XN-450" or "XN-550";
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.xnl.astm02.results", "1.1.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
         ["Sysmex XN-L LIS Interface Implementation Guide 1273-MKT rev.3 (2020), §7/8: ASTM1381-02/1394-97; R.3 parameter in component 5, dilution 6, R.9 instrument judgement, R.13 analysis time.",

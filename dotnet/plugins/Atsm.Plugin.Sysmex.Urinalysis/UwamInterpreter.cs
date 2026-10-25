@@ -24,6 +24,7 @@ internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdap
         "R315168 5.2.5: 15 s establishment, 30 s receiver; order inquiry answered within 8 s (with chemistry analyzer) or 18 s (without)",
         "R315168 5.2.5: in E1381-95 mode U-WAM performs no timeout processing (not covered by these profiles)",
         "R315168 pp.39-40,47: QC identifier and serial in R.14; §5.3.3.7/Appendix J: S.7 points to external target/limit CSV; host resolves, ATSM never opens it.",
+        "R315168 rev.22 appendices B/K: UF-3000/3000x/4000/5000, UC-1000/3500 and UD-10 on the U-WAM host link; not qualification of each analyzer's direct protocol.",
     ];
 
     // The host answer budget leaves margin below the instrument limit for framing and transfer.
@@ -40,7 +41,7 @@ internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdap
         "0.1.0",
         PluginApi.Version,
         "Sysmex",
-        ["U-WAM (UF-5000, UC-3500, UD-10)"],
+        ["U-WAM (UF-3000/3000x/4000/5000, UC-1000/3500, UD-10)"],
         ["Sysmex R315168 U-WAM ASTM Host Online Specifications, revision 22"]);
 
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context)
@@ -69,6 +70,24 @@ internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdap
 /// </summary>
 public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogFormat)
 {
+    public override LogExtraction Extract(ReadOnlySpan<byte> log, LogAdapterOptions options)
+    {
+        var extraction = base.Extract(log, options);
+        var framed = new HashSet<TraceDirection>();
+        var segments = extraction.Segments.Select(segment =>
+        {
+            if (segment.Direction == TraceDirection.Event) return segment;
+            // Each line is a read/write. A continuation without STX is still wire data,
+            // never a standalone application record. LIS01 ends with EOT, MLLP with FS.
+            var bytes = segment.Data.Span;
+            if (bytes.Contains((byte)2) || bytes.Contains((byte)11)) framed.Add(segment.Direction);
+            var result = framed.Contains(segment.Direction) ? segment with { Content = SegmentContent.Wire } : segment;
+            if (bytes.Contains((byte)4) || bytes.Contains((byte)28)) framed.Remove(segment.Direction);
+            return result;
+        }).ToArray();
+        return extraction with { Segments = segments };
+    }
+
     public static readonly RegexLogFormat LogFormat = new(
         "sysmex.port-monitor",
         "Sysmex port monitor (wire bytes or records, one line per read/write)",

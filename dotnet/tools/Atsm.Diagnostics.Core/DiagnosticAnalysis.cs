@@ -73,6 +73,7 @@ public static class DiagnosticReader
 
     public static DiagnosticAnalysis Analyze(DiagnosticCase input, DiagnosticProfile profile, DiagnosticTiming timing)
     {
+        input = RevalidateProtocol(input, profile);
         var values = new List<InstrumentObservation>(); var findings = new List<AtsmDiagnostic>(); var messages = new List<DecodedMessage>();
         if (!input.IsComplete) findings.Add(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "The case was interrupted or its final closure is missing; data may be incomplete."));
         findings.AddRange((input.Header.Limitations ?? []).Select(l => new AtsmDiagnostic("ATSM-DIAG-SOURCE-LIMITATION", AtsmSeverity.Information, l)));
@@ -152,6 +153,22 @@ public static class DiagnosticReader
             }
         }
         return new(input.Entries, stack.Events, messages, values, findings) { QualityResources = resources };
+    }
+
+    /// <summary>Recompute a previous detection failure using today's interpreter. Raw entries are immutable evidence;
+    /// an import-time classification must not permanently block their reanalysis.</summary>
+    public static DiagnosticCase RevalidateProtocol(DiagnosticCase input, DiagnosticProfile profile)
+    {
+        if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") != "true") return input;
+        var segments = input.Entries.Select(e => new TraceSegment(e.Utc, e.Direction,
+            e.Direction == TraceDirection.Event ? SegmentContent.Event : e.Code == TraceReconstruction.MessageCode ? SegmentContent.Message : SegmentContent.Wire, e.Data)).ToArray();
+        var recognized = profile.TracePlugin?.Recognizes(segments) == true
+            || profile.AstmProfile is not null && DiagnosticInputDetector.HasAstmHeader(segments)
+            || profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(segments);
+        if (!recognized) return input;
+        var properties = new Dictionary<string, string>(input.Header.Properties); properties.Remove("unsupportedProtocol");
+        properties["protocol"] = profile.Protocol;
+        return input with { Header = input.Header with { Properties = properties } };
     }
 
     public static string DescribeBytes(ReadOnlyMemory<byte> bytes, bool hex)

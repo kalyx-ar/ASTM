@@ -8,8 +8,10 @@ using Atsm.Protocol.Lis02;
 namespace Atsm.Plugin.Sysmex.Cs2500;
 
 /// <summary>Documented receive-only E1381-02 / E1394-97 profile. No speculative order handling.</summary>
-public sealed partial class Cs2500Plugin : IInstrumentPlugin
+public sealed partial class Cs2500Plugin : IInstrumentPlugin, IInstrumentHeaderProbe
 {
+    // Host Interface Specifications rev.2.04, §5.3.3.1: H.5.1 sender name.
+    public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().Equals("CS-2500", StringComparison.OrdinalIgnoreCase);
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.cs2500.astm02.results", "1.1.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
         ["Sysmex CS-2500 ASTM Host Interface Specifications for US rev.2.04 (2019), §5.2.2/5.2.5: 15/15/30 s, busy 10 s; §5.3.3.4 O.4, §5.3.3.5 R.3/R.7.",

@@ -5,8 +5,8 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.BioRad.Cfx;
-using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
+using Atsm.Protocol.Lis02;
 
 namespace Atsm.Diagnostics;
 
@@ -40,14 +40,7 @@ public static partial class DiagnosticInputDetector
             var hl7 = HasHl7Header(extraction.Segments);
             var compatible = HasAstmHeader(extraction.Segments) || hl7 || selected.IsHl7;
             var controlOnly = extraction.Segments.Where(s => s.Direction != TraceDirection.Event).All(s => s.Data.Span.IndexOfAnyExcept((byte)4, (byte)5, (byte)6) < 0 || s.Data.Span.SequenceEqual(new byte[] { 21 }));
-            var profile = hl7 ? Hl7Profile(selected)
-                : selected.AstmProfile is not null ? selected.Id : selected.InstrumentId == SysmexUrinalysisPlugin.PluginId && compatible
-                    ? SysmexUrinalysisPlugin.WithChemistryProfile : StandardAstmPlugin.ProfileId;
-            // A recorder brand alone does not identify the protocol. Only a declared message header is a model hint.
-            var headers = extraction.Segments.Where(s => s.Data.Span.IndexOf("H|"u8) >= 0).Select(s => Encoding.Latin1.GetString(s.Data.Span));
-            if (!hl7 && headers.Any(h => h.Contains("U-WAM", StringComparison.OrdinalIgnoreCase) || h.Contains("UF-5000", StringComparison.OrdinalIgnoreCase))
-                && selected.AstmPlugin is not SysmexUrinalysisPlugin)
-                profile = SysmexUrinalysisPlugin.WithChemistryProfile; // Conservative budget; a file cannot prove the installed chemistry option.
+            var profile = hl7 ? Hl7Profile(selected) : catalog.ResolveAstmInterpretation(extraction.Segments, selected).Id;
             return new(formats, profile, matchingLogs[0].Id == "legacy.interface-log" ? RecordedBy.Host : InferRecorder(extraction.Segments), !compatible && !controlOnly);
         }
         var first = text.TrimStart('\uFEFF', ' ', '\r', '\n', '\t').AsSpan();
@@ -70,30 +63,55 @@ public static partial class DiagnosticInputDetector
         if (first.StartsWith("MSH", StringComparison.Ordinal)) return new([DiagnosticInputFormat.Hl7Message], Hl7Profile(selected));
         if (bytes.AsSpan().IndexOf("\vMSH"u8) >= 0) return new([DiagnosticInputFormat.WireBytes], Hl7Profile(selected));
         if (first.StartsWith("H|", StringComparison.Ordinal) && IsAstmHeader(first.ToString()))
-            return new([DiagnosticInputFormat.AstmMessage], selected.AstmProfile is not null ? selected.Id : StandardAstmPlugin.ProfileId);
+            return new([DiagnosticInputFormat.AstmMessage], catalog.ResolveAstmInterpretation([new(null, TraceDirection.Received, SegmentContent.Message, bytes)], selected).Id);
         if (bytes.Contains((byte)2) && IsAstmHeader(text))
-            return new([DiagnosticInputFormat.WireBytes], selected.AstmProfile is not null ? selected.Id : StandardAstmPlugin.ProfileId);
+            return new([DiagnosticInputFormat.WireBytes], catalog.ResolveAstmInterpretation([new(null, TraceDirection.Received, SegmentContent.Wire, bytes)], selected).Id);
         var wire = new TraceSegment(null, TraceDirection.Received, SegmentContent.Wire, bytes);
         var protocols = catalog.Profiles.Where(p => p.TracePlugin?.Recognizes([wire]) == true).ToArray();
         if (protocols.Length == 1) return new([DiagnosticInputFormat.WireBytes], protocols[0].Id);
         return new(formats);
     }
 
-    public static bool HasAstmHeader(IEnumerable<TraceSegment> segments) => segments.Any(s => IsAstmHeader(Encoding.Latin1.GetString(s.Data.Span)));
-    public static bool HasHl7Header(IEnumerable<TraceSegment> segments) => segments.Any(s => Hl7Header().IsMatch(Encoding.Latin1.GetString(s.Data.Span)));
+    public static bool HasAstmHeader(IEnumerable<TraceSegment> segments) => ProbeLines(segments).Any(s => IsAstmHeader(s.Text));
+    public static bool HasHl7Header(IEnumerable<TraceSegment> segments) => ProbeLines(segments).Any(s => Hl7Header().IsMatch(s.Text));
     public static bool HasHl7Header(ReadOnlySpan<byte> bytes) => Hl7Header().IsMatch(Encoding.Latin1.GetString(bytes));
     private static string? Hl7Profile(DiagnosticProfile selected) => selected.IsHl7 ? selected.Id
         : selected.InstrumentId == "abbott.architect" ? Atsm.Plugin.Abbott.Architect.ArchitectHl7Plugin.ProfileId : null;
     private static bool IsAstmHeader(string text) => Header().IsMatch(text);
+    internal static IReadOnlyList<Lis02Record> AstmHeaders(IEnumerable<TraceSegment> segments) => ProbeLines(segments)
+        .SelectMany(s => HeaderRecord().Matches(s.Text).Select(m => m.Groups[1].Value))
+        .Where(h => Lis02Delimiters.TryParseHeader(h, out _))
+        .Select(h => { Lis02Delimiters.TryParseHeader(h, out var delimiters); return new Lis02Record(h, delimiters!); }).ToArray();
+
+    // A monitor entry is a read/write, not a frame or record. Reassemble only for probing;
+    // interpretation still uses the original entries and validates framing/checksums.
+    // RX and TX never share a buffer; event labels and file names are not protocol evidence.
+    private static IEnumerable<(TraceDirection Direction, string Text)> ProbeLines(IEnumerable<TraceSegment> segments)
+    {
+        var buffers = new Dictionary<TraceDirection, StringBuilder>();
+        foreach (var segment in segments.Where(s => s.Direction != TraceDirection.Event && s.Content != SegmentContent.Event))
+        {
+            if (!buffers.TryGetValue(segment.Direction, out var buffer)) buffers[segment.Direction] = buffer = new();
+            foreach (var value in segment.Data.ToArray())
+            {
+                if (value is 13 or 10)
+                {
+                    if (buffer.Length > 0) { yield return (segment.Direction, buffer.ToString()); buffer.Clear(); }
+                }
+                else buffer.Append((char)value);
+            }
+        }
+        foreach (var (direction, buffer) in buffers)
+            if (buffer.Length > 0) yield return (direction, buffer.ToString());
+    }
     public static RecordedBy? InferRecorder(IEnumerable<TraceSegment> segments)
     {
         var received = 0; var sent = 0;
-        foreach (var segment in segments.Where(s => s.Direction != TraceDirection.Event))
+        foreach (var (direction, text) in ProbeLines(segments))
         {
-            var text = Encoding.Latin1.GetString(segment.Data.Span);
             var results = ResultOrQuery().Matches(text).Count;
             results += Hl7Header().Matches(text).Count(header => header.Value.TrimStart('\v', '\r', '\n').Split('|').ElementAtOrDefault(8)?.Split('^')[0] is "OUL" or "QBP");
-            if (segment.Direction == TraceDirection.Received) received += results; else sent += results;
+            if (direction == TraceDirection.Received) received += results; else sent += results;
         }
         // R/Q records originate at the instrument for these ASTM interfaces. No inference from ACK/O alone.
         return received == sent ? null : received > sent ? RecordedBy.Host : RecordedBy.Instrument;
@@ -122,6 +140,8 @@ public static partial class DiagnosticInputDetector
     }
     [GeneratedRegex(@"(?:^|[\r\n]|\x02[0-7])H\|[^|\r\n]{3}(?=\||\r|\n|$)", RegexOptions.CultureInvariant)]
     private static partial Regex Header();
+    [GeneratedRegex(@"(?:^|[\r\n]|\x02[0-7])(H\|[^|\r\n]{3}(?:\|[^\x02\x03\x17\r\n]*)?)(?=[\x03\x17\r\n]|$)", RegexOptions.CultureInvariant)]
+    private static partial Regex HeaderRecord();
     [GeneratedRegex(@"(?:^|[\r\n]|\x02[0-7])[RQ]\|", RegexOptions.CultureInvariant)]
     private static partial Regex ResultOrQuery();
     [GeneratedRegex(@"(?:^|[\v\r\n])MSH\|[^\r\n]*", RegexOptions.CultureInvariant)]

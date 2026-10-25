@@ -94,12 +94,25 @@ public sealed class DiagnosticCatalog
         Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,
             g.First().Manufacturer + " · " + (g.Key switch
             {
-                "biorad.cfx" => "CFX Maestro", "abbott.architect" => "ARCHITECT", SysmexUrinalysisPlugin.PluginId => "U-WAM (UF-5000, UC-3500, UD-10)",
+                "biorad.cfx" => "CFX Maestro", "abbott.architect" => "ARCHITECT",
                 "clsi.lis02" => DiagnosticText.Text("Catalog.Generic"), _ => g.First().Name,
             }), g.OrderBy(p => p.TracePlugin is not null).ToArray())).ToArray();
         LogAdapters = AstmPlugins.OfType<ITraceLogAdapterProvider>().Append(new LegacyTestingPlugin()).SelectMany(p => p.LogAdapters).ToArray();
     }
     public DiagnosticProfile Resolve(string id) => Profiles.Single(p => p.Id == id);
+    internal DiagnosticProfile ResolveAstmInterpretation(IReadOnlyList<TraceSegment> segments, DiagnosticProfile selected)
+    {
+        var headers = DiagnosticInputDetector.AstmHeaders(segments);
+        var matched = AstmPlugins.Where(p => p is IInstrumentHeaderProbe probe && headers.Any(probe.RecognizesHeader)).ToArray();
+        if (matched.Length > 1) throw new InvalidDataException("ATSM-DIAG-AMBIGUOUS-INPUT");
+        if (matched.Length == 1)
+        {
+            // Preserve explicit options in the same dialect. Identity cannot reveal the installed chemistry option.
+            if (selected.AstmPlugin is not null && selected.InstrumentId == matched[0].Describe().Id) return selected;
+            return Profiles.First(p => p.AstmPlugin == matched[0]);
+        }
+        return selected.AstmProfile is not null ? selected : Resolve(StandardAstmPlugin.ProfileId);
+    }
     public DiagnosticProfile ResolveInterpretation(DiagnosticCase input, DiagnosticProfile selected)
     {
         var family = Instruments.Single(i => i.Id == selected.InstrumentId);

@@ -79,7 +79,7 @@ public static class ProtocolExplainer
         {
             if (vocabulary.TryGetValue("resultKind." + raw, out var kind)) return DiagnosticText.Plugin(profile.AstmPlugin!, kind);
             if (raw.Contains('/', StringComparison.Ordinal) && vocabulary.TryGetValue("resultFormat." + raw.Split('/')[^1], out var format))
-                return DiagnosticText.Plugin(profile.AstmPlugin!, format) + " (" + raw + ")";
+                return DiagnosticText.Plugin(profile.AstmPlugin!, format);
         }
         return DiagnosticText.Format("Raw.Kind", raw);
     }

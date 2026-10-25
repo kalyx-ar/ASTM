@@ -221,9 +221,9 @@ public sealed class MainPage : ContentPage
                 }
                 else _case = DiagnosticReader.Read(bytes, format, Profile, input.Name, LogOffset(), Recorder);
                 _status.Text = DiagnosticText.Format(_inputFormats[_formats.SelectedIndex] == DiagnosticInputFormat.Auto ? "Detection.Success" : "Detection.Selected", DiagnosticText.Text("Format." + format), Profile.DisplayName);
-                if (_case.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true") _status.Text = DiagnosticText.Text("Detection.Unsupported");
             }
             Analyze();
+            if (_analysis?.Diagnostics.Any(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") == true) _status.Text = DiagnosticText.Text("Detection.Unsupported");
             if (!_case.IsComplete) _status.Text = T("View.Incomplete");
         }
         catch (Exception error) { ShowError(error); }
@@ -328,6 +328,7 @@ public sealed class MainPage : ContentPage
                 _case = _case with { Header = _case.Header with { Profile = detected.Id } };
                 _evidence.Text = detected.Evidence;
             }
+            _case = DiagnosticReader.RevalidateProtocol(_case, Profile);
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
             _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
         }
@@ -343,7 +344,7 @@ public sealed class MainPage : ContentPage
         string[] headers; IEnumerable<DiagnosticRow> rows;
         string D(string raw) => interpreted ? DiagnosticText.Direction(raw) : raw;
         string Detail(string meaning, string raw) => meaning + "\n\n" + DiagnosticText.Text("Original") + "\n" + raw;
-        var unsupported = Profile.TracePlugin is null && _case?.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true";
+        var unsupported = _analysis?.Diagnostics.Any(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") == true;
         switch (_tab)
         {
             case 0:
@@ -525,6 +526,9 @@ public sealed class MainPage : ContentPage
         if (crossSummary.Cells.Length != 10 || crossSummary.Cells[2] != "Semicuantitativo (cruces)" || crossSummary.Cells[3] != "0"
             || crossSummary.Cells[4] != "0" || crossSummary.Cells[5] != "2+" || crossSummary.Cells[6] != "—" || crossSummary.Cells[7] != "4" || crossSummary.Cells[8] != "1")
             throw new InvalidDataException("ATSM-MAUI-ORDINAL-SELFTEST");
+        _analysis = saved with { Observations = [cross with { Quality = new(new(QualityMaterialKind.Control, "CONTROL-SYN")) }] };
+        if (QualityGroups().Single().SummaryRow!.Cells[0] != "CONTROL-SYN / -")
+            throw new InvalidDataException("ATSM-MAUI-NO-LOT-SELFTEST");
         foreach (var (comparison, minimum, maximum) in new[] { (">=", ">=50", "—"), ("<=", "—", "<=50") })
         {
             _analysis = saved with { Observations = [cross with { ResultKind = "CONCENTRATION", Value = new(comparison + "50", 50, comparison) }] };

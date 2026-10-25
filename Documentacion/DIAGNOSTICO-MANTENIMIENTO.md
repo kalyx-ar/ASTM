@@ -41,7 +41,7 @@ Entrada/captura: máximo 32 MiB y 100.000 entradas; CFX: 16 MiB de contenido/XML
 | Bio-Rad CFX Maestro: RDML | XML o ZIP con `rdml_data.xml` (o un único XML), versiones 1.0/1.1; muestra/target/reacción/Cq y exclusiones | Subconjunto de cuantificación, no validador completo de esquema ni lector de curvas. Referencias desconocidas/versiones no soportadas se rechazan. DTD/entidades externas deshabilitadas. |
 | Sysmex XN-L | E1381-02/E1394-97, recepción; identificador de prueba en R.3.5, dilución R.3.6, muestra O.4.3 u O.3.3 | Guía LIS 1273-MKT rev.3 local. XN-350/450/550 como familia de interfaz, pendiente corpus/equipo. R.9 es juicio del instrumento/repetición; no se convierte en validación clínica. No habilita automáticamente toda la serie XN. |
 | Sysmex CS-2500 | E1381-02/E1394-97, recepción; muestra O.4.3, código/nombre/dilución/tipo en R.3; flags crudos | Host Interface Specifications rev.2.04 local. Sin consultas/órdenes, descarga de imágenes ni acceso a rutas del instrumento. |
-| Sysmex U-WAM | Los dos perfiles anteriores, con/sin analizador químico; incluye UF-5000 y UC-3500/UC-1000 a través del middleware | Manual R315168 rev.22 y trazas locales; no equivale a conexión directa universal de esos analizadores. |
+| Sysmex U-WAM | Dos perfiles ASTM, con/sin analizador químico; UF-3000/3000x/4000/5000, UC-1000/3500 y UD-10 a través del middleware; UC-3500 directo con su intérprete serial | Manual R315168 rev.22 y trazas locales; no equivale a conexión directa universal de esos analizadores. |
 | DIAGAST QWALYS 3 | Recepción ASTM ASCII; muestra O.4, reacción R.4.7, identidad R.3, comentarios C.3 | Connection Manual local. Estados R/M se preservan como automatizado/modificado; R.5 es soporte, no unidad de medida. Sin órdenes, interpretación clínica de grupos ni manejo de archivos. Fecha de modificación preservada cruda. |
 | Abbott ARCHITECT | ASI ASTM y HL7/MLLP original ZOS | ASTM con manual/trazas; HL7 con manual y pruebas sintéticas. LAW completo pendiente. |
 | Abbott CELL-DYN Ruby | ASTM derivado de trazas | Hipótesis de encuadre/respuesta pendientes de manual. |
@@ -76,3 +76,26 @@ UC-3500 directo: intérprete serial propio y captura sin respuestas; simulación
 
 
 Seleccionar U-WAM y abrir/analizar resuelve el enlace por contenido dentro de Atsm.Plugin.Sysmex.Urinalysis, sin entrada UC-3500 separada. Interpretación manual disponible en configuración. Vista Calidad enfocada en mediana, DE, extremos, n y señales; material/lote literal y registros reales desplegables: [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).
+
+## Revisión de detección y modelos (2026-10-25)
+
+La importación nueva del log local UF-5000 recupera 425 mensajes y 5.006 observaciones, sin aviso de protocolo incompatible. Se corrigieron dos brechas: la clasificación `unsupportedProtocol` conservada en un caso antiguo ya no bloquea para siempre su reanálisis; y la cabecera puede estar dividida entre lecturas del monitor. Los fragmentos de una transmisión conservan su naturaleza de cable hasta EOT/FS, sin pasar por registros ASTM independientes. Los originales no se modifican ni se omite la validación de tramas.
+
+El puerto opcional `IInstrumentHeaderProbe` mantiene las firmas de identidad en cada plugin. El catálogo consulta sólo cabeceras, no nombres de archivo, comentarios ni etiquetas del monitor; dos dialectos distintos identificados en una entrada generan ambigüedad. RX y TX se reconstruyen por separado. La identidad no cambia las opciones explícitas del mismo dialecto ni demuestra qué analizador químico está instalado.
+
+| Familia | Reconocimiento automático y alcance |
+|---|---|
+| U-WAM / UN | H.5.1: U-WAM, UF-3000/3000x/4000/5000, UC-1000/3500, UD-10. Interpreta registros R/Q/O y QC S según R315168; es cobertura del enlace U-WAM. El UF-5000 directo del corpus local usa esos registros y está comprobado; no se atribuye ese mismo protocolo directo a todos los demás modelos. |
+| UC-3500 directo | Reconocimiento RQ02/CM00/ER y resultados por su sintaxis propia dentro de la misma familia; nunca por el nombre del archivo. Conserva controles, códigos ER/errores de análisis y estados. |
+| XN-L | H.5.1: XN-350, XN-450, XN-550, según 1273-MKT rev.3 pp.34–38. Recepción implementada, sin respuestas a consultas ni descarga de órdenes. |
+| CS-2500 | H.5.1: CS-2500, manual rev.2.04 §5.3.3.1. Recepción implementada, sin respuestas a consultas ni descarga de órdenes. |
+| ARCHITECT | H.5.1: ASI, según 91407-108 §6; identifica la interfaz, no el modelo físico. HL7 conserva su selección específica: MSH por sí solo no identifica fabricante. |
+| CELL-DYN Ruby | H.5.2: CDRuby, evidencia de trazas locales. Siguen pendientes manual y homologación física. |
+| QWALYS 3 | Recepción documentada disponible mediante selección. Las cabeceras de los ejemplos locales no aportan una identidad inequívoca del analizador: no se inventa autodetección. |
+| CFX | CSV/RDML detectados por contenido. Son exportaciones de Maestro; no acreditan control directo ni identificación de cada hardware CFX. |
+
+Fuentes locales: R315168 rev.22 (tabla de modelos, apéndices B/K y §5.3.3), guía 1273-MKT rev.3, CS-2500 rev.2.04, 91407-108 y manual QWALYS 3. Permanecen en `manuales/`, fuera de Git. Sin homologación por modelo/firmware en hardware; el corpus real verificado y las pruebas sintéticas se distinguen en ESTADO.
+
+La siguiente ampliación documentada es SUIT v8: su tabla incluye XN-1000/2000/3000/9000, XE/XS/XT, UF-1000i/500i y CS-2000i **a través de SUIT** (pp.7 y 32 del PDF). No están implementados ni se agregan como si fueran el mismo dialecto XN-L/U-WAM. El manual usa H.2 con cuatro caracteres y registros OBR/OBX de E1238-94, además de S para QC; el parser LIS02 genérico de un carácter no puede interpretar esas estructuras correctamente. Requiere un intérprete SUIT propio y corpus revisado. S.4/7/11/12/13/16 permite obtener analizador, rol QC, lote, prueba, valor y fecha de medición (p.27 del PDF), reutilizando los puertos de calidad existentes; sin inventar unidad, nivel o valores objetivo ausentes. Seguimiento en EDC#205.
+
+Presentación: lote ausente `-`; RAW se muestra como «Original» y MAINFORMAT como «Formateado». Los identificadores técnicos completos siguen en los originales/detalle y modo sin interpretación.

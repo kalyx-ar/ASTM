@@ -15,8 +15,10 @@ namespace Atsm.Plugin.Abbott.CellDynRuby;
 /// CELL-DYN Ruby. No vendor manual is available in this repository yet: the profile and the dialect are derived from
 /// production traces and from the legacy host plugin, and every point not confirmed by the manual is marked as such.
 /// </summary>
-public sealed partial class CellDynRubyPlugin : IInstrumentPlugin
+public sealed partial class CellDynRubyPlugin : IInstrumentPlugin, IInstrumentHeaderProbe
 {
+    // Local trace evidence: H.5 = serial^model^software^version; no model inference from serial numbers.
+    public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 2).Trim().Equals("CDRuby", StringComparison.OrdinalIgnoreCase);
     public const string PluginId = "abbott.celldyn-ruby";
     public const string ProfileId = "abbott.celldyn-ruby.lis2a";
 

@@ -2,6 +2,7 @@ using System.Text;
 using Atsm.Abstractions.Channels;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
+using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Abbott.Architect;
 
@@ -24,8 +25,10 @@ public sealed record ArchitectDialectOptions
     public TimeZoneInfo InstrumentTimeZone { get; init; } = TimeZoneInfo.Local;
 }
 
-public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin
+public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin, IInstrumentHeaderProbe
 {
+    // 91407-108, §6 examples: sender ASI identifies the interface, not the physical ARCHITECT model.
+    public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().Equals("ASI", StringComparison.OrdinalIgnoreCase);
     public const string PluginId = "abbott.architect";
     public const string AsiProfileId = "abbott.architect.asi-rs232";
 

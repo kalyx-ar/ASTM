@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 231 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar la revisión UF-5000: 251 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado; el self-test incluye lote ausente «-». Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -112,7 +112,7 @@ Decisión humana 2026-10-25: ATSM/Diagnostics conservan catálogo compilado, pre
 
 GUI Windows implementada con log/exportación y TCP/SerialTunnel, caso protegido preparado antes de conectar y simulación de host sin órdenes; 11 perfiles. Añadidos CFX CSV/RDML y perfiles de recepción Sysmex XN-L, CS-2500 y QWALYS. Fuentes, capacidades, presencia argentina y límites en [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
-Continuar por validación real CFX/XN-L, kits P-03 y extensión por modelo/firmware (prioridad humana CFX → Sysmex → QWALYS); XN-1000/XN y SUIT requieren confirmar su interfaz antes de agregarlos. No declarar soporte de toda una marca por compartir protocolo. La GUI no completa P-04, P-09, P-10 ni P-13; P-05 fue retirado por la decisión posterior. Para EDC las trazas continúan siendo responsabilidad de Application/SQLCipher.
+Continuar por validación real CFX/XN-L, kits P-03 y extensión por modelo/firmware (prioridad humana CFX → Sysmex → QWALYS). La revisión de SUIT v8 confirma un dialecto E1238-94 con OBR/OBX y QC S, distinto de XN-L/U-WAM: requiere su propio intérprete, corpus y puertos de recepción; no reutilizar el parser de tipos de un carácter para aparentar soporte de XN-1000/XN. [Matriz y campos QC documentados](DIAGNOSTICO-MANTENIMIENTO.md#revisión-de-detección-y-modelos-2026-10-25). No declarar soporte de toda una marca por compartir protocolo. La GUI no completa P-04, P-09, P-10 ni P-13; P-05 fue retirado por la decisión posterior. Para EDC las trazas continúan siendo responsabilidad de Application/SQLCipher.
 
 ### Datos QC y calibración (incremento 2026-10-24)
 

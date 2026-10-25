@@ -22,7 +22,7 @@ internal static class Globals
         ["Source.Title"] = "FUENTE Y EQUIPO", ["Source.Plugin"] = "Marca y modelo", ["Source.Configuration"] = "Configuración de la interfaz",
         ["Source.Format"] = "Formato del archivo", ["Source.Open"] = "Abrir archivo", ["Source.Save"] = "Guardar caso",
         ["Source.AutomaticInterpretation"] = "Interpretación automática",
-        ["Quality.MaterialLot"] = "Material / lote", ["Quality.NoLot"] = "sin lote informado", ["Quality.DataType"] = "Tipo / unidad",
+        ["Quality.MaterialLot"] = "Material / lote", ["Quality.NoLot"] = "-", ["Quality.DataType"] = "Tipo / unidad",
         ["Quality.Minimum"] = "Mínimo", ["Quality.MedianValue"] = "Mediana / resultado", ["Quality.Median"] = "Mediana", ["Quality.Maximum"] = "Máximo",
         ["Quality.SD"] = "DE", ["Quality.N"] = "Mediciones", ["Quality.Signals"] = "Señales", ["Quality.Mean"] = "Media",
         ["Quality.NumericCount"] = "Numéricas para estadística", ["Quality.Distribution"] = "Valores comunicados",
