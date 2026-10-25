@@ -31,7 +31,13 @@ internal static class UrinalysisValueKnowledge
                 return new(vocabulary["value.SemiQuantitative"], "numeric:" + observation.Test.Vendor.Code, false);
             var index = Array.IndexOf(levels, text);
             return new(vocabulary[observation.Test.Vendor.Code == "NIT" ? "value.BinaryCrosses" : "value.Crosses"],
-                "crosses:" + observation.Test.Vendor.Code, true, index < 0 ? null : index, comparison);
+                "crosses:" + observation.Test.Vendor.Code, true, index < 0 ? null : index, comparison)
+            {
+                // Tables 6-7/6-17 distinguish a negative qualitative value from state 1 (not analyzed).
+                // Zero here means no positive crosses, not zero concentration or a missing analysis.
+                DisplayValue = index == 0 && text == "-" && comparison is null
+                    && observation.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed ? "0" : null,
+            };
         }
         var parsed = InstrumentNumericValue.Parse(observation.Value.RawText);
         return parsed is { Numeric: not null, Comparator: not null }

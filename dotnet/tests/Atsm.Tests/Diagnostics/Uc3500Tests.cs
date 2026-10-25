@@ -192,4 +192,21 @@ public sealed class Uc3500Tests
         var crosses = Assert.Single(result.Observations, o => o.Test.Vendor.Code == "BLD" && o.ResultKind == "QUALITATIVE");
         Assert.Equal("2+    ", crosses.Value.RawText); Assert.Null(crosses.Value.Numeric);
     }
+
+    [Fact]
+    public void The_analysis_state_distinguishes_a_negative_measurement_from_a_non_performed_empty_result()
+    {
+        var fields = Result().Split(',');
+        fields[9] = "0 " + "-     " + "      " + "98.2 " + " " + "99.1 ";
+        fields[10] = "1" + new string(' ', 24);
+        var result = Interpret([Entry(0, Frame(string.Join(',', fields)))]);
+        var negative = Assert.Single(result.Observations, o => o.Test.Vendor.Code == "BLD" && o.ResultKind == "QUALITATIVE");
+        var omitted = Assert.Single(result.Observations, o => o.Test.Vendor.Code == "BIL");
+        Assert.NotEqual(InstrumentStatusMeaning.NotPerformed, negative.InstrumentStatusMeaning);
+        Assert.Equal(InstrumentStatusMeaning.NotPerformed, omitted.InstrumentStatusMeaning);
+        Assert.True(string.IsNullOrWhiteSpace(omitted.Value.RawText));
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
+        Assert.Equal("0", ProtocolExplainer.ResultValue(negative, profile));
+        Assert.Equal("-     ", negative.Value.RawText); Assert.Null(negative.Value.Numeric);
+    }
 }

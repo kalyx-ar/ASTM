@@ -24,7 +24,7 @@ public sealed class QualitySemiQuantitativeTests
         var items = new[] { Item(1, "-     "), Item(2, "2+    "), Item(3, "-     "),
             Item(4, "      ") with { InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed } };
         var series = Assert.Single(QualitySeriesBuilder.Build(items, Plugin));
-        Assert.Equal("-", series.Range.Minimum); Assert.Equal("-", series.Range.Median); Assert.Equal("2+", series.Range.Maximum);
+        Assert.Equal("0", series.Range.Minimum); Assert.Equal("0", series.Range.Median); Assert.Equal("2+", series.Range.Maximum);
         Assert.Equal(4, series.MeasurementCount); Assert.Equal(1, series.NotPerformed); Assert.Equal(0, series.NumericCount);
         Assert.Null(series.StandardDeviation); Assert.Null(series.Mean); Assert.Null(items[1].Value.Numeric);
         var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
@@ -64,7 +64,7 @@ public sealed class QualitySemiQuantitativeTests
     public void Even_ordinal_medians_use_the_two_central_categories_without_inventing_a_half_cross()
     {
         var series = Assert.Single(QualitySeriesBuilder.Build([Item(1, "-"), Item(2, "2+")], Plugin));
-        Assert.Equal("- – 2+", series.Range.Median); Assert.Null(series.Median); Assert.Null(series.StandardDeviation);
+        Assert.Equal("0 – 2+", series.Range.Median); Assert.Null(series.Median); Assert.Null(series.StandardDeviation);
     }
 
     [Fact]
@@ -100,5 +100,31 @@ public sealed class QualitySemiQuantitativeTests
         var nitrite = Item(1, "+", "NIT");
         Assert.Equal("Cualitativo (cruces)", ProtocolExplainer.ResultKind(nitrite, new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile)));
         Assert.Null(Plugin.DescribeValue(Item(2, "2+", "NIT"))!.OrdinalRank);
+    }
+
+    [Fact]
+    public void Negative_is_zero_crosses_but_is_not_an_unperformed_result_or_zero_concentration()
+    {
+        var negative = Item(1, "-     ");
+        var series = Assert.Single(QualitySeriesBuilder.Build([negative], Plugin));
+        Assert.Equal(1, series.MeasurementCount); Assert.Equal(0, series.NotPerformed); Assert.Equal("0", series.Range.Minimum);
+        Assert.Equal("0", series.Range.Median); Assert.Equal("0", series.Range.Maximum); Assert.Equal(0, series.NumericCount);
+        Assert.Null(negative.Value.Numeric); Assert.Null(series.StandardDeviation); Assert.Equal("-     ", negative.Value.RawText);
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
+        Assert.Equal("0", ProtocolExplainer.ResultValue(negative, profile));
+        Assert.Null(Plugin.DescribeValue(Item(1, "-", kind: "CONCENTRATION")));
+    }
+
+    [Fact]
+    public void Normal_empty_unknown_and_unperformed_are_not_changed_into_zero()
+    {
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
+        Assert.Equal("normal", ProtocolExplainer.ResultValue(Item(1, "normal", "URO"), profile));
+        Assert.Equal("", ProtocolExplainer.ResultValue(Item(2, ""), profile));
+        Assert.Equal("-", ProtocolExplainer.ResultValue(Item(3, "-", "UNKNOWN"), profile));
+        var omitted = Item(4, "-") with { InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed };
+        Assert.Null(Plugin.DescribeValue(omitted)!.DisplayValue);
+        var series = Assert.Single(QualitySeriesBuilder.Build([omitted], Plugin));
+        Assert.Equal(1, series.NotPerformed); Assert.Null(series.Range.Minimum); Assert.Null(series.Range.Median);
     }
 }

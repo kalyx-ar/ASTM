@@ -376,7 +376,7 @@ public sealed class MainPage : ContentPage
             case 2:
                 headers = [T("Column.Specimen"), T("Column.Position"), T("Column.Test"), T("Column.Type"), T("Column.Value"), T("Column.Unit"), T("Column.Status")];
                 rows = (_analysis?.Observations ?? []).Select(o => Row([o.Specimen.SpecimenId, o.Specimen.Position ?? "", o.Test.Vendor.Display ?? o.Test.Vendor.Code,
-                    interpreted ? ProtocolExplainer.ResultKind(o, Profile) : o.ResultKind ?? "", o.Value.RawText, o.Value.RawUnit ?? "",
+                    interpreted ? ProtocolExplainer.ResultKind(o, Profile) : o.ResultKind ?? "", interpreted ? ProtocolExplainer.ResultValue(o, Profile) : o.Value.RawText, o.Value.RawUnit ?? "",
                     interpreted ? ProtocolExplainer.Status(o) : o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code))], Json(o),
                     o.Specimen.SpecimenId, o.Test.Vendor.Code, o.ResultKind)); break;
             case 3:
@@ -446,7 +446,8 @@ public sealed class MainPage : ContentPage
                 F("Quality.Last", series.Last.Value.RawText, series.Last.ResultTime?.ToString("O") ?? "#" + series.Last.Trace.LastSequence),
                 T("Quality.Method"), string.Join(" · ", signals));
             var children = series.Records.Select(o => new DiagnosticRow([material, series.Test, kind, "", string.IsNullOrWhiteSpace(o.Value.RawText)
-                ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? o.Value.RawText : o.Value.RawText, "", "", "1", o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed ? "1" : "",
+                ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? o.Value.RawText : _interpret.IsChecked ? ProtocolExplainer.ResultValue(o, Profile) : o.Value.RawText,
+                "", "", "1", o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed ? "1" : "",
                 "#" + o.Trace.LastSequence + (o.ResultTime is { } time ? " · " + time.ToString("g") : "") + " · " + ProtocolExplainer.Status(o)
                     + (series.PotentialOutliers.Contains(o.ObservationId) ? " · " + T("Quality.Outlier") : "")], Json(o), series.Key)
                 { Attention = o.Flags.Count > 0 || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
@@ -521,8 +522,8 @@ public sealed class MainPage : ContentPage
         _analysis = saved with { Observations = [cross, cross with { ObservationId = Guid.NewGuid(), Value = new("-") },
             cross with { ObservationId = Guid.NewGuid(), Value = new("-") }, cross with { ObservationId = Guid.NewGuid(), Value = new(""), InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed }] };
         var crossSummary = QualityGroups().Single().SummaryRow!;
-        if (crossSummary.Cells.Length != 10 || crossSummary.Cells[2] != "Semicuantitativo (cruces)" || crossSummary.Cells[3] != "-"
-            || crossSummary.Cells[4] != "-" || crossSummary.Cells[5] != "2+" || crossSummary.Cells[6] != "—" || crossSummary.Cells[7] != "4" || crossSummary.Cells[8] != "1")
+        if (crossSummary.Cells.Length != 10 || crossSummary.Cells[2] != "Semicuantitativo (cruces)" || crossSummary.Cells[3] != "0"
+            || crossSummary.Cells[4] != "0" || crossSummary.Cells[5] != "2+" || crossSummary.Cells[6] != "—" || crossSummary.Cells[7] != "4" || crossSummary.Cells[8] != "1")
             throw new InvalidDataException("ATSM-MAUI-ORDINAL-SELFTEST");
         foreach (var (comparison, minimum, maximum) in new[] { (">=", ">=50", "—"), ("<=", "—", "<=50") })
         {

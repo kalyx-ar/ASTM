@@ -5,7 +5,11 @@ namespace Atsm.Plugins;
 
 /// <summary>Ordinal ranks express order only, never distances, concentrations or arithmetic values.</summary>
 public sealed record InstrumentValueMeaning(ProtocolText Kind, string Scale, bool IsOrdinal,
-    decimal? OrdinalRank = null, string? Comparator = null);
+    decimal? OrdinalRank = null, string? Comparator = null)
+{
+    /// <summary>Contextual presentation only; never replaces RawText or creates a quantitative result.</summary>
+    public string? DisplayValue { get; init; }
+}
 public interface IInstrumentValueKnowledge
 {
     InstrumentValueMeaning? DescribeValue(InstrumentObservation observation);

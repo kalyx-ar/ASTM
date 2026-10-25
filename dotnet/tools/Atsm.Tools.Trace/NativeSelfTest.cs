@@ -60,7 +60,11 @@ internal static class NativeSelfTest
         var bounded = QualitySeriesBuilder.Build([crosses with { ResultKind = "CONCENTRATION", Value = new(">=50", 50, ">=") }], knowledge).Single();
         if (ordinal.Range.Median != "2+" || ordinal.StandardDeviation is not null || bounded.Range.Minimum != ">=50" || bounded.Range.Maximum is not null || bounded.NumericCount != 0)
             throw new InvalidDataException("Native semiquantitative summary mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok");
+        var negative = crosses with { Value = new("-") };
+        var zero = QualitySeriesBuilder.Build([negative], knowledge).Single();
+        if (zero.Range.Minimum != "0" || zero.Range.Median != "0" || zero.NotPerformed != 0 || zero.NumericCount != 0 || negative.Value.RawText != "-")
+            throw new InvalidDataException("Native negative category mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

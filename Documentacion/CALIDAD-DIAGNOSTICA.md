@@ -45,3 +45,12 @@ El plugin Sysmex usa IInstrumentValueKnowledge para describir la escala según e
 >=50 se interpreta como límite inferior y se muestra en Mínimo; <=50 se muestra en Máximo. Se conserva el comparador y el otro extremo queda no acotado (—). El Numeric=50 que acompaña a Comparator=>= es el umbral comunicado, no una medición exacta para las estadísticas. También se admiten >, < y símbolos equivalentes al analizar valores ya entregados por el anfitrión; el cable UC mantiene su especificación ASCII.
 
 En una serie con resultados acotados en sentidos opuestos puede no existir un extremo finito común: se deja — en lugar de fabricar el intervalo [50,20]. Todos los límites siguen en el detalle. Los valores exactos se mantienen en el subconjunto estadístico separado. La fuente para órdenes y categorías del UC es su manual v0.0.5, tablas 6-17/6-18, enlazado en UC3500-PROTOCOLO.
+
+
+## Negativo y ausencia de medición (2026-10-25)
+
+El manual UC-3500 distingue estado 0 (analizado) de estado 1 (no analizado, campos rellenados con espacios); la explicación de campos contempla además un valor cualitativo negativo con concentración en blanco (tablas 6-7 y 6-17). Por tanto, el guion negativo de una escala documentada no se reclasifica como Sin medir por carecer de concentración numérica.
+
+En las escalas de cruces que declaran − como categoría negativa, el modo interpretado muestra **0** (cero cruces) en observaciones/subfilas y extremos/categoría central. Esto no crea una concentración cero, ni un valor numérico para calcular media/DE. El valor original − permanece en el caso, distribución/detalle y modo técnico. Normal de URO conserva su texto; un guion de concentración, de otro parámetro/protocolo o de un estado no realizado no recibe esta equivalencia. El cambio es de representación ordinal, solicitado por el usuario, no una afirmación de ausencia química absoluta.
+
+Sin medir sigue dependiendo del estado de análisis explícito. Un campo vacío no se convierte en cero; tampoco se reconstruye una medición ausente. El puerto neutral expone DisplayValue como metadato de presentación del plugin, sin modificar RawText ni Numeric.

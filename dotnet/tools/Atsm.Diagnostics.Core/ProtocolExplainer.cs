@@ -83,6 +83,11 @@ public static class ProtocolExplainer
         }
         return DiagnosticText.Format("Raw.Kind", raw);
     }
+    public static string ResultValue(InstrumentObservation observation, DiagnosticProfile profile)
+    {
+        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin;
+        return (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation)?.DisplayValue ?? observation.Value.RawText;
+    }
     public static string Status(InstrumentObservation observation) => DiagnosticText.Text("State." + observation.InstrumentStatusMeaning)
         + (observation.Flags.Count == 0 ? "" : " · " + DiagnosticText.Format("Raw.Flags", string.Join(", ", observation.Flags.Select(f => f.Code))));
 }

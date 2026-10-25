@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 228 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 231 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -219,3 +219,8 @@ Calidad muestra normal y otros textos/códigos con frecuencias. La columna Medic
 Valor 2+ clasificado por el conocimiento del plugin como Semicuantitativo (cruces), con orden de categorías y sin aritmética de concentraciones. >=50 / <=50 conservan Comparator y se presentan en el extremo finito correspondiente; nunca se usan como valores exactos de mediana/DE. Nuevo puerto neutral IInstrumentValueKnowledge y resumen QualityReportedRange. No inferir orden de categorías desconocidas ni extremos finitos cuando no están acotados.
 
 Calidad agrega Sin medir con el conteo comunicado y retira esa descripción de Mediana/resultado y Señales. La celda central muestra mediana/categoría central/moda, con distribución completa en detalle. Catorce casos nuevos, 228 pruebas totales; GUI self-test de cruces, ambos comparadores y columna separada. Ver CALIDAD-DIAGNOSTICA.
+
+
+### Negativo en cero cruces (2026-10-25)
+
+Validado el guion en contexto UC: estado 0 analizado con resultado negativo no es Sin medir; estado 1 no realizado lleva campos vacíos. Mostrar 0 cruces sólo en escalas documentadas, conservando RawText y Numeric=null. No inventar concentración cero, ni convertir normal, campos vacíos, guiones de concentración o parámetros desconocidos. Tres pruebas nuevas (231 total), incluida la decodificación real del estado. Ver CALIDAD-DIAGNOSTICA.

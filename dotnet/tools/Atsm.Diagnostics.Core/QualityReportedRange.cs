@@ -18,7 +18,7 @@ public sealed record QualityReportedRange(string? Minimum, string? Median, strin
             if (descriptions.Any(d => d?.OrdinalRank is null) || descriptions.Select(d => d!.Scale).Distinct().Count() != 1)
                 return new(null, null, null, Ordinal: true, Incomparable: true);
             return Summarize(measured.Select((o, i) => new Point(descriptions[i]!.OrdinalRank!.Value,
-                o.Value.RawText.Trim(), descriptions[i]!.Comparator)).ToArray(), true);
+                descriptions[i]!.DisplayValue ?? o.Value.RawText.Trim(), descriptions[i]!.Comparator)).ToArray(), true);
         }
         var points = measured.Select(o =>
         {
