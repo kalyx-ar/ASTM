@@ -1,0 +1,43 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (trabajo en el repositorio neutral kalyx-ar/ATSM).
+Registro previo del alcance: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6391823820
+Autorización humana: investigar datos instrumentales para control interno/calibración y documentar o implementar puertos de acceso a datos estadísticos.
+Commit de implementación: a99311de5b295a9fb00b7403f769e84f78668756
+Mensaje: feat: exponer datos de control interno y calibración (#205)
+Tipos: feat, docs, test. Sin push/PR/release remoto ni Issues nuevos.
+
+Investigación:
+- Matriz por interfaz basada en manuales locales Abbott ARCHITECT ASI/HL7, Sysmex XN-L/CS-2500/U-WAM/SUIT y QWALYS; fuentes públicas primarias Bio-Rad CFX Maestro, RDML e IHE PaLM TF-2b rev.11.
+- Separación de medición individual, estadística reportada, valor asignado/rango y decisión del anfitrión. Señales RLU/Abs/mV, flags, lote, módulo/reactivos y referencia de calibración son datos valiosos, sin implicar validación clínica.
+- U-WAM transmite referencia S.7 a CSV externo de objetivos/límites; su lectura pertenece a anfitrión/ETL. Configuración de envío/liberación puede producir omisiones o varias representaciones; una captura no equivale al histórico completo.
+- R24/ED Base64 de ARCHITECT, parámetros de calibración variables, curvas RFU e interfaz SUIT quedan documentados con límites, sin declarar decodificación o conformidad completas.
+
+Implementación:
+- AnalyticalQualityContext opcional en observación: material/tipo/lote/nivel/vencimiento crudo, módulo/corrida/método, CalibrationReference y ReportedStatistic con valor original, ámbito y campo fuente.
+- Puertos opcionales IQualityDataSource y IQualityResourceContent. Adaptador ObservationQualityDataSource implementado sobre lotes ya custodiados por el anfitrión; lectura asíncrona con filtros exactos, código+sistema, fechas [inicio,fin), cancelación y conservación de repeticiones/flags/no numéricos. No es autorización ni consulta al instrumento.
+- QualityResources en el lote y AstmInterpretation; S.7 U-WAM produce referencia tipada sin abrir rutas. AstmMessageProcessor custodia lotes de sólo recursos mediante el mismo IngestAsync y asigna ResourceId estable por recepción. No hay segundo envío no atómico.
+- Contexto QC de ARCHITECT ASTM y HL7 INV/ZCL; ZCL no cruza OBR ni se asocia a otro ensayo. XN-L QC por O.12, lote sólo en identificador documentado; CS-2500 separa nombre/lote de ancho fijo; U-WAM conserva identificador compuesto y serial real sin adivinar lote/nivel.
+- CFX conserva Content y estadísticas opcionales de cuantificación; nuevo perfil standard-curve-csv con eficiencia/pediente/ordenada/R2. Valores originales/ámbitos, estadísticas no numéricas visibles, sin recalcular ni fijar umbrales. RDML conserva tipo de material y corrida. Perfiles modificados 1.1.0; nuevo perfil 1.0.0.
+- GUI Windows: pestaña Calidad con mediciones, estadísticas reportadas, ámbito y campo fuente; detalle conserva contexto y referencias externas. Catálogo de 12 perfiles; casos DPAPI y custodia existentes sin fallback plano.
+
+Rutas:
+- dotnet/src/Atsm.Abstractions/{Model/AnalyticalQuality.cs,Model/CanonicalModel.cs,Hosting/IQualityDataSource.cs,Hosting/ILabWorkflowHost.cs}.
+- dotnet/src/Atsm.Plugins/PluginContracts.cs; dotnet/src/Atsm.Runtime/{Quality/ObservationQualityDataSource.cs,Sessions/AstmMessageProcessor.cs}.
+- dotnet/plugins/Atsm.Plugin.{Abbott.Architect,BioRad.Cfx,Sysmex.XnL,Sysmex.Cs2500,Sysmex.Uwam}.
+- dotnet/tools/Atsm.Diagnostics.{Core,Windows}; dotnet/tests/Atsm.Tests/Diagnostics/QualityDataTests.cs.
+- Documentacion/{CALIDAD-Y-CALIBRACION,MODELO-CANONICO,DIAGNOSTICO-MANTENIMIENTO,ESTADO,CONTINUACION,README}.md.
+
+Verificación:
+- dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true --verbosity quiet: 159 aprobadas, 0 omitidas, duración ~1 s; 17 casos nuevos, incluidas teorías. Se mantienen las 7 pruebas cruzadas del agente, 5 por TLS.
+- Repetición --no-build --no-restore: 159 aprobadas, 0 omitidas, ~1 s. No se considera éxito por agotar timeout.
+- ctest --test-dir native/build/win-x64 -C Release --verbose, dos veces: 542 checks, 0 failures, ~0,30 s. Binario nativo existente; código nativo sin cambios.
+- Build Release de solución completa: 0 errores/advertencias. Publish Windows con AtsmRequireStrongName=true y --smoke-test DPAPI/render: salida 0; imagen sintética inspeccionada.
+- 19 DLL publicadas con token Strong Name 066190a23251f202; apphost Authenticode NotSigned, pendiente del release. No paquetes nuevos ni cambios de confianza/derivación/SNK.
+- git diff --cached --check sin errores. Sin manuales/corpus real/binarios en Git. Eliminados sólo extractos temporales propios .qc-research.local.txt; manuales originales preservados.
+
+Entrega local y estado:
+- EXE: dotnet/tools/Atsm.Diagnostics.Windows/bin/Release/net10.0-windows/publish/atsm-diagnostics.exe, con toda la carpeta y README.txt; requiere .NET 10 Windows Desktop Runtime.
+- InformationalVersion del ejecutable administrado publicado: 0.1.0+a99311de5b295a9fb00b7403f769e84f78668756 (republicado después del commit de implementación para fijar su procedencia).
+- ZIP: dotnet/tools/Atsm.Diagnostics.Windows/bin/Release/net10.0-windows/ATSM-Diagnostics-Windows.zip
+- SHA-256 ZIP definitivo: 8a3c2e951f2b3cbe1cc419453a75d6c7ebd2ca397be809f11fc45cb03dce1998
+- Pendientes: decodificador/puerto de informes R24 documentado, importador/asociación del CSV de objetivos/límites U-WAM, curvas/señales extendidas y SUIT, corpus QC real por modelo y servicio estadístico/políticas del anfitrión. IQualityResourceContent lo implementa el anfitrión; ATSM no descarga recursos.
+- EDC conserva SQLCipher, autorización UI/Application, Scheduler/ETL y transacción de custodia (P-13). No se implementó módulo/almacén EDC ni comandos de calibración. #205 sigue abierto por su alcance mayor; Project propietario #12 In Progress.
