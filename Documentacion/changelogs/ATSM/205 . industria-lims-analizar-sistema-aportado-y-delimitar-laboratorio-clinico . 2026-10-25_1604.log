@@ -1,0 +1,63 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 16:04 America/Buenos_Aires
+Tipo: fix / docs
+Commit de implementación: 6e60e98f7cf79e7d3880730f57102e6523f41ce1
+Commit del registro: el commit docs que incorpora este archivo.
+Registro previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6401799158
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6401860719
+
+Solicitud y evidencia
+- Validar si el guion es ausencia de medición y mostrar cero si corresponde.
+- UC-3500 Host Communication Specifications v0.0.5, tablas 6-7 y 6-17:
+  estado 0 analizado, estado 1 no analizado/campos vacíos; un cualitativo
+  negativo puede tener concentración en blanco.
+- En las escalas conocidas, el guion negativo sigue siendo registro medido.
+  Se representa como 0 cruces, sin afirmar concentración química cero.
+  Fuente pública enlazada en UC3500-PROTOCOLO y CALIDAD-DIAGNOSTICA.
+- No se cambia el estado ni se rellena un vacío. Normal de URO, guiones de
+  concentración o de parámetros desconocidos no se convierten en cero.
+
+Cambios
+- InstrumentValueMeaning.DisplayValue: metadato neutral de presentación.
+- Conocimiento Sysmex: presentación contextual 0 sólo para el negativo
+  documentado, sin comparador y fuera de NotPerformed.
+- QualityReportedRange usa la representación para extremos/categoría central.
+- Observaciones y subfilas muestran 0 en modo interpretado; modo técnico,
+  distribución, RawText y detalle conservan el guion.
+- Numeric continúa ausente: no se agregan ceros a media ni DE numéricas.
+- Tres pruebas nuevas, self-test MAUI actualizado y NativeAOT ampliado.
+
+Archivos
+- dotnet/src/Atsm.Plugins/InstrumentValueKnowledge.cs
+- dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis/UrinalysisValueKnowledge.cs
+- dotnet/tools/Atsm.Diagnostics.Core/{QualityReportedRange,ProtocolExplainer}.cs
+- dotnet/tools/Atsm.Diagnostics.Maui/MainPage.cs
+- dotnet/tools/Atsm.Tools.Trace/NativeSelfTest.cs
+- QualitySemiQuantitativeTests.cs y Uc3500Tests.cs
+- Documentacion/{CALIDAD-DIAGNOSTICA,ESTADO,CONTINUACION,
+  USABILIDAD-DIAGNOSTICS}.md
+
+Verificación
+- 231/231 pruebas .NET, 0 omitidas; corridas finales de ~1 s y ~5 s.
+  Casos nuevos síncronos: negativo como cero cruces sin cantidad química,
+  normales/vacíos/desconocidos/no realizados sin conversión, y parser real UC
+  distinguiendo estado 0 negativo de estado 1 con datos vacíos.
+- 542 checks nativos correctos, repetidos (~0,25-0,29 s).
+- GUI final: self-test PASS; mínimo/categoría central 0, máximo 2+,
+  DE no calculada para cruces, cuatro registros y uno Sin medir.
+  Conserva captura/casos DPAPI, selección, catálogo y siete vistas.
+- CLI NativeAOT: self-test correcto, negative-zero-crosses=ok.
+- Auditoría GUI ATSM_PUBLICATION_DEPENDENCIES_OK.
+- GUI y CLI ProductVersion 0.1.0+6e60e98f7cf79e7d3880730f57102e6523f41ce1.
+- 19 DLL propias con token 066190A23251F202. Cinco CS8002 conocidas de MAUI
+  oficial sin Strong Name visibles; Authenticode propio sigue pendiente.
+- Una primera prueba de arranque se lanzó antes del fin de la copia de R2R y
+  provocó reintentos temporales de DLL. Publish completó correctamente; se
+  repitió el self-test después de terminar, con PASS y salida 0.
+- Sin nuevas dependencias, ZIP, scripts de empaquetado ni datos reales publicados.
+  Sin cambios de derivación/Identidades, órdenes activas, push ni PR.
+
+Entrega
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- Issue #205 permanece abierto por el alcance LIMS restante.
