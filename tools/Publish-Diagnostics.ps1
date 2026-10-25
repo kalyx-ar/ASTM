@@ -22,6 +22,10 @@ try {
     # working publication until the candidate has passed dependency and real-window self-tests.
     & dotnet publish $project -c Release -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -p:AtsmRequireStrongName=true --artifacts-path $buildRoot -o $staging --verbosity minimal
     if ($LASTEXITCODE -ne 0) { throw 'MAUI publication failed; previous package preserved.' }
+    $unusedLanguages = @(Get-ChildItem -LiteralPath $staging -Recurse -File -Filter '*.mui' | Where-Object {
+        [IO.Path]::GetRelativePath($staging, $_.FullName) -notmatch '^(es(-AR|-ES)?|en-US)[\\/]'
+    })
+    if ($unusedLanguages.Count -ne 0) { throw 'Publication contains unrequested WinUI languages; previous package preserved.' }
     & dotnet build $cli -c Release -p:AtsmRequireStrongName=true --verbosity quiet
     if ($LASTEXITCODE -ne 0) { throw 'Publication verifier build failed.' }
     & dotnet (Join-Path $repository 'dotnet\tools\Atsm.Tools.Trace\bin\Release\net10.0\atsm-trace.dll') verify-publication $staging

@@ -49,3 +49,9 @@ public interface ITraceLogAdapterProvider
 {
     IReadOnlyList<ITraceLogAdapter> LogAdapters { get; }
 }
+
+/// <summary>Optional content signature. An extension alone never proves a recorder format.</summary>
+public interface ITraceLogProbe
+{
+    bool Recognizes(ReadOnlySpan<byte> content);
+}

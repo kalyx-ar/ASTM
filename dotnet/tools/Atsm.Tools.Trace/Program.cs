@@ -15,6 +15,7 @@ using Atsm.Tracing;
 const string Usage = """
     atsm-trace plugins
     atsm-trace self-test
+    atsm-trace inspect-input <file> [--profile <id>]
     atsm-trace verify-publication <directory>
     atsm-trace extract <adapter> <log> <out.atsmtrace> [--recorded-by host|instrument] [--filter <text>] [--utc-offset <+hh:mm>]
     atsm-trace from-text <lis02.txt> <out.atsmtrace> [--direction received|transmitted]
@@ -46,6 +47,7 @@ try
     {
         "plugins" => ListPlugins(),
         "self-test" => NativeSelfTest.Run(),
+        "inspect-input" when args.Length >= 2 => InspectInput.Run(args[1], Option("--profile")),
         "verify-publication" when args.Length == 2 => VerifyPublication(args[1]),
         "extract" when args.Length >= 4 => Extract(args[1], args[2], args[3]),
         "from-text" when args.Length >= 3 => FromText(args[1], args[2]),
@@ -284,7 +286,7 @@ static int Fail()
     return 64;
 }
 
-/// <summary>Shared bundled catalog. Dynamic admission from a plugin folder is a later step.</summary>
+/// <summary>Shared compiled catalog. Dynamic admission belongs to the embedding EDC host.</summary>
 internal static class Catalog
 {
     public static Atsm.Diagnostics.DiagnosticCatalog Shared { get; } = new();

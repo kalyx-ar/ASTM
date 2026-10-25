@@ -22,4 +22,6 @@
     <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#12313E" />
     <None Update="README.txt" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Import Project="..\..\KalyxLang.props" />
+  <Import Project="WindowsLanguages.targets" />
 </Project>

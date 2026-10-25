@@ -24,7 +24,7 @@ public sealed record ArchitectDialectOptions
     public TimeZoneInfo InstrumentTimeZone { get; init; } = TimeZoneInfo.Local;
 }
 
-public sealed class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin
+public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin
 {
     public const string PluginId = "abbott.architect";
     public const string AsiProfileId = "abbott.architect.asi-rs232";

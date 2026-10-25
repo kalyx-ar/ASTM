@@ -109,3 +109,5 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 La propuesta inicial era sólo documental; lo implementado y comprobado desde entonces está en [ESTADO](ESTADO.md). No se conectaron equipos reales. [verificacion-propuesta.json](verificacion-propuesta.json) registra la comprobación documental de la entrega anterior.
 
 La ampliación [Mensajes, trazas y HL7](MENSAJES-TRAZAS-HL7.md) registra P-01 resuelto, HL7/MLLP y ARCHITECT implementados, LAW parcial y la custodia de trazas por la aplicación orquestante. En EDC se exige SQLCipher preparado antes de comunicar y diagnóstico autorizado por UI; su composición sigue pendiente.
+
+Mejoras de Diagnostics: interpretación por defecto, grupos completos, detección de logs, columnas automáticas/redimensionables, equipos con configuraciones internas y Lang opcional. Ver [usabilidad](USABILIDAD-DIAGNOSTICS.md).

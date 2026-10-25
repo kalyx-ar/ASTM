@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <SatelliteResourceLanguages>es;es-AR;es-ES;en;en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <!-- Native WinUI MUI payloads bypass SatelliteResourceLanguages. Keep Spanish and the en-US fallback;
+       do not delete core DLLs/PRI or arbitrary directories after publishing. -->
+  <Target Name="FilterAtsmWinUiLanguages" AfterTargets="AddMicrosoftWindowsAppSDKPayloadFiles;ResolveReferences" BeforeTargets="_CopyFilesMarkedCopyLocal;ComputeFilesToPublish">
+    <ItemGroup>
+      <_AtsmUnusedWinUiMui Include="@(MicrosoftWindowsAppSDKFiles)"
+        Condition="'%(Extension)' == '.mui' and ('%(Filename)' == 'Microsoft.UI.Xaml.dll' or '%(Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(RecursiveDir)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <None Remove="@(_AtsmUnusedWinUiMui)" />
+      <MicrosoftWindowsAppSDKFiles Remove="@(_AtsmUnusedWinUiMui)" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.mui' and ('%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(ReferenceCopyLocalPaths.DestinationSubDirectory)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+    </ItemGroup>
+  </Target>
+  <Target Name="FilterAtsmPublishedWinUiLanguages" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.mui' and ('%(ResolvedFileToPublish.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(ResolvedFileToPublish.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+    </ItemGroup>
+  </Target>
+</Project>

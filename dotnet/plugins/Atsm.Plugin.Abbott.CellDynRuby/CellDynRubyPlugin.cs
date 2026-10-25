@@ -15,7 +15,7 @@ namespace Atsm.Plugin.Abbott.CellDynRuby;
 /// CELL-DYN Ruby. No vendor manual is available in this repository yet: the profile and the dialect are derived from
 /// production traces and from the legacy host plugin, and every point not confirmed by the manual is marked as such.
 /// </summary>
-public sealed class CellDynRubyPlugin : IInstrumentPlugin
+public sealed partial class CellDynRubyPlugin : IInstrumentPlugin
 {
     public const string PluginId = "abbott.celldyn-ruby";
     public const string ProfileId = "abbott.celldyn-ruby.lis2a";

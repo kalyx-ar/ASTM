@@ -7,6 +7,11 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        Microsoft.Maui.Handlers.CheckBoxHandler.Mapper.AppendToMapping("CompactDiagnosticOptions", (handler, _) =>
+        {
+            handler.PlatformView.MinWidth = 0; handler.PlatformView.MinHeight = 0;
+            handler.PlatformView.Padding = new Microsoft.UI.Xaml.Thickness(0);
+        });
         var builder = MauiApp.CreateBuilder().UseMauiApp<App>();
         builder.Services.AddSingleton<IDiagnosticPlatformServices, WindowsDiagnosticServices>();
         builder.Services.AddSingleton<MainPage>();

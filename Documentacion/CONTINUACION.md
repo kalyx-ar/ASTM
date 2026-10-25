@@ -1,6 +1,6 @@
 # Continuación del trabajo
 
-Guía para retomar ATSM desde otra sesión o agente. Estado al 24 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
+Guía para retomar ATSM desde otra sesión o agente. Estado al 25 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
 
 ## Cómo retomar
 
@@ -20,7 +20,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 162 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 180 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: `.\tools\Publish-Diagnostics.ps1`; no forma parte del build multiplataforma `Atsm.slnx`. Ver [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) para uso, catálogo y evidencia por modelo.
 
@@ -185,3 +185,7 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 - El commit `a932694` no compila solo (la solución ya referenciaba el plugin, que llegó en el commit siguiente). No afecta a `main`.
 - Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado; el consumible es `agente-tls.json`.
 - `atsm-trace` registra los plugins de forma estática por decisión humana; no es deuda de carga dinámica.
+
+### Usabilidad y Lang (2026-10-25)
+
+Entregados agrupación sin pérdida, interpretación por defecto, tabla automática/redimensionable, contraste de controles, catálogo de 8 equipos con 12 configuraciones técnicas, detección de formato y del lado del registrador, y filtro de idiomas WinUI. Revisión local UF-5000: 425 mensajes/5.006 observaciones; UC-3500 interno: 2.006 entradas conservadas sin falsa interpretación ASTM. [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md) describe el modo técnico y el adaptador Lang opcional. No confundir detector de formato de log con soporte de un protocolo propietario. Extender vocabulario y firmas por plugin con evidencia/corpus; inspección manual de arrastre pendiente tras Esc del usuario, sin ampliar homologación física.

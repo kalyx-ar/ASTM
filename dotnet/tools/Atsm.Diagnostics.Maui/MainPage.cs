@@ -14,6 +14,8 @@ using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Runtime.Tracing;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
+using Microsoft.Maui.Layouts;
+using static Atsm.Diagnostics.Maui.Globals;
 
 namespace Atsm.Diagnostics.Maui;
 
@@ -23,71 +25,83 @@ public sealed class MainPage : ContentPage
     private readonly IDiagnosticPlatformServices _platform;
     private readonly DiagnosticCatalog _catalog = new();
     private static readonly JsonSerializerOptions DetailJson = new(TraceJson.Options) { WriteIndented = true };
-    private readonly Picker _profiles = Choice("Plugin / formato"), _formats = Choice("Entrada"), _transport = Choice("Transporte"), _mode = Choice("Modo");
+    private readonly Picker _configurations = Choice(T("Source.Configuration")), _recorder = Choice(T("Source.Recorder")), _profiles = Choice(T("Source.Plugin")), _formats = Choice(T("Source.Format")), _transport = Choice(T("Live.Transport")), _mode = Choice(T("Live.Mode"));
     private readonly Entry _host = Input("127.0.0.1"), _port = Input(""), _agentPort = Input("p1"), _controller = Input(Environment.MachineName);
     private readonly Entry _query = Input(""), _response = Input(""), _offset = Input("-03:00"), _password = Input("");
-    private readonly CheckBox _tls = new(), _hex = new();
-    private readonly Label _evidence = Text("", 12), _certificate = Text("Sin certificado seleccionado", 12), _title = Text("Sin caso abierto", 21), _summary = Text("Elegí un perfil y abrí un archivo o conectá una interfaz.", 12), _status = Text("Listo · Diagnóstico sin publicación en LIMS.", 12);
+    private readonly CheckBox _tls = new() { WidthRequest = 24, HeightRequest = 28 }, _hex = new() { WidthRequest = 24, HeightRequest = 28 },
+        _interpret = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 }, _group = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 };
+    private readonly Label _evidence = Text("", 12), _certificate = Text(T("Live.NoCertificate"), 12), _title = Text(T("View.NoCase"), 21), _summary = Text(T("View.Prompt"), 12), _status = Text(T("View.Ready"), 12);
     private readonly Button _open, _save, _connect, _stop;
-    private readonly VerticalStackLayout _interface = new() { Spacing = 8 }, _source = new() { Spacing = 8 }, _tableHeader = new();
-    private readonly CollectionView _table = new() { SelectionMode = SelectionMode.Single, ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical) };
-    private readonly Editor _detail = new() { IsReadOnly = true, Text = "Seleccioná una fila para inspeccionar su detalle.", TextColor = Color.FromArgb("#D7E7EF"), BackgroundColor = Color.FromArgb("#132632"), FontSize = 12, FontFamily = "Consolas" };
+    private readonly VerticalStackLayout _interface = new() { Spacing = 8 }, _source = new() { Spacing = 8 };
+    private readonly DiagnosticTable _table;
+    private readonly Editor _detail = new() { IsReadOnly = true, Text = T("View.DetailPrompt"), TextColor = Color.FromArgb("#D7E7EF"), BackgroundColor = Color.FromArgb("#132632"), FontSize = 12, FontFamily = "Consolas" };
     private readonly Grid _body = new(), _workspace = new();
     private readonly ScrollView _sourceScroll;
     private readonly List<Button> _tabButtons = [];
     private readonly IDispatcherTimer _refresh;
-    private readonly string[] _tabs = ["Trama", "Mensajes", "Observaciones", "Hallazgos", "Calidad", "Eventos", "Catálogo"];
-    private readonly DiagnosticInputFormat[] _inputFormats = [DiagnosticInputFormat.Export, DiagnosticInputFormat.AstmMessage, DiagnosticInputFormat.Hl7Message, DiagnosticInputFormat.SysmexLog, DiagnosticInputFormat.LegacyLog, DiagnosticInputFormat.WireBytes, DiagnosticInputFormat.AtsmTrace];
+    private readonly string[] _tabs = [T("View.Wire"), T("View.Messages"), T("View.Observations"), T("View.Findings"), T("View.Quality"), T("View.Events"), T("View.Catalog")];
+    private readonly DiagnosticInputFormat[] _inputFormats = [DiagnosticInputFormat.Auto, DiagnosticInputFormat.Export, DiagnosticInputFormat.AstmMessage, DiagnosticInputFormat.Hl7Message, DiagnosticInputFormat.SysmexLog, DiagnosticInputFormat.LegacyLog, DiagnosticInputFormat.WireBytes, DiagnosticInputFormat.AtsmTrace];
     private DiagnosticCase? _case;
     private DiagnosticAnalysis? _analysis;
     private DiagnosticTraceSink? _capture;
     private CancellationTokenSource? _liveStop;
     private TaskCompletionSource? _captureFinished;
     private byte[]? _certificateBytes;
-    private bool _ready, _settingsVisible, _selfTestStarted;
+    private bool _ready, _settingsVisible, _selfTestStarted, _selecting;
+    private byte[]? _sourceBytes;
+    private string? _sourceName;
     private int _tab = 2, _lastCount = -1;
     public bool IsCapturing => _liveStop is not null;
-    private DiagnosticProfile Profile => _catalog.Profiles[_profiles.SelectedIndex];
+    private DiagnosticProfile Profile => _catalog.Instruments[_profiles.SelectedIndex].Profiles[_configurations.SelectedIndex];
 
     public MainPage(IDiagnosticPlatformServices platform)
     {
-        _platform = platform; BackgroundColor = Color.FromArgb("#F3F6FA");
-        _open = Action("Abrir archivo", async () => await OpenAsync()); _save = Action("Guardar caso", async () => await SaveAsync());
-        _connect = Action("Conectar", async () => await ConnectAsync()); _stop = Action("Detener", async () => await StopCaptureAsync()); _stop.IsEnabled = false;
+        _platform = platform; _table = new(platform); BackgroundColor = Color.FromArgb("#F3F6FA");
+        _open = Action(T("Source.Open"), async () => await OpenAsync()); _save = Action(T("Source.Save"), async () => await SaveAsync());
+        _connect = Action(T("Live.Connect"), async () => await ConnectAsync()); _stop = Action(T("Live.Stop"), async () => await StopCaptureAsync()); _stop.IsEnabled = false;
         _password.IsPassword = true;
-        foreach (var profile in _catalog.Profiles) _profiles.Items.Add(profile.DisplayName);
-        foreach (var value in new[] { "Exportación del plugin (CSV / RDML)", "Mensaje ASTM completo", "Mensaje HL7 completo", "Log Sysmex · monitor de puertos", "Log legacy · interfaz", "Bytes de cable (.bin)", "Traza ATSM (.atsmtrace)" }) _formats.Items.Add(value);
-        foreach (var value in new[] { "TCP · conectar al instrumento", "TCP · esperar al instrumento", "SerialTunnel · agente ATSM" }) _transport.Items.Add(value);
-        foreach (var value in new[] { "Capturar sin responder", "Simular host: ACK, sin órdenes" }) _mode.Items.Add(value);
+        foreach (var instrument in _catalog.Instruments) _profiles.Items.Add(instrument.DisplayName);
+        foreach (var format in _inputFormats) _formats.Items.Add(DiagnosticText.Text("Format." + format)); _formats.SelectedIndex = 0;
+        foreach (var key in new[] { "Source.RecorderAuto", "Source.RecorderHost", "Source.RecorderInstrument" }) _recorder.Items.Add(T(key)); _recorder.SelectedIndex = 0;
+        _recorder.SelectedIndexChanged += (_, _) => ReopenLog();
+        foreach (var value in new[] { T("Live.TcpClient"), T("Live.TcpServer"), T("Live.Tunnel") }) _transport.Items.Add(value);
+        foreach (var value in new[] { T("Live.Capture"), T("Live.Simulate") }) _mode.Items.Add(value);
         _transport.SelectedIndex = _mode.SelectedIndex = 0;
-        _profiles.SelectedIndexChanged += (_, _) => SetProfile(); _profiles.SelectedIndex = 0;
-        _source.Add(Text("FUENTE Y PERFIL", 12)); _source.Add(_profiles); _source.Add(_evidence); _source.Add(_formats);
+        _profiles.SelectedIndexChanged += (_, _) => ConfigureInstrument(); _configurations.SelectedIndexChanged += (_, _) => SetProfile(); _profiles.SelectedIndex = 0;
+        _source.Add(Text(T("Source.Title"), 12)); _source.Add(Field(T("Source.Plugin"), _profiles)); _source.Add(Field(T("Source.Configuration"), _configurations)); _source.Add(_evidence);
+        _source.Add(Field(T("Source.Format"), _formats)); _source.Add(Field(T("Source.Recorder"), _recorder));
         _source.Add(new HorizontalStackLayout { Spacing = 8, Children = { _open, _save } });
-        _source.Add(Text("Los casos se protegen para el usuario Windows actual. Los originales no se modifican.", 12));
-        _interface.Add(Text("INTERFAZ EN VIVO", 12)); _interface.Add(_transport);
-        _interface.Add(Field("Host / IP local al escuchar", _host));
-        _interface.Add(Field("Puerto TCP", _port)); _interface.Add(Field("Puerto del agente", _agentPort));
-        _interface.Add(Field("Identidad del controlador", _controller)); _interface.Add(new HorizontalStackLayout { Children = { _tls, Text("TLS · sin degradación automática", 12) } });
-        _interface.Add(Action("Certificado PFX / mTLS", async () => await ChooseCertificateAsync())); _interface.Add(_certificate); _interface.Add(Field("Contraseña del PFX (no se guarda)", _password));
-        _interface.Add(_mode); _interface.Add(Text("Conexión propia. SerialTunnel toma control exclusivo; no observa otra sesión.", 12));
-        _interface.Add(Field("Presupuesto de consulta HL7 (segundos)", _query)); _interface.Add(Field("Presupuesto de respuesta HL7 (segundos)", _response));
+        _source.Add(Text(T("Source.Custody"), 12));
+        _interface.Add(Text(T("Live.Title"), 12)); _interface.Add(Field(T("Live.Transport"), _transport));
+        _interface.Add(Field(T("Live.Host"), _host));
+        _interface.Add(Field(T("Live.Port"), _port)); _interface.Add(Field(T("Live.AgentPort"), _agentPort));
+        _interface.Add(Field(T("Live.Controller"), _controller)); _interface.Add(Option(T("Live.Tls"), _tls));
+        _interface.Add(Action(T("Live.Certificate"), async () => await ChooseCertificateAsync())); _interface.Add(_certificate); _interface.Add(Field(T("Live.Password"), _password));
+        _interface.Add(Field(T("Live.Mode"), _mode)); _interface.Add(Text(T("Live.Ownership"), 12));
+        _interface.Add(Field(T("Live.QueryBudget"), _query)); _interface.Add(Field(T("Live.ResponseBudget"), _response));
         _interface.Add(new HorizontalStackLayout { Spacing = 8, Children = { _connect, _stop } });
-        _source.Add(Field("Offset UTC de logs (±hh:mm)", _offset)); _source.Add(_interface);
+        _source.Add(Action(T("View.Source"), () => { _settingsVisible = false; LayoutPanels(); return Task.CompletedTask; })); _source.Add(Field(T("Source.Offset"), _offset)); _source.Add(_interface);
         _sourceScroll = new ScrollView { Content = _source, Padding = 16, BackgroundColor = Colors.White };
 
         var nav = new HorizontalStackLayout { Spacing = 5 };
         for (var i = 0; i < _tabs.Length; i++) { var selected = i; var button = Action(_tabs[i], () => { _tab = selected; ShowTable(); return Task.CompletedTask; }); nav.Add(button); _tabButtons.Add(button); }
-        var controls = new HorizontalStackLayout { Spacing = 8, Children = { Action("Fuente / conexión", () => { _settingsVisible = !_settingsVisible; LayoutPanels(); return Task.CompletedTask; }), Action("Ejemplo CFX", () => { if (!IsCapturing) LoadDemo(); return Task.CompletedTask; }), _hex, Text("Hexadecimal", 12) } };
+        var controls = new FlexLayout { Direction = FlexDirection.Row, Wrap = FlexWrap.Wrap, AlignItems = FlexAlignItems.Center,
+            Children = { Action(T("View.Source"), () => { _settingsVisible = !_settingsVisible; LayoutPanels(); return Task.CompletedTask; }),
+                Action(T("View.Demo"), () => { if (!IsCapturing) LoadDemo(); return Task.CompletedTask; }),
+                Option(T("View.Interpret"), _interpret),
+                Option(T("View.Group"), _group),
+                Option(T("View.Hex"), _hex) } };
         _hex.CheckedChanged += (_, _) => { if (_ready) ShowTable(); };
+        _interpret.CheckedChanged += (_, _) => { if (_ready) ShowTable(); };
+        _group.CheckedChanged += (_, _) => { if (_ready) ShowTable(); };
         var summary = new VerticalStackLayout { Spacing = 6, Padding = 14, BackgroundColor = Colors.White, Children = { _title, _summary, controls } };
-        _workspace.RowDefinitions = new RowDefinitionCollection(new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star), new RowDefinition(150));
+        _workspace.RowDefinitions = new RowDefinitionCollection(new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star), new RowDefinition(150));
         Place(_workspace, summary, 0, 0); Place(_workspace, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = nav }, 0, 1);
-        Place(_workspace, _tableHeader, 0, 2); Place(_workspace, _table, 0, 3); Place(_workspace, _detail, 0, 4);
-        _table.BackgroundColor = Colors.White; _table.EmptyView = Text("Sin datos para esta vista.", 14);
-        _table.SelectionChanged += (_, e) => { if (e.CurrentSelection.FirstOrDefault() is DiagnosticRow row) _detail.Text = row.Details.Length <= 65536 ? row.Details : row.Details[..65536] + "\n[Detalle visual limitado a 64 KiB; el caso conserva el contenido.]"; };
+        Place(_workspace, _table, 0, 2); Place(_workspace, _detail, 0, 3);
+        _table.DetailSelected += detail => _detail.Text = detail.Length <= 65536 ? detail : detail[..65536] + "\n" + T("View.DetailLimit");
         _body.ColumnDefinitions = new ColumnDefinitionCollection(new ColumnDefinition(330), new ColumnDefinition(GridLength.Star)); _body.ColumnSpacing = 14; _body.Padding = 14;
         Place(_body, _sourceScroll, 0, 0); Place(_body, _workspace, 1, 0);
-        var banner = new VerticalStackLayout { Padding = new Thickness(22, 12), BackgroundColor = Color.FromArgb("#12313E"), Children = { new Label { Text = "ATSM  /  Diagnóstico", FontSize = 25, TextColor = Colors.White }, new Label { Text = "MAUI · Interfaces, logs y datos de calidad · Motor independiente de EDC", FontSize = 12, TextColor = Color.FromArgb("#BBD0DA") } } };
+        var banner = new VerticalStackLayout { Padding = new Thickness(22, 12), BackgroundColor = Color.FromArgb("#12313E"), Children = { new Label { Text = T("App.Banner"), FontSize = 25, TextColor = Colors.White }, new Label { Text = T("App.Subtitle"), FontSize = 12, TextColor = Color.FromArgb("#BBD0DA") } } };
         var root = new Grid { RowDefinitions = new RowDefinitionCollection(new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto)) };
         Place(root, banner, 0, 0); Place(root, _body, 0, 1); Place(root, new Border { Content = _status, Padding = new Thickness(20, 8), BackgroundColor = Color.FromArgb("#E3EBF2"), StrokeThickness = 0 }, 0, 2); Content = root;
         _refresh = Dispatcher.CreateTimer(); _refresh.Interval = TimeSpan.FromSeconds(1); _refresh.Tick += (_, _) => RefreshCapture();
@@ -102,9 +116,9 @@ public sealed class MainPage : ContentPage
         if (selfTest >= 0 && selfTest + 1 < args.Length && !_selfTestStarted)
         {
             _selfTestStarted = true;
-            Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), () =>
+            Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); SelfTest(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, catalog=12, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=12, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
             });
         }
@@ -117,20 +131,46 @@ public sealed class MainPage : ContentPage
         _body.ColumnDefinitions[1].Width = compact ? new GridLength(0) : GridLength.Star;
         Grid.SetColumn(_workspace, compact ? 0 : 1); _sourceScroll.IsVisible = !compact || _settingsVisible; _workspace.IsVisible = !compact || !_settingsVisible;
     }
+    private void ConfigureInstrument()
+    {
+        if (_profiles.SelectedIndex < 0 || _selecting) return;
+        _selecting = true; _configurations.Items.Clear();
+        foreach (var profile in _catalog.Instruments[_profiles.SelectedIndex].Profiles) _configurations.Items.Add(profile.Configuration);
+        _configurations.SelectedIndex = 0; _selecting = false; SetProfile();
+    }
     private void SetProfile()
     {
-        if (!_ready || _profiles.SelectedIndex < 0) return;
+        if (!_ready || _selecting || _profiles.SelectedIndex < 0 || _configurations.SelectedIndex < 0) return;
         _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect;
-        _formats.SelectedIndex = Profile.ContentPlugin is not null ? 0 : Profile.IsHl7 ? 2 : 1;
-        _connect.IsEnabled = Profile.CanConnect && !IsCapturing; if (_case is not null && !IsCapturing) Analyze();
+        _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
+        if (_case is not null && !IsCapturing) Analyze();
     }
-    private void SelectProfile(string id) => _profiles.SelectedIndex = Enumerable.Range(0, _catalog.Profiles.Count).Single(i => _catalog.Profiles[i].Id == id);
+    private void SelectProfile(string id)
+    {
+        var model = _catalog.Instruments.Single(instrument => instrument.Profiles.Any(p => p.Id == id));
+        _selecting = true; _profiles.SelectedIndex = _catalog.Instruments.ToList().IndexOf(model);
+        _configurations.Items.Clear(); foreach (var profile in model.Profiles) _configurations.Items.Add(profile.Configuration);
+        _configurations.SelectedIndex = model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
+        _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
+    }
+    private RecordedBy? Recorder => _recorder.SelectedIndex switch { 1 => RecordedBy.Host, 2 => RecordedBy.Instrument, _ => null };
+    private TimeSpan LogOffset()
+    {
+        if (!TimeSpan.TryParse((_offset.Text ?? "").TrimStart('+'), CultureInfo.InvariantCulture, out var offset) || Math.Abs(offset.TotalHours) > 14) throw new ArgumentException(T("Validation.Offset"));
+        return offset;
+    }
+    private void ReopenLog()
+    {
+        if (!_ready || IsCapturing || _sourceBytes is null || _case?.Header.Properties?.GetValueOrDefault("inputFormat") is not ("SysmexLog" or "LegacyLog")) return;
+        try { _case = DiagnosticReader.Read(_sourceBytes, Enum.Parse<DiagnosticInputFormat>(_case.Header.Properties["inputFormat"]), Profile, _sourceName!, LogOffset(), Recorder); Analyze(); }
+        catch (Exception error) { ShowError(error); }
+    }
     private DiagnosticTiming Timing(bool live = false)
     {
         TimeSpan Budget(Entry input)
         {
             if (!live || !Profile.IsHl7) return TimeSpan.Zero;
-            if (!double.TryParse(input.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0 || seconds > 86400) throw new ArgumentException("Ingresá los plazos HL7 configurados en el equipo, en segundos y con punto decimal.");
+            if (!double.TryParse(input.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var seconds) || seconds <= 0 || seconds > 86400) throw new ArgumentException(T("Validation.Hl7Timing"));
             return TimeSpan.FromSeconds(seconds);
         }
         return new(Budget(_query), Budget(_response), TimeZoneInfo.Local);
@@ -141,28 +181,44 @@ public sealed class MainPage : ContentPage
         try
         {
             var input = await _platform.PickInputAsync(); if (input is null) return;
+            _sourceBytes = null; _sourceName = null;
             await using var stream = await input.OpenReadAsync();
             if (Path.GetExtension(input.Name).Equals(".atsmcase", StringComparison.OrdinalIgnoreCase))
             {
                 var loaded = ProtectedCaseJournal.Read(stream, _platform.CaseProtection);
-                if (loaded.Header.Profile is not { } id || !_catalog.Profiles.Any(p => p.Id == id)) throw new InvalidDataException("El perfil guardado no está disponible en este catálogo.");
+                if (loaded.Header.Profile is not { } id || !_catalog.Profiles.Any(p => p.Id == id)) throw new InvalidDataException(T("Validation.Profile"));
                 SelectProfile(id); _case = loaded;
+                _status.Text = T("View.FileRead");
             }
             else
             {
-                var bytes = await ReadBoundedAsync(stream); var extension = Path.GetExtension(input.Name).ToLowerInvariant();
-                if (Profile.ContentPlugin is not null && extension is ".rdml" or ".rdm" or ".xml") SelectProfile(CfxPlugin.RdmlProfileId);
-                if (!TimeSpan.TryParse((_offset.Text ?? "").TrimStart('+'), CultureInfo.InvariantCulture, out var offset) || Math.Abs(offset.TotalHours) > 14) throw new ArgumentException("Offset UTC inválido (±hh:mm).");
-                _case = DiagnosticReader.Read(bytes, extension == ".atsmtrace" ? DiagnosticInputFormat.AtsmTrace : _inputFormats[_formats.SelectedIndex], Profile, input.Name, offset);
+                var bytes = await ReadBoundedAsync(stream); _sourceBytes = bytes; _sourceName = input.Name;
+                var format = _inputFormats[_formats.SelectedIndex];
+                var detected = DiagnosticInputDetector.Detect(bytes, Profile, _catalog);
+                if (format == DiagnosticInputFormat.Auto)
+                {
+                    if (!detected.Recognized) throw new InvalidDataException(DiagnosticText.Text(detected.Candidates.Count == 0 ? "Detection.Unknown" : "Detection.Ambiguous"));
+                    format = detected.Format; if (detected.ProfileId is { } profileId) SelectProfile(profileId);
+                }
+                if (format == DiagnosticInputFormat.ProtectedCase)
+                {
+                    using var protectedInput = new MemoryStream(bytes); var loaded = ProtectedCaseJournal.Read(protectedInput, _platform.CaseProtection);
+                    if (loaded.Header.Profile is not { } id || !_catalog.Profiles.Any(p => p.Id == id)) throw new InvalidDataException(T("Validation.Profile"));
+                    SelectProfile(id); _case = loaded;
+                }
+                else _case = DiagnosticReader.Read(bytes, format, Profile, input.Name, LogOffset(), Recorder);
+                _status.Text = DiagnosticText.Format(_inputFormats[_formats.SelectedIndex] == DiagnosticInputFormat.Auto ? "Detection.Success" : "Detection.Selected", DiagnosticText.Text("Format." + format), Profile.DisplayName);
+                if (_case.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true") _status.Text = DiagnosticText.Text("Detection.Unsupported");
             }
-            Analyze(); _status.Text = _case.IsComplete ? "Archivo leído · Original conservado · Sin acciones sobre instrumentos ni LIMS." : "Caso incompleto: puede faltar el tramo final. Registros disponibles conservados.";
+            Analyze();
+            if (!_case.IsComplete) _status.Text = T("View.Incomplete");
         }
         catch (Exception error) { ShowError(error); }
     }
     private static async Task<byte[]> ReadBoundedAsync(Stream stream)
     {
         using var output = new MemoryStream(); var buffer = new byte[8192]; int count;
-        while ((count = await stream.ReadAsync(buffer)) > 0) { if (output.Length + count > DiagnosticReader.MaxInputBytes) throw new InvalidDataException("Límite de entrada: 32 MiB."); output.Write(buffer, 0, count); }
+        while ((count = await stream.ReadAsync(buffer)) > 0) { if (output.Length + count > DiagnosticReader.MaxInputBytes) throw new InvalidDataException(T("Validation.InputLimit")); output.Write(buffer, 0, count); }
         return output.ToArray();
     }
     private async Task SaveAsync()
@@ -177,7 +233,7 @@ public sealed class MainPage : ContentPage
                 foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
                 foreach (var batch in _case.Batches ?? []) journal.Append("batch", batch);
             }
-            _status.Text = "Caso protegido guardado: " + destination.DisplayName + " · Usuario Windows actual.";
+            _status.Text = F("View.Saved", destination.DisplayName);
         }
         catch (Exception error) { ShowError(error); }
     }
@@ -199,19 +255,19 @@ public sealed class MainPage : ContentPage
         ProtectedCaseJournal? journal = null; X509Certificate2? certificate = null;
         try
         {
-            if (!int.TryParse(_port.Text, out var port) || port is < 1 or > 65535) throw new ArgumentException("Ingresá el puerto TCP configurado en el instrumento o agente.");
+            if (!int.TryParse(_port.Text, out var port) || port is < 1 or > 65535) throw new ArgumentException(T("Validation.Port"));
             var timing = Timing(live: true); var selected = Profile; var host = (_host.Text ?? "").Trim(); var controller = (_controller.Text ?? "").Trim(); var agentPort = (_agentPort.Text ?? "").Trim();
-            if (host.Length == 0 || controller.Length == 0) throw new ArgumentException("Completá host e identidad del controlador.");
+            if (host.Length == 0 || controller.Length == 0) throw new ArgumentException(T("Validation.Host"));
             var transport = _transport.SelectedIndex; var simulate = _mode.SelectedIndex == 1; var tls = _tls.IsChecked;
             if (_certificateBytes is not null) certificate = X509CertificateLoader.LoadPkcs12(_certificateBytes, _password.Text, X509KeyStorageFlags.EphemeralKeySet);
-            if (tls && transport == 1 && certificate is null) throw new ArgumentException("El servidor TLS requiere un PFX con clave privada.");
+            if (tls && transport == 1 && certificate is null) throw new ArgumentException(T("Validation.Certificate"));
             var endpoint = new TcpEndpointOptions(host, port, tls ? TlsMode.Tls : TlsMode.Plain) { ClientCertificates = certificate is null ? null : new X509CertificateCollection { certificate }, ServerCertificate = certificate };
             var destination = await _platform.PickCaseDestinationAsync(); if (destination is null) return;
             var header = new TraceHeader(Guid.CreateVersion7(), transport == 2 ? "SerialTunnel" : "TCP", "diagnostic", selected.Id, DateTimeOffset.UtcNow,
                 new Dictionary<string, string> { ["protocol"] = selected.Protocol, ["mode"] = simulate ? "diagnostic-host" : "capture-no-responses", ["protection"] = "Windows DPAPI CurrentUser" });
             journal = new(destination.Create(), _platform.CaseProtection, header); _capture = new(header, journal); _case = new(header, []); _lastCount = -1;
             _capture.EnsureReady(); _liveStop = new(); _captureFinished = new(TaskCreationOptions.RunContinuationsAsynchronously); SetBusy(true); _refresh.Start();
-            _status.Text = "Abriendo interfaz · Caso protegido preparado antes de conectar."; var token = _liveStop.Token;
+            _status.Text = T("Live.Opening"); var token = _liveStop.Token;
             await Task.Run(() => LiveDiagnostic.RunAsync(selected, timing, _capture, async stop =>
             {
                 IInstrumentChannel channel;
@@ -222,12 +278,12 @@ public sealed class MainPage : ContentPage
                     try { channel = await TcpNativeChannel.AcceptAsync("maintenance", listener, endpoint, "diagnostic", stop); } finally { listener.Stop(); }
                 }
                 else channel = await TcpNativeChannel.ConnectAsync("maintenance", endpoint, "diagnostic", stop);
-                Dispatcher.Dispatch(() => _status.Text = simulate ? "Simulación de host · Custodia de diagnóstico, consultas sin órdenes." : "Captura conectada sin respuestas · Conexión propia.");
+                Dispatcher.Dispatch(() => _status.Text = simulate ? T("Live.Simulating") : T("Live.Connected"));
                 return channel;
             }, simulate, controller, token));
-            _status.Text = "Interfaz cerrada · Caso protegido conservado.";
+            _status.Text = T("Live.Closed");
         }
-        catch (OperationCanceledException) { _status.Text = "Captura detenida · Caso protegido conservado."; }
+        catch (OperationCanceledException) { _status.Text = T("Live.Stopped"); }
         catch (Exception error) { journal?.MarkIncomplete(); ShowError(error); }
         finally
         {
@@ -240,7 +296,7 @@ public sealed class MainPage : ContentPage
     public async Task StopCaptureAsync() { var finished = _captureFinished?.Task; _liveStop?.Cancel(); if (finished is not null) await finished; }
     private void SetBusy(bool busy)
     {
-        _profiles.IsEnabled = _formats.IsEnabled = _open.IsEnabled = _save.IsEnabled = !busy;
+        _profiles.IsEnabled = _configurations.IsEnabled = _recorder.IsEnabled = _formats.IsEnabled = _open.IsEnabled = _save.IsEnabled = !busy;
         _connect.IsEnabled = !busy && Profile.CanConnect; _stop.IsEnabled = busy;
     }
     private void RefreshCapture(bool force = false)
@@ -254,62 +310,94 @@ public sealed class MainPage : ContentPage
         try
         {
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
-            _summary.Text = $"{_case.Entries.Count:N0} entradas · {_analysis.Messages.Count:N0} mensajes · {_analysis.Observations.Count:N0} observaciones · {_analysis.Diagnostics.Count:N0} hallazgos · Vista: últimas 2.000 filas"; ShowTable();
+            _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
         }
         catch (Exception error) { ShowError(error); }
     }
     private string Json<T>(T value) => JsonSerializer.Serialize(value, (System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>)DetailJson.GetTypeInfo(typeof(T)));
+    private static DiagnosticRow Row(string[] cells, string details, params string?[] key) => new(cells, details, DiagnosticGrouping.Key(key));
     private void ShowTable()
     {
         if (!_ready) return;
+        var interpreted = _interpret.IsChecked;
         foreach (var (button, index) in _tabButtons.Select((b, i) => (b, i))) button.BackgroundColor = index == _tab ? Teal : Color.FromArgb("#38576B");
         string[] headers; IEnumerable<DiagnosticRow> rows;
+        string D(string raw) => interpreted ? DiagnosticText.Direction(raw) : raw;
+        string Detail(string meaning, string raw) => meaning + "\n\n" + DiagnosticText.Text("Original") + "\n" + raw;
+        var unsupported = _case?.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true";
         switch (_tab)
         {
             case 0:
-                headers = ["#", "ms", "Dirección", "Bytes", "Código / contenido"];
-                rows = (_case?.Entries ?? []).Select(e => new DiagnosticRow([e.Sequence.ToString(), e.Elapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture), e.Direction.ToString(), e.Data.Length.ToString(), e.Code ?? DiagnosticReader.DescribeBytes(e.Data[..Math.Min(e.Data.Length, 140)], _hex.IsChecked)], e.Code + "\n" + e.Detail + "\n" + DiagnosticReader.DescribeBytes(e.Data, _hex.IsChecked))); break;
+                headers = [T("Column.Sequence"), T("Column.Milliseconds"), T("Column.Direction"), T("Column.Bytes"), T("Column.Command")];
+                rows = (_case?.Entries ?? []).Select(entry =>
+                {
+                    var meaning = unsupported ? DiagnosticText.Format("Message.Wire", entry.Data.Length) : ProtocolExplainer.Entry(entry, Profile);
+                    var raw = DiagnosticReader.DescribeBytes(entry.Data, _hex.IsChecked);
+                    return Row([entry.Sequence.ToString(), entry.Elapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture), D(entry.Direction.ToString()), entry.Data.Length.ToString(), interpreted ? meaning : entry.Code ?? raw],
+                        Detail(meaning, "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), meaning);
+                }); break;
             case 1:
-                headers = ["#", "Dirección", "Tipo", "Contenido"];
-                rows = (_analysis?.Messages ?? []).Select(m => new DiagnosticRow([m.Sequence.ToString(), m.Direction, m.Type, m.Text], m.Text.Replace("\r", "\r\n", StringComparison.Ordinal))); break;
+                headers = [T("Column.Sequence"), T("Column.Direction"), T("Column.Type"), T("Column.Content")];
+                var observations = (_analysis?.Observations ?? []).ToLookup(o => o.Trace.LastSequence);
+                rows = (_analysis?.Messages ?? []).Select(message =>
+                {
+                    var kind = ProtocolExplainer.MessageKind(message, Profile);
+                    var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
+                    return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
+                        Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + ProtocolExplainer.RecordEvidence(message.Text, Profile), message.Text), message.Direction, kind);
+                }); break;
             case 2:
-                headers = ["Muestra", "Posición", "Prueba", "Tipo", "Valor original", "Unidad", "Estado / flags"];
-                rows = (_analysis?.Observations ?? []).Select(o => new DiagnosticRow([o.Specimen.SpecimenId, o.Specimen.Position ?? "", o.Test.Vendor.Display ?? o.Test.Vendor.Code, o.ResultKind ?? "", o.Value.RawText, o.Value.RawUnit ?? "", o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code))], Json(o))); break;
+                headers = [T("Column.Specimen"), T("Column.Position"), T("Column.Test"), T("Column.Type"), T("Column.Value"), T("Column.Unit"), T("Column.Status")];
+                rows = (_analysis?.Observations ?? []).Select(o => Row([o.Specimen.SpecimenId, o.Specimen.Position ?? "", o.Test.Vendor.Display ?? o.Test.Vendor.Code,
+                    interpreted ? ProtocolExplainer.ResultKind(o, Profile) : o.ResultKind ?? "", o.Value.RawText, o.Value.RawUnit ?? "",
+                    interpreted ? ProtocolExplainer.Status(o) : o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code))], Json(o),
+                    o.Specimen.SpecimenId, o.Test.Vendor.Code, o.ResultKind)); break;
             case 3:
-                headers = ["Nivel", "Código", "Hallazgo"];
-                rows = (_analysis?.Diagnostics ?? []).Select(d => new DiagnosticRow([d.Severity.ToString(), d.Code, d.Message], d.Code + "\n" + d.Location + "\n" + d.Message)); break;
+                headers = interpreted ? [T("Column.Severity"), T("Column.Finding"), T("Column.Sequence")] : [T("Column.Severity"), T("Column.Code"), T("Column.Finding"), T("Column.Sequence")];
+                rows = (_analysis?.Diagnostics ?? []).Select(finding =>
+                {
+                    var meaning = DiagnosticText.Finding(finding);
+                    return Row(interpreted ? [DiagnosticText.Text("Severity." + finding.Severity), meaning, finding.Location ?? ""] : [DiagnosticText.Text("Severity." + finding.Severity), finding.Code, finding.Message, finding.Location ?? ""],
+                        Detail(meaning, finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
+                }); break;
             case 4:
-                headers = ["Material / lote", "Prueba", "Dato reportado", "Valor original", "Ámbito", "Campo fuente"];
+                headers = [T("Column.Material"), T("Column.Test"), T("Column.Statistic"), T("Column.Value"), T("Column.Scope"), T("Column.SourceField")];
                 rows = (_analysis?.Observations ?? []).Where(o => o.Specimen.Role != SpecimenRole.Patient && (o.Quality is not null || o.Specimen.Role is SpecimenRole.Control or SpecimenRole.Calibrator)).SelectMany(QualityRows)
-                    .Concat((_analysis?.QualityResources ?? []).Select(r => new DiagnosticRow(["Referencia externa", "", "Objetivos / límites", "Requiere anfitrión / ETL", "Lote", r.SourceField], Json(r)))); break;
+                    .Concat((_analysis?.QualityResources ?? []).Select(resource => Row([T("Quality.External"), "", T("Quality.Targets"), T("Quality.RequiresHost"), T("Quality.Batch"), resource.SourceField], Json(resource), resource.SourceField))); break;
             case 5:
-                headers = ["Capa", "#", "Código", "Detalle"];
-                rows = (_analysis?.Events ?? []).Select(e => new DiagnosticRow([e.Level.ToString(), e.Sequence.ToString(), e.Code, e.Detail ?? ""], $"{e.Level}\n{e.Code}\n{e.Detail}")); break;
+                headers = interpreted ? [T("Column.Layer"), T("Column.Sequence"), T("Column.Detail")] : [T("Column.Layer"), T("Column.Sequence"), T("Column.Code"), T("Column.Detail")];
+                rows = (_analysis?.Events ?? []).Select(item =>
+                {
+                    var meaning = item.Code == "lis02.message" && item.Detail is { } records
+                        ? ProtocolExplainer.RecordNames(string.Join("\r", records.Select(code => code + "|")), Profile)
+                        : DiagnosticText.Event(item.Code, item.Detail);
+                    return Row(interpreted ? [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), meaning] : [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), item.Code, item.Detail ?? ""],
+                        Detail(meaning, item.Level + "\n" + item.Code + "\n" + item.Detail), item.Level.ToString(), item.Code);
+                }); break;
             default:
-                headers = ["Marca", "Perfil", "Formato", "Evidencia / alcance"];
-                rows = _catalog.Profiles.Select(p => new DiagnosticRow([p.Manufacturer, p.Name, p.Protocol, p.Evidence], p.Id + "\n" + p.DisplayName + "\n" + p.Evidence + "\n" + string.Join("\n", p.AstmProfile?.Evidence ?? p.ContentProfile?.Evidence ?? []))); break;
+                headers = [T("Column.Profile"), T("Column.Configuration"), T("Column.Evidence")];
+                rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration)), string.Join(" · ", instrument.Profiles.Select(p => p.Evidence).Distinct(StringComparer.Ordinal))],
+                    string.Join("\n\n", instrument.Profiles.Select(p => p.Id + "\n" + p.DisplayName + "\n" + p.Evidence + "\n" + string.Join("\n", p.AstmProfile?.Evidence ?? p.ContentProfile?.Evidence ?? []))), instrument.Id)); break;
         }
-        _tableHeader.Clear(); _tableHeader.Add(new DataRowView(headers, header: true));
-        _table.ItemsSource = null; _table.ItemTemplate = new DataTemplate(() => new DataRowView(headers)); _table.ItemsSource = rows.TakeLast(2000).ToArray();
+        var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 2 };
+        _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible);
     }
     private IEnumerable<DiagnosticRow> QualityRows(InstrumentObservation observation)
     {
         var context = observation.Quality; var material = context?.Material;
         var label = (material?.Identifier ?? observation.Specimen.SpecimenId) + (material?.Lot is { } lot ? " / " + lot : ""); var detail = Json(observation);
-        if (observation.Value.RawText.Length > 0) yield return new([label, observation.Test.Vendor.Code, "Medición · " + observation.ResultKind, observation.Value.RawText, "Individual", "Observación"], detail);
-        foreach (var statistic in context?.Statistics ?? []) yield return new([label, observation.Test.Vendor.Code, statistic.Kind switch
-        { ReportedStatisticKind.CqMean => "Cq · media", ReportedStatisticKind.CqStandardDeviation => "Cq · desvío estándar", ReportedStatisticKind.EfficiencyPercent => "Eficiencia (%)", ReportedStatisticKind.Slope => "Pendiente", ReportedStatisticKind.YIntercept => "Ordenada al origen", ReportedStatisticKind.RSquared => "R²",
-            ReportedStatisticKind.StartingQuantity => "Cantidad inicial (SQ)", ReportedStatisticKind.LogStartingQuantity => "Log cantidad inicial", ReportedStatisticKind.StartingQuantityMean => "SQ · media", ReportedStatisticKind.StartingQuantityStandardDeviation => "SQ · desvío estándar", _ => statistic.Kind.ToString() }, statistic.Value.RawText,
-            statistic.Scope switch { StatisticScope.ReplicateGroup => "Réplicas", StatisticScope.StandardCurve => "Curva", _ => "Pozo" }, statistic.SourceField], detail);
+        if (observation.Value.RawText.Length > 0) yield return Row([label, observation.Test.Vendor.Code, F("Quality.Measurement", observation.ResultKind), observation.Value.RawText, T("Quality.Individual"), T("Quality.Observation")], detail, label, observation.Test.Vendor.Code, "measurement");
+        foreach (var statistic in context?.Statistics ?? []) yield return Row([label, observation.Test.Vendor.Code, T("Statistic." + statistic.Kind), statistic.Value.RawText,
+            T("Scope." + statistic.Scope), statistic.SourceField], detail, label, observation.Test.Vendor.Code, statistic.Kind.ToString(), statistic.Scope.ToString());
     }
     public void LoadDemo()
     {
         SelectProfile(CfxPlugin.CsvProfileId);
         var data = Encoding.UTF8.GetBytes("Well,Sample,Target,Cq,Fluor,Content,Cq Mean,Cq Std. Dev\r\nA01,CONTROL-SYN-1,TARGET-A,23.45,FAM,Pos-01,23.50,0.07\r\nA02,STANDARD-SYN-2,TARGET-A,28.12,FAM,Std-01,28.10,0.03\r\nA03,NTC-SYN-3,TARGET-B,Undetermined,HEX,NTC,Undetermined,\r\n");
-        _case = DiagnosticReader.Read(data, DiagnosticInputFormat.Export, Profile, "Ejemplo sintético · Bio-Rad CFX", TimeSpan.FromHours(-3)); _tab = 4; Analyze();
-        _status.Text = "Ejemplo sintético · Estadísticas reportadas por el software, sin decisión QC ni datos de pacientes.";
+        _case = DiagnosticReader.Read(data, DiagnosticInputFormat.Export, Profile, T("View.DemoTitle"), TimeSpan.FromHours(-3)); _tab = 4; Analyze();
+        _status.Text = T("View.DemoStatus");
     }
-    private void SelfTest()
+    private async Task SelfTestAsync()
     {
         var runtime = Path.GetFullPath(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
         if (!runtime.StartsWith(Path.GetFullPath(AppContext.BaseDirectory), StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("External runtime used.");
@@ -318,40 +406,44 @@ public sealed class MainPage : ContentPage
         {
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
-            if (_catalog.Profiles.Count != 12 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
+            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == "sysmex.uwam") != 1 || _catalog.Profiles.Count != 12 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
             if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("ATSM-UNPROTECTED-CASE");
         }
         finally { File.Delete(path); }
+        foreach (var interpreted in new[] { false, true })
+        {
+            _interpret.IsChecked = interpreted;
+            for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
+        }
+        _tab = 4; ShowTable();
     }
-    private void ShowError(Exception error) => _status.Text = "No se completó la operación: " + error.Message;
-    private static Entry Input(string text) => new() { Text = text, FontSize = 13, TextColor = Ink, BackgroundColor = Colors.White, MinimumHeightRequest = 36 };
-    private static Picker Choice(string title) => new() { Title = title, FontSize = 13, TextColor = Ink, BackgroundColor = Colors.White, MinimumHeightRequest = 38 };
+    private void ShowError(Exception error)
+    {
+        var code = error.Message.StartsWith("ATSM-", StringComparison.Ordinal) ? error.Message : error.GetType().Name;
+        _status.Text = F("App.Error", code); _detail.Text = error.Message;
+        if (lang.Values.Contains(error.Message, StringComparer.Ordinal) || DiagnosticText.IsLocalized(error.Message)) _status.Text = error.Message;
+    }
+    private static Entry Input(string text) => new() { Text = text, FontSize = 13, TextColor = Ink, BackgroundColor = Colors.Transparent, MinimumHeightRequest = 36 };
+    private static Picker Choice(string title) => new() { Title = title, FontSize = 13, TextColor = Ink, BackgroundColor = Colors.Transparent, MinimumHeightRequest = 38 };
     private static Label Text(string value, double size) => new() { Text = value, FontSize = size, TextColor = size <= 12 ? Muted : Ink, VerticalTextAlignment = TextAlignment.Center };
-    private static View Field(string label, View input) => new VerticalStackLayout { Spacing = 2, Children = { Text(label, 12), input } };
+    private static View Field(string label, View input) => new VerticalStackLayout
+    {
+        Spacing = 4, Margin = new Thickness(0, 3),
+        Children = { Text(label, 12), new Border { Content = input, Padding = new Thickness(8, 1), Stroke = Color.FromArgb("#B7C7D4"), StrokeThickness = 1,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 5 }, BackgroundColor = Color.FromArgb("#F7FAFC") } }
+    };
+    private static View Option(string label, CheckBox check)
+    {
+        check.Color = Teal; check.MinimumWidthRequest = 0; check.WidthRequest = 24; check.HeightRequest = 28;
+        SemanticProperties.SetDescription(check, label);
+        var caption = Text(label, 12); var toggle = new TapGestureRecognizer(); toggle.Tapped += (_, _) => check.IsChecked = !check.IsChecked; caption.GestureRecognizers.Add(toggle);
+        var option = new Grid { ColumnDefinitions = [new(24), new(GridLength.Auto)], ColumnSpacing = 5, Margin = new Thickness(6, 2, 12, 2), VerticalOptions = LayoutOptions.Center };
+        Place(option, check, 0, 0); Place(option, caption, 1, 0); return option;
+    }
     private static Button Action(string title, Func<Task> action)
     {
-        var button = new Button { Text = title, FontSize = 12, BackgroundColor = Teal, TextColor = Colors.White, Padding = new Thickness(10, 7), CornerRadius = 5, MinimumHeightRequest = 34 };
+        var button = new Button { Text = title, FontSize = 12, BackgroundColor = Teal, TextColor = Colors.White, Padding = new Thickness(10, 7), Margin = new Thickness(0, 1, 4, 1), CornerRadius = 5, MinimumHeightRequest = 34 };
         button.Clicked += async (_, _) => await action(); return button;
     }
     private static void Place(Grid grid, View view, int column, int row) { Grid.SetColumn(view, column); Grid.SetRow(view, row); grid.Children.Add(view); }
-    private sealed record DiagnosticRow(string[] Cells, string Details);
-    private sealed class DataRowView : Grid
-    {
-        private readonly Label[] _labels;
-        public DataRowView(string[] columns, bool header = false)
-        {
-            Padding = new Thickness(8, 5); ColumnSpacing = 8; MinimumHeightRequest = 34; BackgroundColor = Color.FromArgb(header ? "#EAF0F6" : "#FFFFFF");
-            _labels = new Label[columns.Length];
-            for (var i = 0; i < columns.Length; i++)
-            {
-                ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); var label = Text(header ? columns[i] : "", 12); label.LineBreakMode = LineBreakMode.TailTruncation; label.MaxLines = 1;
-                if (header) label.FontAttributes = FontAttributes.Bold; _labels[i] = label; Place(this, label, i, 0);
-            }
-        }
-        protected override void OnBindingContextChanged()
-        {
-            base.OnBindingContextChanged(); if (BindingContext is not DiagnosticRow row) return;
-            for (var i = 0; i < _labels.Length; i++) _labels[i].Text = i < row.Cells.Length ? row.Cells[i] : "";
-        }
-    }
 }

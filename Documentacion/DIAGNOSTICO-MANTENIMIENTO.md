@@ -31,7 +31,7 @@ Cada registro se vuelca a disco antes de aceptar custodia. Se guardan los bytes 
 
 Un corte al final de un registro permite recuperar los registros previos completos y marca el caso incompleto. Un fallo criptográfico, reordenamiento o cadena rota se rechaza; falta de cierre, error de captura o límite alcanzado quedan visibles. Guardar nuevamente un caso incompleto conserva esa condición. Un caso sellado sólo acredita el cierre de su captura: no garantiza que el instrumento haya completado su protocolo ni que los resultados estén validados clínicamente.
 
-Entrada/captura: máximo 32 MiB y 100.000 entradas; CFX: 16 MiB de contenido/XML y 64 miembros ZIP. La UI muestra las últimas 2.000 filas y hasta 64 KiB del detalle seleccionado; el caso conserva la captura admitida. No es un monitor continuo de producción sin rotación. Los metadatos del caso guardan limitaciones del origen y líneas omitidas por adaptadores; los errores de enlace y los mensajes incompletos aparecen entre los hallazgos.
+Entrada/captura: máximo 32 MiB y 100.000 entradas; CFX: 16 MiB de contenido/XML y 64 miembros ZIP. La UI agrupa y pagina 300 filas visibles, conservando todos los registros admitidos y hasta 64 KiB del detalle seleccionado; el caso conserva la captura admitida. No es un monitor continuo de producción sin rotación. Los metadatos del caso guardan limitaciones del origen y líneas omitidas por adaptadores; los errores de enlace y los mensajes incompletos aparecen entre los hallazgos.
 
 ## Repertorio y evidencia
 
@@ -66,3 +66,7 @@ CFX usa exportaciones y QWALYS contempla intercambio por archivos **append**: so
 La GUI es un anfitrión de mantenimiento. Sigue pendiente integrar ATSM en EDC (P-13: `ILabWorkflowHost`, Scheduler/ETL, SQLCipher, permisos/UI), completar LAW (P-02), outbox durable (P-04), observadores/captura remota (P-09), LocalSerial (P-10) y distribución firmada/CI (P-14). El journal de diagnóstico no resuelve la outbox ni habilita reenvío de escrituras inciertas. Mantener SerialTunnel sin spool de disco; ver [la decisión de recuperación](MENSAJES-TRAZAS-HL7.md).
 
 Validación de esta entrega: suite .NET con casos CSV/RDML, posiciones/estados de fabricantes, custodia antes de aceptación, simulación ASTM completa, reapertura/reanálisis, corrupción, reordenamiento y cortes del journal; pruebas nativas de regresión; build MAUI, prueba de ventana/handler/runtime privado y DPAPI del usuario. Los conteos finales y commits se registran en ESTADO y en un changelog nuevo.
+
+## Mejoras de uso del 2026-10-25
+
+La lista contiene 8 equipos/familias, con 12 perfiles técnicos en el selector de configuración. Interpretación y grupos activados por defecto; original disponible en detalle y modo técnico. Detección automática por contenido, lado del registrador configurable, columnas automáticas a ventana/contenido con arrastre opcional, controles contrastados y publicación con idiomas limitados. Seeds español neutral y Lang opcional por anfitrión. Uso, diferencia de U-WAM con/sin química y límites de enlaces internos en [USABILIDAD-DIAGNOSTICS](USABILIDAD-DIAGNOSTICS.md).

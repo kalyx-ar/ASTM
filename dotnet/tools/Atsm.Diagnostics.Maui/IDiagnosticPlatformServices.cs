@@ -7,6 +7,7 @@ public sealed record DiagnosticDestination(string DisplayName, Func<Stream> Crea
 /// Windows is the first validated host; another platform must provide its own protected storage.</summary>
 public interface IDiagnosticPlatformServices
 {
+    void AttachColumnResize(Microsoft.Maui.Controls.View grip, Action<double> resizeBy, Action autoFit);
     IDiagnosticCaseProtection CaseProtection { get; }
     void EnsureWindowReady();
     Task<DiagnosticInput?> PickInputAsync(bool certificate = false);

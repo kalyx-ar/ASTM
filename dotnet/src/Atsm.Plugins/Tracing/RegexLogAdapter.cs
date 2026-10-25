@@ -33,7 +33,7 @@ public sealed record RegexLogFormat(
 }
 
 /// <summary>Generic adapter driven by a <see cref="RegexLogFormat"/>; plugins configure it instead of writing parsers.</summary>
-public class RegexLogAdapter(RegexLogFormat format) : ITraceLogAdapter
+public class RegexLogAdapter(RegexLogFormat format) : ITraceLogAdapter, ITraceLogProbe
 {
     public RegexLogFormat Format { get; } = format;
 
@@ -42,6 +42,8 @@ public class RegexLogAdapter(RegexLogFormat format) : ITraceLogAdapter
     public string Description => Format.Description;
 
     public IReadOnlyList<string> Limitations => Format.Limitations;
+
+    public bool Recognizes(ReadOnlySpan<byte> content) => Format.Entry.IsMatch(Format.Encoding.GetString(content));
 
     public virtual LogExtraction Extract(ReadOnlySpan<byte> log, LogAdapterOptions options)
     {

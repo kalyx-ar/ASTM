@@ -12,7 +12,7 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Sysmex.Uwam;
 
-public sealed class UwamPlugin : IInstrumentPlugin, ITraceLogAdapterProvider
+public sealed partial class UwamPlugin : IInstrumentPlugin, ITraceLogAdapterProvider
 {
     public const string PluginId = "sysmex.uwam";
     public const string WithChemistryProfile = "sysmex.uwam.lis2a2.with-chemistry";

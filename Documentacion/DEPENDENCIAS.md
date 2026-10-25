@@ -56,3 +56,17 @@ Presentación oficial Microsoft.Maui.Controls 10.0.110, SDK MAUI instalado por V
 Inventario exacto de las 37 dependencias NuGet de MAUI con versión, autor, licencia, repositorio, SHA-256 y SHA-512: [diagnostics-maui-dependencies.json](diagnostics-maui-dependencies.json). Todas verificaron `dotnet nuget verify --all`, salida 0. Origen/nuspec/repositorio oficial y firmas se comprobaron antes de la distribución. Aprobación: solicitud humana expresa de MAUI y aprobación implícita de bibliotecas oficiales dentro de ese alcance; registro previo [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395906842). Sin nuevos paquetes de terceros, Syncfusion o toolkits; consumidores MAUI separados del motor neutral.
 
 **Alerta:** Microsoft.Maui.Controls, Microsoft.Maui, Microsoft.Maui.Graphics y Microsoft.Maui.Controls.Xaml tienen PublicKeyToken nulo. Firma NuGet verificada no equivale a Strong Name de DLL o Authenticode. CS8002 sigue visible exclusivamente como advertencia del EXE MAUI, con alcance registrado [antes del ajuste](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6395998752). Ensamblados propios firmados con token de distribución; ejecutables NativeAOT nativos sin Strong Name CLR. Authenticode propio pendiente del release. No se re-firman bibliotecas oficiales ni se alteran baselines, listas de confianza o derivaciones EDC. Ver [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md).
+
+## Adaptador opcional Kalyx.Globalization.Lang (2026-10-25)
+
+Pedido humano explícito de usar Lang para UI y diagnóstico de plugins. Alcance previo: [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6398309342); inventario precisado antes de compilar en [este comentario](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6398449976). EnableKalyxLang=true y KalyxGlobalizationProject habilitan la referencia al proyecto propio existente, sin modificarlo. Consumidores: Diagnostics.Core y Diagnostics.Maui. **La publicación estándar conserva seed español y no incluye Lang/SQLite**. La conexión y el proveedor de persistencia pertenecen al anfitrión; no se agrega otro proveedor nativo.
+
+| Dependencia condicional existente | Origen / licencia | Verificación |
+|---|---|---|
+| Kalyx.Globalization | Código propio del checkout EDC; condiciones de distribución EDC | Strong Name de distribución; fuente local, sin copiar ni alterar su implementación |
+| Microsoft.Data.Sqlite.Core 10.0.13 | Microsoft, MIT | Firma NuGet completa correcta; SHA256 661e6696b35e88a5cdceb1ac223dafa303a5af27c7df8bee22156c0ddc5ee0d7 |
+| SQLitePCLRaw.core 2.1.13 | Eric Sink/SourceGear, Apache-2.0, [fuente](https://github.com/ericsink/SQLitePCL.raw) | Transitiva de Sqlite.Core ya presente en EDC; firma NuGet completa correcta; SHA256 d93d5f7ab3f864c47722a2d90048c31a1aac743e153d87b9f4a07589ee2f9daf |
+
+Compilación contra Lang existente correcta y prueba con runtime real/conexión DbConnection sintética: traducción de diagnóstico y vocabulario U-WAM, registro de seeds de cada ensamblado y conexión conservada abierta. No acredita persistencia SQLCipher de Diagnostics en EDC ni descarga de traducciones.
+
+**Alerta de firma actualizada:** Microsoft.Maui.Essentials también tiene PublicKeyToken=null; al usar su tipo AppTheme se agrega a las cuatro advertencias directas anteriores. Los cinco CS8002 siguen visibles. Son los paquetes oficiales MAUI 10.0.110 ya verificados, sin nuevos paquetes ni cambios de admisión. Firma NuGet no equivale a Strong Name ni Authenticode; firma Authenticode propia pendiente del release.

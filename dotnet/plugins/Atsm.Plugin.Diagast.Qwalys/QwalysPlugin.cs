@@ -9,7 +9,7 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Diagast.Qwalys;
 
-public sealed class QwalysPlugin : IInstrumentPlugin
+public sealed partial class QwalysPlugin : IInstrumentPlugin
 {
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("diagast.qwalys3.astm.results", "1.0.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,

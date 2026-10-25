@@ -1,0 +1,13 @@
+<Project>
+  <!-- Explicit opt-in for hosts that supply Kalyx.Globalization and an already-open connection.
+       Standalone ATSM stays independent and uses the same Spanish seed without a database. -->
+  <PropertyGroup Condition="'$(EnableKalyxLang)' == 'true'">
+    <DefineConstants>$(DefineConstants);KALYX_LANG</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(EnableKalyxLang)' == 'true' and '$(KalyxGlobalizationProject)' != ''">
+    <ProjectReference Include="$(KalyxGlobalizationProject)" />
+  </ItemGroup>
+  <Target Name="RequireKalyxLangProject" BeforeTargets="PrepareForBuild" Condition="'$(EnableKalyxLang)' == 'true'">
+    <Error Condition="'$(KalyxGlobalizationProject)' == '' or !Exists('$(KalyxGlobalizationProject)')" Text="EnableKalyxLang requires KalyxGlobalizationProject pointing to the existing Kalyx.Globalization.csproj." />
+  </Target>
+</Project>

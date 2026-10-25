@@ -19,8 +19,15 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public string Manufacturer { get; } = manufacturer;
     public string Name { get; } = name;
     public string Protocol { get; } = protocol;
-    public string Evidence { get; } = evidence;
-    public string DisplayName => $"{Manufacturer} · {Name} · {Protocol}";
+    public string Evidence => DiagnosticText.Localize("Profile." + Id + ".Evidence", evidence);
+    public string InstrumentId => AstmPlugin?.Describe().Id ?? ContentPlugin?.Describe().Id ?? (IsHl7 ? "abbott.architect" : Id);
+    public string Configuration => Id switch
+    {
+        UwamPlugin.WithChemistryProfile => DiagnosticText.Text("Configuration.WithChemistry"),
+        UwamPlugin.WithoutChemistryProfile => DiagnosticText.Text("Configuration.WithoutChemistry"),
+        _ => Protocol,
+    };
+    public string DisplayName => $"{Manufacturer} · {Name} · {Configuration}";
     public IInstrumentPlugin? AstmPlugin { get; init; }
     public AstmProfile? AstmProfile { get; init; }
     public IInstrumentContentPlugin? ContentPlugin { get; init; }
@@ -46,6 +53,7 @@ public sealed class DiagnosticCatalog
     public IReadOnlyList<IInstrumentContentPlugin> ContentPlugins { get; } = [new CfxPlugin()];
     public IReadOnlyList<ITraceLogAdapter> LogAdapters { get; }
     public IReadOnlyList<DiagnosticProfile> Profiles { get; }
+    public IReadOnlyList<DiagnosticInstrument> Instruments { get; }
     public DiagnosticCatalog()
     {
         var profiles = new List<DiagnosticProfile>();
@@ -60,7 +68,8 @@ public sealed class DiagnosticCatalog
             var evidence = descriptor.Id switch
             {
                 "abbott.celldyn-ruby" => "Trazas locales; hipótesis pendientes de manual",
-                "abbott.architect" or "sysmex.uwam" => "Manual y trazas locales; sin homologación en hardware",
+                "abbott.architect" => "Manual y trazas locales; sin homologación en hardware",
+                "sysmex.uwam" => "Manual y trazas de la interfaz U-WAM ↔ LIS; el enlace interno UC-3500 requiere otro perfil. Sin homologación en hardware.",
                 "clsi.lis02" => "Estándar genérico; no valida un equipo particular",
                 _ => "Manual + pruebas sintéticas; sólo recepción de resultados",
             };
@@ -69,7 +78,15 @@ public sealed class DiagnosticCatalog
         profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP", "Manual + pruebas sintéticas; ZOS, no actor LAW completo") { IsHl7 = true });
         if (profiles.Select(p => p.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != profiles.Count) throw new InvalidOperationException("Duplicate profile ID.");
         Profiles = profiles;
+        Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,
+            g.First().Manufacturer + " · " + (g.Key switch
+            {
+                "biorad.cfx" => "CFX Maestro", "abbott.architect" => "ARCHITECT", "sysmex.uwam" => "U-WAM (UF-5000, UC-3500, UD-10)",
+                "clsi.lis02" => DiagnosticText.Text("Catalog.Generic"), _ => g.First().Name,
+            }), g.ToArray())).ToArray();
         LogAdapters = AstmPlugins.OfType<ITraceLogAdapterProvider>().Append(new LegacyTestingPlugin()).SelectMany(p => p.LogAdapters).ToArray();
     }
     public DiagnosticProfile Resolve(string id) => Profiles.Single(p => p.Id == id);
 }
+
+public sealed record DiagnosticInstrument(string Id, string DisplayName, IReadOnlyList<DiagnosticProfile> Profiles);

@@ -11,7 +11,7 @@ using Atsm.Tracing;
 
 namespace Atsm.Diagnostics;
 
-public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace }
+public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace, ProtectedCase, Auto = -1 }
 public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text);
 public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IReadOnlyList<StackEvent> Events,
     IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
@@ -23,30 +23,44 @@ public sealed record DiagnosticCase(TraceHeader Header, IReadOnlyList<TraceEntry
 public static class DiagnosticReader
 {
     public const int MaxInputBytes = 32 * 1024 * 1024;
-    public static DiagnosticCase Read(byte[] bytes, DiagnosticInputFormat format, DiagnosticProfile profile, string sourceName, TimeSpan utcOffset)
+    public static DiagnosticCase Read(byte[] bytes, DiagnosticInputFormat format, DiagnosticProfile profile, string sourceName, TimeSpan utcOffset, RecordedBy? recordedBy = null)
     {
         if (bytes.Length == 0 || bytes.Length > MaxInputBytes) throw new InvalidDataException("ATSM-DIAG-INPUT-LIMIT");
+        if (format == DiagnosticInputFormat.Auto)
+        {
+            var catalog = new DiagnosticCatalog(); var detected = DiagnosticInputDetector.Detect(bytes, profile, catalog);
+            format = detected.Format; if (detected.ProfileId is { } id) profile = catalog.Resolve(id);
+            recordedBy ??= detected.Recorder;
+        }
+        if (format == DiagnosticInputFormat.ProtectedCase) throw new InvalidDataException("ATSM-DIAG-PROTECTED-READER-REQUIRED");
         if (format == DiagnosticInputFormat.AtsmTrace)
         {
             using var reader = new StringReader(new UTF8Encoding(false, true).GetString(bytes));
             var (header, entries) = TraceFile.Read(reader); return new(header, entries);
         }
         IReadOnlyList<TraceSegment> segments;
+        var properties = new Dictionary<string, string> { ["inputFormat"] = format.ToString(), ["protocol"] = profile.Protocol };
         var limitations = new List<string> { "Diagnostic import; no external effects." };
         if (format is DiagnosticInputFormat.SysmexLog or DiagnosticInputFormat.LegacyLog)
         {
             var adapterId = format == DiagnosticInputFormat.SysmexLog ? "sysmex.port-monitor" : "legacy.interface-log";
             var adapter = new DiagnosticCatalog().LogAdapters.Single(a => a.Id == adapterId);
-            var extracted = adapter.Extract(bytes, new(RecordedBy: format == DiagnosticInputFormat.SysmexLog ? RecordedBy.Instrument : RecordedBy.Host) { UtcOffset = utcOffset });
+            var original = adapter.Extract(bytes, new(RecordedBy.Host) { UtcOffset = utcOffset });
+            var inferred = format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments);
+            var recorder = recordedBy ?? inferred ?? RecordedBy.Instrument;
+            var extracted = recorder == RecordedBy.Host ? original : adapter.Extract(bytes, new(recorder) { UtcOffset = utcOffset });
             if (extracted.Segments.Count == 0) throw new InvalidDataException("ATSM-DIAG-NO-LOG-ENTRIES");
             segments = extracted.Segments;
+            properties["recordedBy"] = recorder.ToString();
+            if (recordedBy is null && inferred is null) properties["directionUncertain"] = "true";
+            if (!DiagnosticInputDetector.HasAstmHeader(segments) && segments.Any(s => s.Data.Length > 1)) properties["unsupportedProtocol"] = "true";
             limitations.AddRange(adapter.Limitations);
-            limitations.Add($"Adapter {adapterId}; recorded by { (format == DiagnosticInputFormat.SysmexLog ? "instrument" : "host") }; {extracted.Skipped} skipped lines.");
+            limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
             limitations.AddRange(extracted.Findings);
         }
         else segments = [new(null, TraceDirection.Received, format == DiagnosticInputFormat.WireBytes ? SegmentContent.Wire : SegmentContent.Message, bytes)];
         var (newHeader, newEntries) = TraceReconstruction.Real(segments, sourceName, "diagnostic", limitations);
-        return new(newHeader with { Profile = profile.Id, Properties = new Dictionary<string, string> { ["inputFormat"] = format.ToString(), ["protocol"] = profile.Protocol } }, newEntries);
+        return new(newHeader with { Profile = profile.Id, Properties = properties }, newEntries);
     }
 
     public static DiagnosticAnalysis Analyze(DiagnosticCase input, DiagnosticProfile profile, DiagnosticTiming timing)
@@ -54,6 +68,13 @@ public static class DiagnosticReader
         var values = new List<InstrumentObservation>(); var findings = new List<AtsmDiagnostic>(); var messages = new List<DecodedMessage>();
         if (!input.IsComplete) findings.Add(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "The case was interrupted or its final closure is missing; data may be incomplete."));
         findings.AddRange((input.Header.Limitations ?? []).Select(l => new AtsmDiagnostic("ATSM-DIAG-SOURCE-LIMITATION", AtsmSeverity.Information, l)));
+        if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true")
+        {
+            findings.Add(new("ATSM-DIAG-UNSUPPORTED-PROTOCOL", AtsmSeverity.Warning, "Recorded bytes do not match a supported message protocol; raw input retained."));
+            return new(input.Entries, [], [], [], findings);
+        }
+        if (input.Header.Properties?.GetValueOrDefault("directionUncertain") == "true")
+            findings.Add(new("ATSM-DIAG-DIRECTION-UNCERTAIN", AtsmSeverity.Warning, "Recorder side could not be inferred; confirm instrument or host."));
         if (profile.ContentPlugin is { } contentPlugin)
         {
             var payload = input.Entries.Where(e => e.Direction == TraceDirection.Received).SelectMany(e => e.Data.ToArray()).ToArray();

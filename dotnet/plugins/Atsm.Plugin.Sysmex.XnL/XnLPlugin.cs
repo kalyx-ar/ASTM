@@ -7,7 +7,7 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Plugin.Sysmex.XnL;
 
-public sealed class XnLPlugin : IInstrumentPlugin
+public sealed partial class XnLPlugin : IInstrumentPlugin
 {
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.xnl.astm02.results", "1.1.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,

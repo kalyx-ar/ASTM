@@ -11,4 +11,5 @@
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Diagast.Qwalys\Atsm.Plugin.Diagast.Qwalys.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Legacy.Testing\Atsm.Plugin.Legacy.Testing.csproj" />
   </ItemGroup>
+  <Import Project="..\..\KalyxLang.props" />
 </Project>

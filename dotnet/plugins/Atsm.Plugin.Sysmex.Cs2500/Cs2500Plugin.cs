@@ -8,7 +8,7 @@ using Atsm.Protocol.Lis02;
 namespace Atsm.Plugin.Sysmex.Cs2500;
 
 /// <summary>Documented receive-only E1381-02 / E1394-97 profile. No speculative order handling.</summary>
-public sealed class Cs2500Plugin : IInstrumentPlugin
+public sealed partial class Cs2500Plugin : IInstrumentPlugin
 {
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.cs2500.astm02.results", "1.1.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
