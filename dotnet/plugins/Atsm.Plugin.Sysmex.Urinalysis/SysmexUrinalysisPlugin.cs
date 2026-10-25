@@ -5,7 +5,7 @@ using Atsm.Plugins;
 namespace Atsm.Plugin.Sysmex.Urinalysis;
 
 /// <summary>One equipment-family plugin, with shared knowledge and separate protocol decoders.</summary>
-public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTracePlugin, ITraceLogAdapterProvider, IInstrumentKnowledge
+public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTracePlugin, ITraceLogAdapterProvider, IInstrumentKnowledge, IInstrumentValueKnowledge
 {
     public const string PluginId = "sysmex.urinalysis";
     public const string WithChemistryProfile = UwamInterpreter.WithChemistryProfile;
@@ -28,4 +28,5 @@ public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTrace
     public TraceInterpretation Interpret(InstrumentTraceProfile profile, IReadOnlyList<TraceEntry> entries,
         InstrumentRef instrument, Guid traceId, TimeZoneInfo timeZone) => serial.Interpret(profile, entries, instrument, traceId, timeZone);
     public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code) => knowledge.Lookup(context, code);
+    public InstrumentValueMeaning? DescribeValue(InstrumentObservation observation) => UrinalysisValueKnowledge.Describe(observation, DiagnosticVocabulary);
 }

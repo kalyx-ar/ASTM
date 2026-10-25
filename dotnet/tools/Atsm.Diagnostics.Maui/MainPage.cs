@@ -124,7 +124,7 @@ public sealed class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=13, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=13, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
             });
         }
@@ -388,10 +388,10 @@ public sealed class MainPage : ContentPage
                         Detail(meaning, finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
                 }); break;
             case 4:
-                headers = [T("Quality.MaterialLot"), T("Column.Test"), T("Quality.DataType"), T("Quality.Minimum"), T("Quality.MedianValue"), T("Quality.Maximum"), T("Quality.SD"), T("Quality.N"), T("Quality.Signals")];
+                headers = [T("Quality.MaterialLot"), T("Column.Test"), T("Quality.DataType"), T("Quality.Minimum"), T("Quality.MedianValue"), T("Quality.Maximum"), T("Quality.SD"), T("Quality.N"), T("Quality.Unperformed"), T("Quality.Signals")];
                 var quality = QualityGroups();
                 _table.SetGroups("quality:" + interpreted + ":" + _group.IsChecked, headers,
-                    _group.IsChecked ? quality : DiagnosticGrouping.Build(quality.SelectMany(g => g.Children), false), 8);
+                    _group.IsChecked ? quality : DiagnosticGrouping.Build(quality.SelectMany(g => g.Children), false), 9);
                 return;
             case 5:
                 headers = interpreted ? [T("Column.Layer"), T("Column.Sequence"), T("Column.Detail")] : [T("Column.Layer"), T("Column.Sequence"), T("Column.Code"), T("Column.Detail")];
@@ -420,18 +420,19 @@ public sealed class MainPage : ContentPage
             ? T(value.NotPerformed ? "Quality.Unperformed" : "Quality.NoValue")
             : value.Value + (value.NotPerformed ? " · " + T("Quality.Unperformed") : ""), value.Count);
         var groups = new List<DiagnosticRowGroup>();
-        foreach (var series in QualitySeriesBuilder.Build(_analysis?.Observations ?? []))
+        var knowledge = ((object?)Profile.TracePlugin ?? Profile.AstmPlugin) as Atsm.Plugins.IInstrumentValueKnowledge;
+        foreach (var series in QualitySeriesBuilder.Build(_analysis?.Observations ?? [], knowledge))
         {
             var material = series.Material + (string.IsNullOrWhiteSpace(series.Lot) ? " / " + T("Quality.NoLot") : " / " + series.Lot)
                 + (string.IsNullOrWhiteSpace(series.Level) ? "" : " / " + series.Level);
-            var kind = ProtocolExplainer.ResultKind(series.Records[0], Profile) + (series.Unit.Length == 0 ? "" : " · " + series.Unit);
+            var described = series.Records.FirstOrDefault(o => knowledge?.DescribeValue(o) is not null) ?? series.Records[0];
+            var kind = ProtocolExplainer.ResultKind(described, Profile) + (series.Unit.Length == 0 ? "" : " · " + series.Unit);
             var signals = new List<string>();
             if (series.MeasurementCount == 1) signals.Add(T("Quality.Single"));
             if (series.PotentialOutliers.Count > 0) signals.Add(F("Quality.Outliers", series.PotentialOutliers.Count));
             if (series.Flagged > 0) signals.Add(F("Quality.Flagged", series.Flagged));
-            if (series.NumericCount > 0 && series.NonNumeric > 0) signals.Add(F("Quality.Mixed", series.NonNumeric));
-            if (series.NotPerformed > 0) signals.Add(F("Quality.NotPerformed", series.NotPerformed));
             if (series.Repeated > 0) signals.Add(F("Quality.Repeated", series.Repeated));
+            if (series.Range.Incomparable) signals.Add(T("Quality.Unordered"));
             var reported = series.Records.Sum(o => o.Quality?.Statistics.Count ?? 0);
             if (reported > 0) signals.Add(F("Quality.Reported", reported));
             var detail = string.Join("\n", material, series.Test + " · " + kind,
@@ -439,24 +440,28 @@ public sealed class MainPage : ContentPage
                 T("Quality.Maximum") + ": " + series.Maximum?.ToString("G29"), T("Quality.SD") + ": " + series.StandardDeviation?.ToString("G17"),
                 T("Quality.Mean") + ": " + series.Mean?.ToString("G17"), T("Quality.N") + ": " + series.MeasurementCount,
                 T("Quality.NumericCount") + ": " + series.NumericCount,
+                T("Quality.Unperformed") + ": " + series.NotPerformed,
+                T("Quality.ReportedRange") + ": " + series.Range.Minimum + " … " + series.Range.Maximum,
                 T("Quality.Distribution") + ": " + string.Join(" · ", series.ValueFrequencies.Select(Frequency)),
                 F("Quality.Last", series.Last.Value.RawText, series.Last.ResultTime?.ToString("O") ?? "#" + series.Last.Trace.LastSequence),
                 T("Quality.Method"), string.Join(" · ", signals));
             var children = series.Records.Select(o => new DiagnosticRow([material, series.Test, kind, "", string.IsNullOrWhiteSpace(o.Value.RawText)
-                ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? o.Value.RawText : o.Value.RawText, "", "", "1",
+                ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? o.Value.RawText : o.Value.RawText, "", "", "1", o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed ? "1" : "",
                 "#" + o.Trace.LastSequence + (o.ResultTime is { } time ? " · " + time.ToString("g") : "") + " · " + ProtocolExplainer.Status(o)
                     + (series.PotentialOutliers.Contains(o.ObservationId) ? " · " + T("Quality.Outlier") : "")], Json(o), series.Key)
                 { Attention = o.Flags.Count > 0 || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
-            var outcomes = series.ValueFrequencies.Where(f => !f.Numeric).ToArray();
-            var result = series.NumericCount == 0 ? string.Join(" · ", series.ValueFrequencies.Select(Frequency))
-                : Number(series.Median) + (outcomes.Length == 0 ? "" : " · " + string.Join(" · ", outcomes.Select(Frequency)));
-            groups.Add(new(series.Key, children) { SummaryRow = new([material, series.Test, kind, Number(series.Minimum), result, Number(series.Maximum),
-                Approximate(series.StandardDeviation), series.MeasurementCount.ToString(CultureInfo.CurrentCulture), signals.Count == 0 ? T("Quality.NoSignals") : string.Join(" · ", signals)], detail, series.Key)
+            var measuredValues = series.ValueFrequencies.Where(f => !f.NotPerformed && f.Value.Length > 0).ToArray();
+            var modes = measuredValues.Where(f => f.Count == measuredValues.Max(v => v.Count)).ToArray();
+            var result = series.Range.Median ?? (series.NumericCount > 0 ? Number(series.Median)
+                : series.Range.BoundedCount > 0 ? "—" : modes.Length == 1 ? modes[0].Value : modes.Length > 1 ? T("Quality.MixedResults") : "—");
+            groups.Add(new(series.Key, children) { SummaryRow = new([material, series.Test, kind, series.Range.Minimum ?? "—", result, series.Range.Maximum ?? "—",
+                Approximate(series.StandardDeviation), series.MeasurementCount.ToString(CultureInfo.CurrentCulture), series.NotPerformed.ToString(CultureInfo.CurrentCulture),
+                signals.Count == 0 ? T("Quality.NoSignals") : string.Join(" · ", signals)], detail, series.Key)
                 { Attention = series.Flagged > 0 || series.PotentialOutliers.Count > 0 } });
         }
         foreach (var resource in _analysis?.QualityResources ?? [])
         {
-            var row = Row([T("Quality.External"), "", T("Quality.Targets"), "", "", "", "", "", T("Quality.RequiresHost")], Json(resource), resource.SourceField);
+            var row = Row([T("Quality.External"), "", T("Quality.Targets"), "", "", "", "", "", "", T("Quality.RequiresHost")], Json(resource), resource.SourceField);
             groups.Add(new(row.GroupKey, [row]));
         }
         return groups;
@@ -485,7 +490,10 @@ public sealed class MainPage : ContentPage
             var normal = analyzed.Observations[0] with { Value = new("normal ") };
             _analysis = analyzed with { Observations = [normal, normal, normal, normal] };
             var normalSummary = QualityGroups().Single().SummaryRow!;
-            if (!normalSummary.Cells[4].Contains("normal (4)", StringComparison.Ordinal) || normalSummary.Cells[7] != "4") throw new InvalidDataException("ATSM-MAUI-QUALITATIVE-COUNT-SELFTEST");
+            if (normalSummary.Cells[4] != "normal" || normalSummary.Cells[7] != "4" || normalSummary.Cells[8] != "0") throw new InvalidDataException("ATSM-MAUI-QUALITATIVE-COUNT-SELFTEST");
+            _analysis = analyzed with { Observations = [normal, normal, normal with { Value = new(""), InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed }] };
+            var mixedSummary = QualityGroups().Single().SummaryRow!;
+            if (mixedSummary.Cells[4] != "normal" || mixedSummary.Cells[8] != "1" || mixedSummary.Cells[7] != "3") throw new InvalidDataException("ATSM-MAUI-UNPERFORMED-COLUMN-SELFTEST");
             _analysis = analyzed;
             if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("ATSM-UNPROTECTED-CASE");
         }
@@ -505,6 +513,25 @@ public sealed class MainPage : ContentPage
         if (AutomaticInterpretation || Profile.TracePlugin is not null) throw new InvalidDataException("ATSM-MAUI-MANUAL-INTERPRETATION-SELFTEST");
         _configurations.SelectedIndex = 0;
         if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile) throw new InvalidDataException("ATSM-MAUI-AUTO-RESTORE-SELFTEST");
+        var saved = _analysis!;
+        var cross = new InstrumentObservation(Guid.NewGuid(), new("synthetic"), new("CONTROL-SYN", Role: SpecimenRole.Control),
+            CodeSet.Of(new("BLD", null, "urn:atsm:vendor:sysmex.uc3500")), new("2+"), null, [], "0", InstrumentStatusMeaning.Unknown,
+            "QUALITATIVE", null, null, null, [], [], VendorIdentity.Empty, new(_case.Header.TraceId, 0, 0))
+        { Quality = new(new(QualityMaterialKind.Control, "CONTROL-SYN", "LOT-SYN")) };
+        _analysis = saved with { Observations = [cross, cross with { ObservationId = Guid.NewGuid(), Value = new("-") },
+            cross with { ObservationId = Guid.NewGuid(), Value = new("-") }, cross with { ObservationId = Guid.NewGuid(), Value = new(""), InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed }] };
+        var crossSummary = QualityGroups().Single().SummaryRow!;
+        if (crossSummary.Cells.Length != 10 || crossSummary.Cells[2] != "Semicuantitativo (cruces)" || crossSummary.Cells[3] != "-"
+            || crossSummary.Cells[4] != "-" || crossSummary.Cells[5] != "2+" || crossSummary.Cells[6] != "—" || crossSummary.Cells[7] != "4" || crossSummary.Cells[8] != "1")
+            throw new InvalidDataException("ATSM-MAUI-ORDINAL-SELFTEST");
+        foreach (var (comparison, minimum, maximum) in new[] { (">=", ">=50", "—"), ("<=", "—", "<=50") })
+        {
+            _analysis = saved with { Observations = [cross with { ResultKind = "CONCENTRATION", Value = new(comparison + "50", 50, comparison) }] };
+            var bounded = QualityGroups().Single().SummaryRow!;
+            if (bounded.Cells[2] != "Valor semicuantitativo" || bounded.Cells[3] != minimum || bounded.Cells[5] != maximum || bounded.Cells[6] != "—")
+                throw new InvalidDataException("ATSM-MAUI-BOUNDED-SELFTEST");
+        }
+        _analysis = saved;
         foreach (var interpreted in new[] { false, true })
         {
             _interpret.IsChecked = interpreted;

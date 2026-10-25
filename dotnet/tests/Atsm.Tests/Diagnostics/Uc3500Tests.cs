@@ -180,4 +180,16 @@ public sealed class Uc3500Tests
         Assert.Contains(result.Diagnostics, d => d.Code == "ATSM-UC3500-ANALYSIS-00CC");
         Assert.All(result.Observations, o => Assert.Contains(o.Flags, f => f.Code == "00CC"));
     }
+
+    [Fact]
+    public void Result_bound_is_parsed_as_a_comparator_and_never_as_an_exact_50()
+    {
+        var fields = Result().Split(',');
+        fields[9] = "0 " + "2+    " + ">=50  " + "98.2 " + " " + "99.1 ";
+        var result = Interpret([Entry(0, Frame(string.Join(',', fields)))]);
+        var concentration = Assert.Single(result.Observations, o => o.Test.Vendor.Code == "BLD" && o.ResultKind == "CONCENTRATION");
+        Assert.Equal(50m, concentration.Value.Numeric); Assert.Equal(">=", concentration.Value.Comparator); Assert.Equal(">=50  ", concentration.Value.RawText);
+        var crosses = Assert.Single(result.Observations, o => o.Test.Vendor.Code == "BLD" && o.ResultKind == "QUALITATIVE");
+        Assert.Equal("2+    ", crosses.Value.RawText); Assert.Null(crosses.Value.Numeric);
+    }
 }

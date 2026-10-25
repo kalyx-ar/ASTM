@@ -13,6 +13,9 @@ internal sealed partial class Uc3500Interpreter
         Add("kind.CM00", "Orden de análisis", "tabla 6-15");
         Add("kind.ER", "Respuesta a la orden", "tabla 6-16");
         Add("kind.RESULT", "Resultados de análisis", "tabla 6-17");
+        Add("value.Crosses", "Semicuantitativo (cruces)", "tabla 6-18: valores cualitativos ordenados en cruces");
+        Add("value.BinaryCrosses", "Cualitativo (cruces)", "tabla 6-18: NIT negativo/positivo");
+        Add("value.SemiQuantitative", "Valor semicuantitativo", "tabla 6-18: valores con comparadores/límites");
         foreach (var (key, label) in new (string, string)[] { ("QUALITATIVE", "Valor cualitativo"), ("CONCENTRATION", "Concentración informada"),
             ("REFLECTANCE1", "Reflectancia R%(1)"), ("REFLECTANCE2", "Reflectancia R%(2)"), ("COLOR", "Color informado"), ("COLOR-RANK", "Código de evaluación del color"), ("TURBIDITY", "Turbidez informada") })
             Add("resultKind." + key, label, "tabla 6-17");

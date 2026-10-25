@@ -1,15 +1,18 @@
 using Atsm.Abstractions.Model;
+using Atsm.Plugins;
 
 namespace Atsm.Diagnostics;
 
 public sealed record QualityValueFrequency(string Value, int Count, bool Numeric, bool NotPerformed);
 
 public sealed record QualitySeries(string Key, string Material, string? Lot, string? Level, string Test, string Kind, string Unit,
-    IReadOnlyList<InstrumentObservation> Records, int NumericCount, int NonNumeric, int NotPerformed, int Repeated, int Flagged,
+    IReadOnlyList<InstrumentObservation> Records, int NumericCount, int NonNumeric, int Repeated, int Flagged,
     decimal? Minimum, decimal? Median, decimal? Maximum, double? StandardDeviation, double? Mean,
     IReadOnlySet<Guid> PotentialOutliers)
 {
     public int MeasurementCount => Records.Count;
+    public int NotPerformed => Records.Count(o => o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed);
+    public QualityReportedRange Range { get; init; } = new(null, null, null);
     public IReadOnlyList<QualityValueFrequency> ValueFrequencies { get; init; } = [];
     public InstrumentObservation Last => Records[^1];
 }
@@ -18,7 +21,7 @@ public sealed record QualitySeries(string Key, string Material, string? Lot, str
 /// Reported means/SDs in Quality.Statistics stay metadata; they are not additional replicates.</summary>
 public static class QualitySeriesBuilder
 {
-    public static IReadOnlyList<QualitySeries> Build(IEnumerable<InstrumentObservation> observations)
+    public static IReadOnlyList<QualitySeries> Build(IEnumerable<InstrumentObservation> observations, IInstrumentValueKnowledge? knowledge = null)
     {
         return observations.Where(o => o.Specimen.Role != SpecimenRole.Patient && (o.Quality is not null || o.Specimen.Role is SpecimenRole.Control or SpecimenRole.Calibrator))
             .GroupBy(Key, StringComparer.Ordinal).Select(group =>
@@ -26,7 +29,10 @@ public static class QualitySeriesBuilder
                 var records = group.OrderBy(o => o.Trace.FirstSequence).ToArray(); var first = records[0];
                 var unique = records.DistinctBy(o => o.ObservationId).ToArray();
                 var measured = unique.Where(o => o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed).ToArray();
-                var numeric = measured.Where(IsNumeric).ToArray(); var sorted = numeric.Select(o => o.Value.Numeric!.Value).Order().ToArray();
+                bool Arithmetic(InstrumentObservation o) => IsNumeric(o)
+                    && knowledge?.DescribeValue(o)?.IsOrdinal != true;
+                var numeric = measured.Where(Arithmetic).ToArray();
+                var sorted = numeric.Select(o => o.Value.Numeric!.Value).Order().ToArray();
                 double? mean = null, deviation = null;
                 if (sorted.Length > 0)
                 {
@@ -48,16 +54,17 @@ public static class QualitySeriesBuilder
                 return new QualitySeries(group.Key, first.Quality?.Material?.Identifier ?? first.Specimen.SpecimenId,
                     first.Quality?.Material?.Lot, first.Quality?.Material?.Level, first.Test.Vendor.Display ?? first.Test.Vendor.Code,
                     first.ResultKind ?? "", first.Value.RawUnit ?? first.Value.Unit?.Code ?? "", records, numeric.Length,
-                    measured.Length - numeric.Length, unique.Length - measured.Length, records.Length - unique.Length,
+                    measured.Length - numeric.Length, records.Length - unique.Length,
                     unique.Count(o => o.Flags.Count > 0 || o.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning),
                     sorted.Length == 0 ? null : sorted[0], sorted.Length == 0 ? null : Quantile(sorted, 0.5m),
                     sorted.Length == 0 ? null : sorted[^1], deviation, mean, outliers)
                 {
+                    Range = QualityReportedRange.Build(measured, knowledge),
                     // Frequencies describe every communicated record, including retransmissions and
                     // non-performed results. Only the numeric statistics deduplicate observations.
                     ValueFrequencies = records.GroupBy(o => (Value: string.IsNullOrWhiteSpace(o.Value.RawText)
                             ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? "" : o.Value.RawText.Trim(),
-                        Numeric: IsNumeric(o) && o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed,
+                        Numeric: Arithmetic(o) && o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed,
                         NotPerformed: o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed))
                         .Select(g => new QualityValueFrequency(g.Key.Value, g.Count(), g.Key.Numeric, g.Key.NotPerformed))
                         .OrderByDescending(f => f.Count).ThenBy(f => f.Value, StringComparer.Ordinal).ToArray(),
@@ -65,7 +72,7 @@ public static class QualitySeriesBuilder
             }).ToArray();
     }
     private static bool IsNumeric(InstrumentObservation o) => o.Value.Numeric is not null && string.IsNullOrEmpty(o.Value.Comparator)
-        && !o.Value.RawText.TrimStart().StartsWith('<') && !o.Value.RawText.TrimStart().StartsWith('>');
+        && InstrumentNumericValue.Parse(o.Value.RawText).Comparator is null;
     private static string Key(InstrumentObservation o) => DiagnosticGrouping.Key(o.Instrument.InstrumentId, o.Instrument.SerialNumber,
         o.Specimen.Role.ToString(), o.Quality?.Material?.Kind.ToString(), o.Quality?.Material?.Identifier ?? o.Specimen.SpecimenId,
         o.Quality?.Material?.Lot, o.Quality?.Material?.Level, o.Quality?.Material?.TypeRaw, o.Quality?.Method, o.Quality?.ModuleId,

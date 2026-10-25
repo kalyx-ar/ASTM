@@ -69,6 +69,9 @@ public static class ProtocolExplainer
     }
     public static string ResultKind(InstrumentObservation observation, DiagnosticProfile profile)
     {
+        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin;
+        if (plugin is IInstrumentValueKnowledge knowledge && knowledge.DescribeValue(observation) is { } valueMeaning)
+            return DiagnosticText.Plugin(plugin, valueMeaning.Kind);
         var raw = observation.ResultKind ?? "";
         if (raw.Length == 0) return "";
         if (profile.TracePlugin is { } trace && trace.DiagnosticVocabulary.TryGetValue("resultKind." + raw, out var traceKind)) return DiagnosticText.Plugin(trace, traceKind);

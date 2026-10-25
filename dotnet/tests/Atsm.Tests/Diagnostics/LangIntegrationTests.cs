@@ -18,6 +18,7 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Diagnostics.Core", "Finding.ATSM-DIAG-INCOMPLETE-CASE")] = "CASO TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "record.S")] = "CONTROL TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UC3500-ER04")] = "TIRA TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Crosses")] = "CRUCES TRADUCIDAS";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -26,6 +27,8 @@ public sealed class LangIntegrationTests
         Assert.Contains(database.Missing, label => label.Source == "Atsm.Plugin.Sysmex.Cs2500");
         Assert.Contains(database.Missing, label => label.Source == "Atsm.Plugin.Sysmex.Urinalysis");
         Assert.Equal("TIRA TRADUCIDA", DiagnosticText.Finding(new("ATSM-UC3500-ER04", AtsmSeverity.Warning, "Original"), catalog.Resolve("sysmex.uc3500.serial")));
+        var plugin = catalog.Resolve("sysmex.uc3500.serial").TracePlugin!;
+        Assert.Equal("CRUCES TRADUCIDAS", DiagnosticText.Plugin(plugin, plugin.DiagnosticVocabulary["value.Crosses"]));
         Assert.Equal(ConnectionState.Open, database.State);
     }
 

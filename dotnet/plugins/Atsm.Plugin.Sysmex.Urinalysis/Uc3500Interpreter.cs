@@ -218,8 +218,8 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
                 if (raw[1] != ' ') flags.Add(new(raw.Substring(1, 1), null, CodeSystems.Vendor(PluginId)));
                 if (f[4] != "0000") flags.Add(new(f[4], null, CodeSystems.Vendor(PluginId)));
                 var id = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"{trace.TraceId:N}/{trace.FirstSequence}/{test}/{kind}"))[..16]);
-                var numeric = decimal.TryParse(value.Trim(), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var number) ? number : (decimal?)null;
-                yield return new InstrumentObservation(id, instrument, specimen, CodeSet.Of(new(test, null, CodeSystems.Vendor(PluginId))), new(value, numeric, RawUnit: unit), null,
+                var parsed = InstrumentNumericValue.Parse(value);
+                yield return new InstrumentObservation(id, instrument, specimen, CodeSet.Of(new(test, null, CodeSystems.Vendor(PluginId))), new(value, parsed.Numeric, parsed.Comparator, RawUnit: unit), null,
                     flags, raw[..1], !analyzed ? InstrumentStatusMeaning.NotPerformed : flags.Count > 0 ? InstrumentStatusMeaning.Warning : InstrumentStatusMeaning.Unknown,
                     kind, null, time, null, [], [], new(source), trace)
                 { Quality = new(role == SpecimenRole.Control ? new(QualityMaterialKind.Control, specimen.SpecimenId) : null,

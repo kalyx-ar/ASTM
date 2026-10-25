@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 214 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 228 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -212,3 +212,10 @@ Calidad prioriza mediana y DE, con material/lote literal, mínimo/máximo/n, se�
 ### Resultados cualitativos y conteo de comunicaciones (2026-10-25)
 
 Calidad muestra normal y otros textos/códigos con frecuencias. La columna Mediciones cuenta todos los registros comunicados, incluso cualitativos, duplicados y no realizados. NumericCount queda separado para mediana/DE y se explica en detalle. No mostrar Sin valores numéricos como defecto de un dato cualitativo. Tres casos nuevos de pruebas (214 total), self-test GUI con normal (4) y cuatro mediciones, y NativeAOT con cualitativos. Conservar identificadores literales; los asteriscos del control UC ya vienen de la captura.
+
+
+### Semicuantitativos y resumen compacto (2026-10-25)
+
+Valor 2+ clasificado por el conocimiento del plugin como Semicuantitativo (cruces), con orden de categorías y sin aritmética de concentraciones. >=50 / <=50 conservan Comparator y se presentan en el extremo finito correspondiente; nunca se usan como valores exactos de mediana/DE. Nuevo puerto neutral IInstrumentValueKnowledge y resumen QualityReportedRange. No inferir orden de categorías desconocidas ni extremos finitos cuando no están acotados.
+
+Calidad agrega Sin medir con el conteo comunicado y retira esa descripción de Mediana/resultado y Señales. La celda central muestra mediana/categoría central/moda, con distribución completa en detalle. Catorce casos nuevos, 228 pruebas totales; GUI self-test de cruces, ambos comparadores y columna separada. Ver CALIDAD-DIAGNOSTICA.

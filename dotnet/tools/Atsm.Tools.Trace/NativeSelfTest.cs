@@ -54,7 +54,13 @@ internal static class NativeSelfTest
         var qualitative = QualitySeriesBuilder.Build([normal, normal, normal, normal]).Single();
         if (qualitative.MeasurementCount != 4 || qualitative.NumericCount != 0 || qualitative.ValueFrequencies.Single() is not { Value: "normal", Count: 4 })
             throw new InvalidDataException("Native qualitative summary mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok");
+        var crosses = value with { Test = CodeSet.Of(new("BLD", null, "urn:atsm:vendor:sysmex.uc3500")), ResultKind = "QUALITATIVE", Value = new("2+") };
+        var knowledge = (Atsm.Plugins.IInstrumentValueKnowledge)ucProfile.TracePlugin!;
+        var ordinal = QualitySeriesBuilder.Build([crosses], knowledge).Single();
+        var bounded = QualitySeriesBuilder.Build([crosses with { ResultKind = "CONCENTRATION", Value = new(">=50", 50, ">=") }], knowledge).Single();
+        if (ordinal.Range.Median != "2+" || ordinal.StandardDeviation is not null || bounded.Range.Minimum != ">=50" || bounded.Range.Maximum is not null || bounded.NumericCount != 0)
+            throw new InvalidDataException("Native semiquantitative summary mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

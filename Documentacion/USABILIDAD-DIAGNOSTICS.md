@@ -70,7 +70,7 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 ## Verificación y límites
 
-214 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+228 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 
@@ -88,3 +88,6 @@ U-WAM agrupa también la interpretación serial UC-3500 dentro del mismo plugin 
 
 
 Calidad: Mediana / resultado incluye los valores cualitativos (p. ej., normal) con sus frecuencias; Mediciones es el total de registros comunicados. El detalle conserva la distribución completa y el subconjunto numérico de mediana/DE. Los registros vacíos/no realizados se distinguen y siguen accesibles en subfilas.
+
+
+Semicuantitativos: tipo específico para cruces y valores acotados, rango/categoría central sin medias de cruces. Sin medir es una columna numérica separada. Mediana/resultado no enumera la distribución; ésta permanece en detalle/subfilas. Los comparadores se conservan al mostrar los límites finitos en Mínimo/Máximo.
