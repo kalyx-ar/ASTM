@@ -1,0 +1,61 @@
+Issue: kalyx-ar/EDC#205
+Fecha local: 2026-10-25T13:57 America/Buenos_Aires
+Tipo: feat / fix / docs
+Commit de implementación: 09745258551cbf1cfc2279b41eef4266c21795d7
+Commit de este registro: el commit docs que incorpora este archivo.
+Alcance autorizado: intérprete UC-3500 y selección/copia de texto MAUI.
+Registro previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6400163670
+Resumen funcional remoto: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6400476492
+
+Cambios
+- Puerto neutral IInstrumentTracePlugin en Atsm.Plugins, sin almacenamiento ni envío.
+- Plugin Sysmex.Uc3500: serial propio, RQ02/CM00/ER, resultados, reflectancias,
+  serie C, controles, correlación, comprobación BCC/SUM/SUM2/NONE y CRLF.
+- Detección por contenido y lado del registrador; reanálisis del protocolo antes
+  marcado incompatible. Catálogo: 9 equipos/familias, 13 perfiles.
+- Semántica española por plugin y Lang opcional; códigos desconocidos preservados.
+- Captura directa sin responder, con custodia previa; simulación activa rechazada.
+- LabelHandler habilita IsTextSelectionEnabled; self-test de título/cabeceras.
+- Diagnóstico/CLI conservan originales y sólo imprimen agregados al inspeccionar.
+- Documentación de protocolo, mantenimiento, usabilidad, calidad y continuación.
+
+Fuentes y límites
+- Sysmex UC-3500 Host Communication Specifications, v0.0.5, 2017-04-14,
+  secciones 6.1.1, 6.1.2, 7; copia pública referenciada en UC3500-PROTOCOLO.md.
+- Datos privados/manuales locales permanecen ignorados. Sin publicación de trazas.
+- Tabla de resultados suma 446 bytes frente a 441 declarados: aviso y estructura
+  validada, sin recortar. Fechas abreviadas conservadas sin siglo/día/mes inferidos.
+- 8010 clasificado por familia de tira, sin asignar significado específico a una
+  correspondencia ambigua en la extracción de columnas.
+- Sin homologación física, host activo UC-3500 ni estadísticas QC calculadas.
+- Sin dependencias nuevas, ZIP, scripts de empaquetado, spool plano ni cambios
+  en las funciones protegidas de Identidades.
+
+Verificación
+- 201/201 pruebas .NET, 0 omitidas; dos corridas finales, ~1 s de pruebas.
+  Veinte casos adicionales UC-3500, incluidos checksum separado/control,
+  fragmentación, CRLF completo, integridad, correlación y captura sin escrituras.
+- 542 checks nativos, 0 fallos, repetidos (~0,26 s).
+- Lang real con conexión sintética: 1 correcta, 77 ms, seed UC-3500 incluido.
+- GUI final: PASS ventana, propietario de diálogos, runtime privado, DPAPI,
+  selección nativa del título y cabeceras, siete vistas crudas/interpretadas.
+- CLI NativeAOT final: self-test correcto, uc3500=ok; auditoría de referencias GUI OK.
+- Ambas salidas: ProductVersion 0.1.0+09745258551cbf1cfc2279b41eef4266c21795d7.
+- 20 DLL propias GUI con token 066190A23251F202; cinco advertencias CS8002
+  oficiales de MAUI sin Strong Name visibles; NuGet/firma de ensamblado distintos,
+  Authenticode propio pendiente. Tres carpetas de idioma, sin rutas publish.
+- Captura local: 2.006 entradas, 501 mensajes, 501 BCC correctos,
+  2.251 observaciones/representaciones. 128 RQ02, 128 CM00,
+  111 ER04, 17 ER00 y 117 resultados. Solicitud Strip 9A en los 111 ER04;
+  resultado con Strip 11A y 00CC. Sin IDs de muestra en este registro.
+- Un vector sintético de checksum mal construido se corrigió antes del commit.
+  La prueba HL7 Fragmented_MLLP_and_coalesced_blocks_are_acknowledged_individually
+  falló una vez: aislada pasó en 122 ms, luego regresiones completas correctas.
+  Causa sin confirmar, sin cambiar timeouts ni afirmar corrección del runtime.
+  Intermitencia TLS previa también permanece documentada.
+
+Entrega
+- GUI: dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- CLI: dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- Fuentes/documentación en commit local; sin push ni PR.
+- Issue #205 permanece abierto en su Project propietario por el alcance restante.
