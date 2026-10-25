@@ -49,8 +49,12 @@ internal static class NativeSelfTest
         if (ucInput.Header.Profile != ucProfile.Id || uc.Messages.Count != 1 || !ProtocolExplainer.MessageContent(uc.Messages[0], ucProfile, []).Contains("Consulta", StringComparison.Ordinal))
             throw new InvalidDataException("Native UC-3500 mismatch.");
         var quality = QualitySeriesBuilder.Build(analysis.Observations).Single();
-        if (quality.Count != 1 || quality.Median != 23.4m || quality.StandardDeviation is not null) throw new InvalidDataException("Native quality summary mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok");
+        if (quality.NumericCount != 1 || quality.MeasurementCount != 1 || quality.Median != 23.4m || quality.StandardDeviation is not null) throw new InvalidDataException("Native quality summary mismatch.");
+        var normal = value with { Value = new("normal ") };
+        var qualitative = QualitySeriesBuilder.Build([normal, normal, normal, normal]).Single();
+        if (qualitative.MeasurementCount != 4 || qualitative.NumericCount != 0 || qualitative.ValueFrequencies.Single() is not { Value: "normal", Count: 4 })
+            throw new InvalidDataException("Native qualitative summary mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

@@ -17,7 +17,7 @@ public sealed class QualitySeriesTests
     {
         var items = new[] { Item(1, 2), Item(2, 4), Item(3, 6), Item(4, 8) };
         var series = Assert.Single(QualitySeriesBuilder.Build(items));
-        Assert.Equal(4, series.Count); Assert.Equal(2m, series.Minimum); Assert.Equal(5m, series.Median); Assert.Equal(8m, series.Maximum);
+        Assert.Equal(4, series.NumericCount); Assert.Equal(2m, series.Minimum); Assert.Equal(5m, series.Median); Assert.Equal(8m, series.Maximum);
         Assert.Equal(5, series.Mean); Assert.Equal(Math.Sqrt(20d / 3), series.StandardDeviation!.Value, 12);
         Assert.Equal("MATERIAL-LITERAL", series.Material); Assert.Equal("LOTE-LITERAL", series.Lot);
         Assert.Equal(items, series.Records); Assert.Same(items[^1], series.Last);
@@ -44,14 +44,15 @@ public sealed class QualitySeriesTests
     }
 
     [Fact]
-    public void Censored_missing_unperformed_and_duplicate_records_remain_visible_but_do_not_inflate_n()
+    public void Censored_missing_unperformed_and_duplicate_records_remain_visible_but_do_not_inflate_numeric_statistics()
     {
         var first = Item(1, 4);
         var items = new[] { first, first, Item(2, null), Item(3, 99) with { InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed },
             Item(4, 10) with { Value = new("<10", 10, "<", RawUnit: "mg/dL") } };
         var series = Assert.Single(QualitySeriesBuilder.Build(items));
-        Assert.Equal(1, series.Count); Assert.Equal(2, series.NonNumeric); Assert.Equal(1, series.NotPerformed); Assert.Equal(1, series.Repeated);
-        Assert.Equal(5, series.Records.Count); Assert.Null(series.StandardDeviation); Assert.Equal(4m, series.Median);
+        Assert.Equal(1, series.NumericCount); Assert.Equal(2, series.NonNumeric); Assert.Equal(1, series.NotPerformed); Assert.Equal(1, series.Repeated);
+        Assert.Equal(5, series.MeasurementCount); Assert.Equal(5, series.ValueFrequencies.Sum(f => f.Count)); Assert.Null(series.StandardDeviation); Assert.Equal(4m, series.Median);
+        Assert.Equal(2, Assert.Single(series.ValueFrequencies, f => f.Numeric).Count);
     }
 
     [Fact]
@@ -61,7 +62,7 @@ public sealed class QualitySeriesTests
         var control = first with { Quality = first.Quality! with { Statistics = [new(ReportedStatisticKind.CqMean, new("50", 50), StatisticScope.ReplicateGroup, "SYN")] } };
         var patient = Item(2, 100) with { Specimen = new("PATIENT-SYN", Role: SpecimenRole.Patient) };
         var series = Assert.Single(QualitySeriesBuilder.Build([control, patient]));
-        Assert.Equal(1, series.Count); Assert.Equal(4m, series.Median); Assert.Single(series.Records[0].Quality!.Statistics);
+        Assert.Equal(1, series.NumericCount); Assert.Equal(4m, series.Median); Assert.Single(series.Records[0].Quality!.Statistics);
     }
 
     [Fact]
@@ -80,5 +81,40 @@ public sealed class QualitySeriesTests
         var summary = new DiagnosticRow(["MEDIAN"], "STATISTICS", "key");
         var group = new DiagnosticRowGroup("key", [row]) { SummaryRow = summary };
         Assert.Same(summary, group.Summary(_ => "")); Assert.Same(row, Assert.Single(group.Children));
+    }
+
+    [Fact]
+    public void Qualitative_results_have_frequencies_and_communicated_count_without_numeric_statistics()
+    {
+        var normal = Item(1, null, kind: "QUALITATIVE") with { Value = new("normal ") };
+        var positive = Item(2, null, kind: "QUALITATIVE") with { Value = new("1+    ") };
+        var noResult = Item(3, null, kind: "QUALITATIVE") with { Value = new("      "), InstrumentStatusMeaning = InstrumentStatusMeaning.NotPerformed };
+        var series = Assert.Single(QualitySeriesBuilder.Build([normal, normal, positive, noResult]));
+        Assert.Equal(4, series.MeasurementCount); Assert.Equal(0, series.NumericCount);
+        Assert.Equal(2, Assert.Single(series.ValueFrequencies, f => f.Value == "normal").Count);
+        Assert.Equal(1, Assert.Single(series.ValueFrequencies, f => f.Value == "1+").Count);
+        Assert.Equal("", Assert.Single(series.ValueFrequencies, f => f.NotPerformed).Value);
+        Assert.Null(series.Median); Assert.Null(series.StandardDeviation);
+        Assert.Equal("normal ", series.Records[0].Value.RawText);
+        Assert.Equal("MATERIAL-LITERAL", series.Material); Assert.Equal("LOTE-LITERAL", series.Lot);
+    }
+
+    [Fact]
+    public void Mixed_results_keep_qualitative_outcomes_beside_the_numeric_subset()
+    {
+        var text = Item(2, null) with { Value = new("normal", RawUnit: "mg/dL") };
+        var series = Assert.Single(QualitySeriesBuilder.Build([Item(1, 5), text, Item(3, 7)]));
+        Assert.Equal(3, series.MeasurementCount); Assert.Equal(2, series.NumericCount); Assert.Equal(6m, series.Median);
+        Assert.Equal("normal", Assert.Single(series.ValueFrequencies, f => !f.Numeric).Value);
+        Assert.Equal(Math.Sqrt(2), series.StandardDeviation!.Value, 12);
+    }
+
+    [Fact]
+    public void A_coded_qualitative_result_is_displayable_even_when_raw_text_is_absent()
+    {
+        var item = Item(1, null) with { Value = new("", Coded: new("N", "normal", "urn:synthetic")) };
+        var series = Assert.Single(QualitySeriesBuilder.Build([item]));
+        Assert.Equal(1, series.MeasurementCount); Assert.Equal("normal", Assert.Single(series.ValueFrequencies).Value);
+        Assert.Equal("", series.Records[0].Value.RawText);
     }
 }

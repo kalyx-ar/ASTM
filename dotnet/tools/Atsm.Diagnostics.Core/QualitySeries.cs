@@ -2,11 +2,15 @@ using Atsm.Abstractions.Model;
 
 namespace Atsm.Diagnostics;
 
+public sealed record QualityValueFrequency(string Value, int Count, bool Numeric, bool NotPerformed);
+
 public sealed record QualitySeries(string Key, string Material, string? Lot, string? Level, string Test, string Kind, string Unit,
-    IReadOnlyList<InstrumentObservation> Records, int Count, int NonNumeric, int NotPerformed, int Repeated, int Flagged,
+    IReadOnlyList<InstrumentObservation> Records, int NumericCount, int NonNumeric, int NotPerformed, int Repeated, int Flagged,
     decimal? Minimum, decimal? Median, decimal? Maximum, double? StandardDeviation, double? Mean,
     IReadOnlySet<Guid> PotentialOutliers)
 {
+    public int MeasurementCount => Records.Count;
+    public IReadOnlyList<QualityValueFrequency> ValueFrequencies { get; init; } = [];
     public InstrumentObservation Last => Records[^1];
 }
 
@@ -47,7 +51,17 @@ public static class QualitySeriesBuilder
                     measured.Length - numeric.Length, unique.Length - measured.Length, records.Length - unique.Length,
                     unique.Count(o => o.Flags.Count > 0 || o.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning),
                     sorted.Length == 0 ? null : sorted[0], sorted.Length == 0 ? null : Quantile(sorted, 0.5m),
-                    sorted.Length == 0 ? null : sorted[^1], deviation, mean, outliers);
+                    sorted.Length == 0 ? null : sorted[^1], deviation, mean, outliers)
+                {
+                    // Frequencies describe every communicated record, including retransmissions and
+                    // non-performed results. Only the numeric statistics deduplicate observations.
+                    ValueFrequencies = records.GroupBy(o => (Value: string.IsNullOrWhiteSpace(o.Value.RawText)
+                            ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? "" : o.Value.RawText.Trim(),
+                        Numeric: IsNumeric(o) && o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed,
+                        NotPerformed: o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed))
+                        .Select(g => new QualityValueFrequency(g.Key.Value, g.Count(), g.Key.Numeric, g.Key.NotPerformed))
+                        .OrderByDescending(f => f.Count).ThenBy(f => f.Value, StringComparer.Ordinal).ToArray(),
+                };
             }).ToArray();
     }
     private static bool IsNumeric(InstrumentObservation o) => o.Value.Numeric is not null && string.IsNullOrEmpty(o.Value.Comparator)

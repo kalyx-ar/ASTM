@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 211 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 214 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -207,3 +207,8 @@ Dos corridas finales 201/201, 0 omitidas; nativo 542/542 repetido, GUI self-test
 Atsm.Plugin.Sysmex.Urinalysis reúne ASTM U-WAM y serial UC; retirados proyectos/DLL redundantes. Una entrada U-WAM, ocho familias/trece perfiles. Interpretación automática por contenido, opción manual y conocimiento contextual por perfil/registro/campo/código. Captura automática sin enviar ACK supuestos; simulación exige configuración expresa.
 
 Calidad prioriza mediana y DE, con material/lote literal, mínimo/máximo/n, señales y originales en subfilas. Media/último/método y estadísticas informadas en detalle. Los cálculos descriptivos pertenecen al diagnosticador, sin reglas de aceptación QC. Diez pruebas nuevas: 211 en total; ver [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).
+
+
+### Resultados cualitativos y conteo de comunicaciones (2026-10-25)
+
+Calidad muestra normal y otros textos/códigos con frecuencias. La columna Mediciones cuenta todos los registros comunicados, incluso cualitativos, duplicados y no realizados. NumericCount queda separado para mediana/DE y se explica en detalle. No mostrar Sin valores numéricos como defecto de un dato cualitativo. Tres casos nuevos de pruebas (214 total), self-test GUI con normal ×4 y cuatro mediciones, y NativeAOT con cualitativos. Conservar identificadores literales; los asteriscos del control UC ya vienen de la captura.
