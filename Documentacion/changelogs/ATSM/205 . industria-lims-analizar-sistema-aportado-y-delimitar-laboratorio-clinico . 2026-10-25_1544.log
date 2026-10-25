@@ -1,0 +1,73 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 15:44 America/Buenos_Aires
+Tipo: feat / fix / docs
+Commit de implementación: 9cd9c0f540ce980eae68a4693841ea7c749cf73d
+Commit de registro: el commit docs que incorpora este archivo.
+Alcance humano previo: issuecomment-6401428740 e issuecomment-6401454025.
+Resumen funcional: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6401646544
+
+Solicitud
+- Reconocer 2+ como valoración en cruces y rotular la representación.
+- Mostrar >=50 como límite inferior y <=X como límite superior.
+- No enumerar toda la distribución en Mediana/resultado.
+- Sin medir en una columna numérica independiente.
+
+Implementación
+- Puerto neutral IInstrumentValueKnowledge y metadatos de escala/orden del plugin.
+- Plugin Sysmex.Urinalysis: escalas por parámetro según tablas UC 6-17/6-18.
+  Semicuantitativo (cruces) conserva el original y el orden de categorías.
+  NIT mantiene su escala binaria Cualitativo (cruces). Niveles desconocidos
+  no reciben un orden inventado ni se convierten en concentraciones.
+- Parser neutral de valor numérico/comparador: RawText sigue intacto.
+  Numeric=50 con Comparator=>= es un umbral, no una medición exacta.
+- QualityReportedRange muestra el extremo finito; el lado no acotado queda
+  sin valor. No fabrica un intervalo cuando hay cotas opuestas sin extremos
+  comunes finitos. Categorías ordinales pares usan sus dos valores centrales,
+  sin interpolar una cruz intermedia.
+- Mediana/DE numéricas excluyen cruces, censurados y no realizados.
+- Resultado compacto: mediana/categoría central/moda; empate cualitativo Mixto.
+  Distribución completa en detalle y registros originales en subfilas.
+- Sin medir cuenta cada registro comunicado en ese estado, incluidos duplicados.
+  Retirado de la celda de resultado y de señales redundantes.
+
+Archivos
+- dotnet/src/Atsm.Plugins/InstrumentValueKnowledge.cs
+- dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis/{SysmexUrinalysisPlugin,
+  Uc3500Interpreter,Uc3500Vocabulary,UrinalysisValueKnowledge}.cs
+- dotnet/tools/Atsm.Diagnostics.Core/{QualitySeries,QualityReportedRange,
+  ProtocolExplainer}.cs
+- dotnet/tools/Atsm.Diagnostics.Maui/{MainPage,Lang}.cs
+- dotnet/tools/Atsm.Tools.Trace/NativeSelfTest.cs
+- Pruebas QualitySemiQuantitativeTests, Uc3500Tests y LangIntegrationTests.
+- Documentacion/{CALIDAD-DIAGNOSTICA,ESTADO,CONTINUACION,
+  USABILIDAD-DIAGNOSTICS}.md
+
+Verificación
+- 228 pruebas .NET correctas, 0 omitidas; dos corridas finales (~1 s).
+  Catorce casos nuevos: cruces, comparadores ASCII/Unicode, límites opuestos,
+  orden por parámetro, medianas ordinales, niveles desconocidos, parser real
+  de resultados UC y conteo de estados no realizados retransmitidos.
+- 542 checks nativos correctos, repetidos (~0,24-0,26 s).
+- Lang real/conexión sintética: 1 correcta (81 ms), traducción value.Crosses.
+- GUI final: PASS ventana, runtime privado, DPAPI, siete vistas en ambos modos,
+  selección de texto, U-WAM auto/manual, tabla de 10 columnas, rango −/2+,
+  categoría central, DE no calculada sobre cruces, >=50/<=50 y Sin medir aparte.
+- CLI NativeAOT: self-test correcto, semiquantitative=ok.
+  Auditoría GUI: ATSM_PUBLICATION_DEPENDENCIES_OK.
+- GUI y CLI ProductVersion 0.1.0+9cd9c0f540ce980eae68a4693841ea7c749cf73d.
+- 19 DLL propias con token 066190A23251F202. Cinco advertencias CS8002 de MAUI
+  oficial sin Strong Name conservadas; Authenticode propio pendiente.
+- Cero ZIP bajo LIMS. Sin dependencias nuevas ni scripts de empaquetado.
+
+Límites
+- Conocimiento documentado de UC; no se extiende automáticamente el mismo
+  orden a campos de otros protocolos/equipos por coincidir un texto.
+- Datos originales y códigos preservados; sin objetivos/límites de aceptación QC
+  inferidos, homologación en hardware ni órdenes activas nuevas.
+- Sin datos de pacientes ni manuales publicados. Sin push ni PR.
+- Funciones protegidas de Identidades y trabajo ajeno conservados.
+- Issue #205 permanece abierto por su alcance LIMS pendiente.
+
+Entrega
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
