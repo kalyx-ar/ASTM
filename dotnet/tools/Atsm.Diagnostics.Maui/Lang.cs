@@ -26,7 +26,7 @@ internal static class Globals
         ["Quality.Minimum"] = "Mínimo", ["Quality.MedianValue"] = "Mediana / resultado", ["Quality.Median"] = "Mediana", ["Quality.Maximum"] = "Máximo",
         ["Quality.SD"] = "DE", ["Quality.N"] = "Mediciones", ["Quality.Signals"] = "Señales", ["Quality.Mean"] = "Media",
         ["Quality.NumericCount"] = "Numéricas para estadística", ["Quality.Distribution"] = "Valores comunicados",
-        ["Quality.Frequency"] = "{0} ×{1}", ["Quality.NoValue"] = "Sin valor", ["Quality.Unperformed"] = "no realizado",
+        ["Quality.Frequency"] = "{0} ({1})", ["Quality.NoValue"] = "Sin valor", ["Quality.Unperformed"] = "No realizado",
         ["Quality.Single"] = "Una medición", ["Quality.Outliers"] = "{0} posibles atípicos",
         ["Quality.Outlier"] = "Posible atípico", ["Quality.Flagged"] = "{0} con alarmas", ["Quality.Mixed"] = "{0} cualitativos/censurados",
         ["Quality.NotPerformed"] = "{0} no realizados", ["Quality.Repeated"] = "{0} duplicados", ["Quality.Reported"] = "{0} estadísticas informadas en detalle",

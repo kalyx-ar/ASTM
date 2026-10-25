@@ -416,8 +416,9 @@ public sealed class MainPage : ContentPage
     {
         static string Number(decimal? n) => n?.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
         static string Approximate(double? n) => n?.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
-        string Frequency(QualityValueFrequency value) => F("Quality.Frequency", value.Value.Length == 0 ? T("Quality.NoValue") : value.Value, value.Count)
-            + (value.NotPerformed ? " (" + T("Quality.Unperformed") + ")" : "");
+        string Frequency(QualityValueFrequency value) => F("Quality.Frequency", value.Value.Length == 0
+            ? T(value.NotPerformed ? "Quality.Unperformed" : "Quality.NoValue")
+            : value.Value + (value.NotPerformed ? " · " + T("Quality.Unperformed") : ""), value.Count);
         var groups = new List<DiagnosticRowGroup>();
         foreach (var series in QualitySeriesBuilder.Build(_analysis?.Observations ?? []))
         {
@@ -484,7 +485,7 @@ public sealed class MainPage : ContentPage
             var normal = analyzed.Observations[0] with { Value = new("normal ") };
             _analysis = analyzed with { Observations = [normal, normal, normal, normal] };
             var normalSummary = QualityGroups().Single().SummaryRow!;
-            if (!normalSummary.Cells[4].Contains("normal ×4", StringComparison.Ordinal) || normalSummary.Cells[7] != "4") throw new InvalidDataException("ATSM-MAUI-QUALITATIVE-COUNT-SELFTEST");
+            if (!normalSummary.Cells[4].Contains("normal (4)", StringComparison.Ordinal) || normalSummary.Cells[7] != "4") throw new InvalidDataException("ATSM-MAUI-QUALITATIVE-COUNT-SELFTEST");
             _analysis = analyzed;
             if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("ATSM-UNPROTECTED-CASE");
         }
