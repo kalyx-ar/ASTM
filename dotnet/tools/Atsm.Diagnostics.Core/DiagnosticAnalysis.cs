@@ -14,7 +14,10 @@ namespace Atsm.Diagnostics;
 public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, GlymsLog, WireBytes, AtsmTrace }
 public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text);
 public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IReadOnlyList<StackEvent> Events,
-    IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics);
+    IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
+{
+    public IReadOnlyList<QualityResourceReference> QualityResources { get; init; } = [];
+}
 public sealed record DiagnosticCase(TraceHeader Header, IReadOnlyList<TraceEntry> Entries, IReadOnlyList<InstrumentObservationBatch>? Batches = null, bool IsComplete = true);
 
 public static class DiagnosticReader
@@ -90,6 +93,7 @@ public static class DiagnosticReader
             return new(input.Entries, [], messages, values, findings);
         }
         var astm = profile.AstmPlugin!.CreateDialect(profile.AstmProfile!, new(new("diagnostic"), TimeProvider.System));
+        var resources = new List<QualityResourceReference>();
         var stack = new TraceStackBuilder(profile.AstmProfile!.Encoding, astm).Build(input.Entries);
         findings.AddRange(stack.Events.Where(e => e.Code is "lis01.invalid-frame" or "lis01.frame-rejected" or "lis01.altered-by-recorder" or "lis01.implicit-acknowledge" or "lis01.retransmission")
             .Select(e => new AtsmDiagnostic("ATSM-DIAG-" + e.Code.ToUpperInvariant().Replace('.', '-'), AtsmSeverity.Warning, e.Detail ?? e.Code, $"entry:{e.Sequence}")));
@@ -104,9 +108,10 @@ public static class DiagnosticReader
             {
                 var interpreted = astm.Interpret(item, new(input.Header.TraceId, message.FirstSequence, message.LastSequence));
                 values.AddRange(interpreted.Observations); findings.AddRange(interpreted.Diagnostics);
+                resources.AddRange(interpreted.QualityResources);
             }
         }
-        return new(input.Entries, stack.Events, messages, values, findings);
+        return new(input.Entries, stack.Events, messages, values, findings) { QualityResources = resources };
     }
 
     public static string DescribeBytes(ReadOnlyMemory<byte> bytes, bool hex)

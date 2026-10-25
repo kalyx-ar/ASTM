@@ -4,10 +4,13 @@ Requiere .NET 10 Windows Desktop Runtime. Mantener toda esta carpeta junto al EX
 Abrir atsm-diagnostics.exe; --demo carga un ejemplo CFX sintético.
 
 Elegir perfil y formato antes de abrir el archivo. Las pestañas muestran bytes,
-mensajes, observaciones, hallazgos y catálogo. Seleccionar una fila muestra detalle.
+mensajes, observaciones, calidad, hallazgos y catálogo. Seleccionar una fila muestra detalle.
 
 CFX: exportaciones Maestro CSV UTF-8 (Well,Sample,Target,Cq; coma, decimal punto)
 o RDML 1.0/1.1. No lee .pcrd ni controla el termociclador.
+El perfil CSV de curva estándar lee Target (o Fluor), Efficiency %, Slope,
+Y-intercept y R^2. Calidad distingue mediciones y estadísticas reportadas.
+Las referencias externas U-WAM se muestran sin abrir archivos automáticamente.
 Sysmex XN-L, CS-2500 y QWALYS 3: recepción ASTM; sin consultas ni órdenes.
 Los perfiles nuevos requieren validación en equipo. No hay validación clínica.
 

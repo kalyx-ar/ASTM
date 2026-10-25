@@ -1,5 +1,7 @@
 # Modelo canónico y contrato con el host
 
+Extensión implementada 2026-10-24: `InstrumentObservation.Quality` conserva material/lote, módulo/corrida/método, referencia de calibración y estadísticas reportadas con ámbito/campo original. `InstrumentObservationBatch.QualityResources` conserva recursos externos, incluso en lotes sin observaciones. Puertos opcionales `IQualityDataSource` (adaptador de lectura implementado) e `IQualityResourceContent` (lo implementa el anfitrión/ETL); el único puerto obligatorio de flujo sigue siendo `ILabWorkflowHost`. Contratos reales, mapeos y límites en [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md); los ejemplos indicativos históricos siguientes no sustituyen a las clases de `dotnet/src/Atsm.Abstractions`.
+
 Estado: propuesta. Es la frontera que hace a ATSM neutral: los plugins producen y consumen este modelo; cada LIS/LIMS (EDC u otro) implementa un único adaptador.
 
 ## Principios

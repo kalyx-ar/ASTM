@@ -81,12 +81,16 @@ public sealed class AstmMessageProcessor(IAstmDialect dialect, AstmProfile profi
             if (interpretation.Diagnostics.Any(d => d.Severity == AtsmSeverity.Error)) continue;
             if (interpretation.Instrument is { } identified) Instrument = identified;
             var messageOrdinal = ordinal++;
-            if (interpretation.Observations.Count > 0)
+            if (interpretation.Observations.Count > 0 || interpretation.QualityResources.Count > 0)
             {
                 var observations = interpretation.Observations.Select((o, i) => o with
                 { ObservationId = ReceptionIdentity.Derive(receptionId, $"{profile.Id}/observation/{messageOrdinal}", i) }).ToArray();
                 var batch = new InstrumentObservationBatch(ReceptionIdentity.Derive(receptionId, profile.Id + "/batch", messageOrdinal),
-                    Instrument, observations, reference);
+                    Instrument, observations, reference)
+                {
+                    QualityResources = interpretation.QualityResources.Select((r, i) => r with
+                    { ResourceId = ReceptionIdentity.Derive(receptionId, $"{profile.Id}/quality-resource/{messageOrdinal}", i) }).ToArray(),
+                };
                 IngestOutcome outcome;
                 try { outcome = await host.IngestAsync(batch, token).ConfigureAwait(false); }
                 catch (Exception error) when (error is not OperationCanceledException)

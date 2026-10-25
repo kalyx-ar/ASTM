@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using Atsm.Abstractions.Diagnostics;
@@ -18,10 +19,12 @@ public sealed class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentCon
 {
     public const string CsvProfileId = "biorad.cfx.maestro.quantification-csv";
     public const string RdmlProfileId = "biorad.cfx.maestro.rdml";
+    public const string CurveProfileId = "biorad.cfx.maestro.standard-curve-csv";
     private const int MaxContentBytes = 16 * 1024 * 1024; // Host import limit, not an instrument framing limit.
     public IReadOnlyList<InstrumentContentProfile> Profiles { get; } =
-    [new(CsvProfileId, "1.0.0", "CSV", ["Bio-Rad CFX Maestro 2.3, 10000126764B, pp. 189-194 and Table 19: exported quantification results; header names are configurable."]),
-     new(RdmlProfileId, "1.0.0", "RDML", ["Bio-Rad 10000126764B p.192: RDML v1.0/v1.1 exports; RDML Consortium schemas and compression notes."])];
+    [new(CsvProfileId, "1.1.0", "CSV", ["Bio-Rad CFX Maestro 2.3, 10000126764B, pp. 189-194 and Table 19: quantification, Content, replicate Cq/SQ statistics; header names are configurable."]),
+     new(RdmlProfileId, "1.1.0", "RDML", ["Bio-Rad 10000126764B p.192: RDML v1.0/v1.1 exports; sample/type preserves standards/controls, no proprietary recalculation."]),
+     new(CurveProfileId, "1.0.0", "CSV curva estándar", ["Bio-Rad CFX Maestro 2.3 10000126764B p.204 Table 20: exported Standard Curve Results; instrument-software statistics, no recomputation."])];
     public PluginDescriptor Describe() => new("biorad.cfx", "0.1.0", PluginApi.Version, "Bio-Rad",
         ["CFX96/CFX384 Touch", "CFX Connect", "CFX Opus 96/384", "CFX Opus Deepwell", "CFX Duet (via Maestro exports)"],
         ["CFX Maestro 2.3 software compatibility list, 10000126764B p.25. Export format support only; no direct instrument control or hardware qualification."]);
@@ -34,6 +37,7 @@ public sealed class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentCon
         {
             if (content.IsEmpty || content.Length > MaxContentBytes) throw new InvalidDataException("ATSM-CFX-CONTENT-LIMIT");
             if (profile.Id == CsvProfileId) ReadCsv(new UTF8Encoding(false, true).GetString(content.Span).TrimStart('\uFEFF'), instrument, trace, values, findings);
+            else if (profile.Id == CurveProfileId) ReadCurve(new UTF8Encoding(false, true).GetString(content.Span).TrimStart('\uFEFF'), instrument, trace, values, findings);
             else if (profile.Id == RdmlProfileId) ReadRdml(content, instrument, trace, values, findings);
             else throw new InvalidDataException("ATSM-CFX-UNKNOWN-PROFILE");
         }
@@ -62,8 +66,79 @@ public sealed class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentCon
             if (row.Length != names.Length) throw new InvalidDataException("ATSM-CFX-COLUMN-COUNT");
             Add(row[sample], row[well], row[target], row[cq], culture, instrument, trace, values, findings,
                 new() { ["row"] = i.ToString(CultureInfo.InvariantCulture), ["format"] = "CFX quantification CSV" });
+            string Field(string name) => Column(name) is var column && column >= 0 ? row[column] : "";
+            var content = Field("Content");
+            var sampleType = Regex.Match(content.Trim(), @"^(?<type>Std|Standard|NTC|NRT|Pos|Neg|Positive Control|Negative Control)(?:-\d+)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var material = Material(sampleType.Groups["type"].Value, row[sample]);
+            var sourceFields = new Dictionary<string, string> { ["Content"] = content, ["Fluor"] = Field("Fluor"), ["Biological Set Name"] = Field("Biological Set Name") };
+            var statistics = new List<ReportedStatistic>();
+            foreach (var (name, kind, scope) in new[] {
+                ("Cq Mean", ReportedStatisticKind.CqMean, StatisticScope.ReplicateGroup),
+                ("Cq Std. Dev", ReportedStatisticKind.CqStandardDeviation, StatisticScope.ReplicateGroup),
+                ("Starting Quantity (SQ)", ReportedStatisticKind.StartingQuantity, StatisticScope.Well),
+                ("Log Starting Quantity", ReportedStatisticKind.LogStartingQuantity, StatisticScope.Well),
+                ("SQ Mean", ReportedStatisticKind.StartingQuantityMean, StatisticScope.ReplicateGroup),
+                ("SQ Std. Dev", ReportedStatisticKind.StartingQuantityStandardDeviation, StatisticScope.ReplicateGroup) })
+            {
+                if (Column(name) < 0) continue;
+                var raw = Field(name); sourceFields[name] = raw;
+                // The export does not identify replicate membership completely: do not fabricate a group ID.
+                var metric = MetricValue(raw, culture);
+                if (metric.Numeric is null) findings.Add(new("ATSM-CFX-NONNUMERIC-STATISTIC", AtsmSeverity.Warning, "Reported statistic is absent or nonnumeric; original text retained.", name));
+                statistics.Add(new(kind, metric, scope, "CSV:" + name));
+            }
+            values[^1] = values[^1] with { Specimen = values[^1].Specimen with { Role = ControlRole(material) },
+                Quality = material is null && statistics.Count == 0 ? null : new(material)
+                { Statistics = statistics, SourceFields = sourceFields } };
         }
     }
+
+    private void ReadCurve(string text, InstrumentRef instrument, TraceRef trace, List<InstrumentObservation> values, List<AtsmDiagnostic> findings)
+    {
+        var options = csvOptions ?? new(); var rows = CsvRows(text, options.Separator);
+        if (rows.Count < 2) throw new InvalidDataException("ATSM-CFX-MISSING-ROWS");
+        var headers = rows[0].Select(h => h.Trim()).ToArray();
+        if (headers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != headers.Length) throw new InvalidDataException("ATSM-CFX-DUPLICATE-COLUMN");
+        int Column(string name) => Array.FindIndex(headers, h => h.Equals(name, StringComparison.OrdinalIgnoreCase));
+        var target = Column(options.TargetColumn);
+        if (target < 0) target = Column("Fluor");
+        if (target < 0) target = Column("Fluor (or Target)");
+        if (target < 0) throw new InvalidDataException("ATSM-CFX-MISSING-TARGET");
+        var metrics = new[] { ("Efficiency %", ReportedStatisticKind.EfficiencyPercent), ("Slope", ReportedStatisticKind.Slope),
+            ("Y-intercept", ReportedStatisticKind.YIntercept), ("R^2", ReportedStatisticKind.RSquared) };
+        if (metrics.Any(m => Column(m.Item1) < 0)) throw new InvalidDataException("ATSM-CFX-MISSING-CURVE-METRIC");
+        var culture = CultureInfo.GetCultureInfo(options.Culture);
+        for (var i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i]; if (row.All(string.IsNullOrWhiteSpace)) continue;
+            if (row.Length != headers.Length || string.IsNullOrWhiteSpace(row[target])) throw new InvalidDataException("ATSM-CFX-INVALID-CURVE");
+            var statistics = metrics.Select(m => new ReportedStatistic(m.Item2, MetricValue(row[Column(m.Item1)], culture),
+                StatisticScope.StandardCurve, "CSV:" + m.Item1, $"row:{i}")).ToArray();
+            findings.AddRange(statistics.Where(s => s.Value.Numeric is null).Select(s => new AtsmDiagnostic("ATSM-CFX-NONNUMERIC-STATISTIC", AtsmSeverity.Warning,
+                "Reported curve statistic is absent or nonnumeric; original text retained.", s.SourceField)));
+            values.Add(new(Guid.CreateVersion7(), instrument, new(""), CodeSet.Of(new(row[target], row[target], CodeSystems.Vendor("biorad.cfx"))),
+                new(""), null, [], "exported", InstrumentStatusMeaning.Unknown, "standard-curve", null, null, null, [], [],
+                new(new Dictionary<string, string> { ["row"] = i.ToString(CultureInfo.InvariantCulture), ["format"] = "CFX Standard Curve Results" }), trace)
+            { Quality = new() { Statistics = statistics, SourceFields = headers.Select((h, column) => (h, row[column])).ToDictionary(x => x.h, x => x.Item2) } });
+        }
+        if (values.Count == 0) throw new InvalidDataException("ATSM-CFX-NO-CURVES");
+    }
+
+    private static ObservationValue MetricValue(string raw, CultureInfo culture) => new(raw,
+        decimal.TryParse(raw.Trim(), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent, culture, out var number) ? number : null);
+
+    private static QualityMaterial? Material(string type, string id) => type.ToLowerInvariant() switch
+    {
+        "std" or "standard" => new(QualityMaterialKind.Standard, id, TypeRaw: type),
+        "ntc" => new(QualityMaterialKind.NoTemplateControl, id, TypeRaw: type),
+        "nrt" => new(QualityMaterialKind.NoReverseTranscriptaseControl, id, TypeRaw: type),
+        "pos" or "positive control" => new(QualityMaterialKind.PositiveControl, id, TypeRaw: type),
+        "neg" or "negative control" => new(QualityMaterialKind.NegativeControl, id, TypeRaw: type),
+        _ => null,
+    };
+
+    private static SpecimenRole ControlRole(QualityMaterial? material) => material?.Kind is QualityMaterialKind.NoTemplateControl
+        or QualityMaterialKind.NoReverseTranscriptaseControl or QualityMaterialKind.PositiveControl or QualityMaterialKind.NegativeControl ? SpecimenRole.Control : SpecimenRole.Unknown;
 
     private static void ReadRdml(ReadOnlyMemory<byte> content, InstrumentRef instrument, TraceRef trace, List<InstrumentObservation> values, List<AtsmDiagnostic> findings)
     {
@@ -102,6 +177,12 @@ public sealed class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentCon
                 new() { ["experiment"] = (string?)experiment.Attribute("id") ?? "", ["run"] = (string?)run.Attribute("id") ?? "",
                     ["format"] = "RDML " + (string?)root.Attribute("version"), ["exclusion"] = (string?)data.Element(ns + "excl") ?? "",
                     ["excluded"] = data.Element(ns + "excl") is null ? "false" : "true" });
+            var sampleNode = root.Elements(ns + "sample").Single(s => (string?)s.Attribute("id") == sample);
+            var rawType = (string?)sampleNode.Element(ns + "type") ?? "";
+            var material = Material(rawType, sample);
+            values[^1] = values[^1] with { Specimen = values[^1].Specimen with { Role = ControlRole(material) },
+                Quality = material is null ? null : new(material, RunId: (string?)experiment.Attribute("id") + "/" + (string?)run.Attribute("id"))
+                { SourceFields = new Dictionary<string, string> { ["sample/type"] = rawType } } };
         }
         if (values.Count == 0) throw new InvalidDataException("ATSM-CFX-NO-REACTIONS");
     }

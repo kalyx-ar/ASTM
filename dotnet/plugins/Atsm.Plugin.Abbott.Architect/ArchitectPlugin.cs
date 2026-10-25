@@ -41,7 +41,7 @@ public sealed class ArchitectPlugin(ArchitectDialectOptions? options = null) : I
     [
         new AstmProfile(
             AsiProfileId,
-            "1.0.0",
+            "1.1.0",
             Lis01Options.Default with { BusyRetryDelay = TimeSpan.FromSeconds(15) },
             CodePage850.Value,
             new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },

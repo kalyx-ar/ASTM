@@ -42,6 +42,7 @@ flowchart LR
 | [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
 | [CONTINUACION](CONTINUACION.md) | Pendientes con alcance y criterios de aceptación, para retomar el trabajo |
 | [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) | GUI Windows, casos protegidos, catálogo real por modelo y prioridad Argentina |
+| [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md) | Investigación por interfaz, contexto QC/estadísticas/recursos externos y puertos de consulta del anfitrión |
 | [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |

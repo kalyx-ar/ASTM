@@ -232,7 +232,13 @@ public sealed class ArchitectDialect(DialectContext context, ArchitectDialectOpt
             [new ReagentLot(NullIfEmpty(record.Text(3, 8)), NullIfEmpty(record.Text(3, 9)), "reagent")],
             new List<string>(),
             new VendorIdentity(identity),
-            trace);
+            trace)
+        {
+            Quality = order.Role == SpecimenRole.Control ? new(
+                new(QualityMaterialKind.Control, order.SpecimenId, NullIfEmpty(record.Text(3, 10))),
+                ModuleId: NullIfEmpty(record.Text(14)))
+            { SourceFields = new Dictionary<string, string> { ["O.12"] = "Q", ["R.3"] = record.Field(3), ["R.6"] = record.Field(6) } } : null,
+        };
     }
 
     private static InstrumentObservation NotPerformed(InstrumentRef instrument, OrderState order, Lis02Record record, TraceRef trace) => new(

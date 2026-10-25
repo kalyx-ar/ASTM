@@ -76,9 +76,16 @@ public sealed record InstrumentObservation(
     IReadOnlyList<ReagentLot> Reagents,
     IReadOnlyList<string> Comments,
     VendorIdentity VendorIdentity,
-    TraceRef Trace);
+    TraceRef Trace)
+{
+    /// <summary>Evidence-backed analytical context; never a clinical release or a host QC decision.</summary>
+    public AnalyticalQualityContext? Quality { get; init; }
+}
 
-public sealed record InstrumentObservationBatch(Guid BatchId, InstrumentRef Instrument, IReadOnlyList<InstrumentObservation> Observations, TraceRef Trace);
+public sealed record InstrumentObservationBatch(Guid BatchId, InstrumentRef Instrument, IReadOnlyList<InstrumentObservation> Observations, TraceRef Trace)
+{
+    public IReadOnlyList<QualityResourceReference> QualityResources { get; init; } = [];
+}
 
 public sealed record OrderQuery(Guid QueryId, InstrumentRef Instrument, IReadOnlyList<SpecimenRef> Specimens, string Scope, TraceRef Trace);
 

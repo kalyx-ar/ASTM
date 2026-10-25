@@ -63,6 +63,7 @@ public sealed record AstmInterpretation(
     IReadOnlyList<AtsmDiagnostic> Diagnostics)
 {
     public static readonly AstmInterpretation Empty = new([], [], null, []);
+    public IReadOnlyList<QualityResourceReference> QualityResources { get; init; } = [];
 }
 
 public interface IAstmDialect

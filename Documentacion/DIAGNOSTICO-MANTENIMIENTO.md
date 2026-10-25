@@ -4,7 +4,7 @@ Entrega del 2026-10-24, trazada en [kalyx-ar/EDC#205](https://github.com/kalyx-a
 
 ## Aplicación Windows
 
-`dotnet/tools/Atsm.Diagnostics.Windows` es una aplicación WPF .NET 10. `Atsm.Diagnostics.Core` compone el catálogo y el anfitrión de diagnóstico; ninguno depende de EDC. Los plugins siguen separados del motor genérico. Se distribuyen 11 perfiles integrados: no se admiten DLL arbitrarias desde una carpeta.
+`dotnet/tools/Atsm.Diagnostics.Windows` es una aplicación WPF .NET 10. `Atsm.Diagnostics.Core` compone el catálogo y el anfitrión de diagnóstico; ninguno depende de EDC. Los plugins siguen separados del motor genérico. Se distribuyen 12 perfiles integrados: no se admiten DLL arbitrarias desde una carpeta.
 
 Compilar/publicar desde la raíz ATSM:
 
@@ -28,6 +28,8 @@ La captura abre una conexión propia: **no es un sniffer de la comunicación EDC
 Para HL7 activo se deben ingresar los plazos configurados en el equipo, en segundos; no se inventan valores del fabricante. El perfil disponible es ARCHITECT ZOS con ACK original, distinto de un actor LAW completo. Las fechas del instrumento se interpretan con la zona local de la estación; los logs permiten ingresar su offset UTC (predeterminado `-03:00`). Elegir un log de un solo instrumento/dialecto; no se autodetecta una marca desde cualquier texto.
 
 ## Custodia y límites
+
+Incremento QC: pestaña **Calidad** con mediciones, estadísticas reportadas, ámbito y campo fuente; detalle con lote/módulo/calibración y referencias externas sin abrirlas. Perfil adicional CFX CSV de curva estándar, con columnas `Target` (o `Fluor`), `Efficiency %`, `Slope`, `Y-intercept`, `R^2`. Matriz de evidencia, puertos y límites en [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md). No aplica reglas de aceptación QC ni calibra el equipo.
 
 La **aplicación** proporciona `DiagnosticTraceSink` y comprueba el almacén antes de abrir la interfaz. En esta herramienta independiente se usa DPAPI `CurrentUser` de Windows, por registros autenticados y encadenados, con identidad y secuencia de caso. No hay fallback plano, claves propias ni spool de SerialTunnel. El proveedor está fuera del motor; no introduce una dependencia a Windows en las bibliotecas neutrales.
 

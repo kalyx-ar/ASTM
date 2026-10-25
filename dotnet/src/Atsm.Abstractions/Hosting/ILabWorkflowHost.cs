@@ -27,14 +27,17 @@ public sealed record CodeMapping(string VendorCode, IReadOnlyList<CodedValue> Co
 public sealed record CodeMappingSet(string Version, string VendorSystem, IReadOnlyList<CodeMapping> Mappings);
 
 /// <summary>
-/// The only port a LIS/LIMS implements to host ATSM. Implementations live in the host repository.
+/// Required workflow port for hosting ATSM. Optional quality read/resource ports remain separate.
+/// Implementations live in the host repository.
 /// </summary>
 public interface ILabWorkflowHost
 {
     /// <summary>Synchronous host query. <paramref name="deadline"/> carries the instrument's response budget.</summary>
     ValueTask<OrderQueryAnswer> AnswerQueryAsync(OrderQuery query, CancellationToken deadline);
 
-    /// <summary>Return <see cref="IngestState.Accepted"/> only once the batch is durably stored by the host.</summary>
+    /// <summary>Return <see cref="IngestState.Accepted"/> only once the entire batch, including quality
+    /// context and resource references, is durably stored. A batch may contain references only;
+    /// acceptance of a reference does not mean the external content has been fetched.</summary>
     ValueTask<IngestOutcome> IngestAsync(InstrumentObservationBatch batch, CancellationToken cancellationToken);
 
     IAsyncEnumerable<WorkOrder> PendingOrdersAsync(InstrumentRef instrument, CancellationToken cancellationToken);

@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Atsm.Abstractions.Channels;
+using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Channels;
 using Atsm.Channels.SerialTunnel;
@@ -212,13 +213,16 @@ public partial class MainWindow : Window
             ObservationsGrid.ItemsSource = analyzed.Observations.TakeLast(2000).Select(o => new ObservationRow(o.Specimen.SpecimenId, o.Specimen.Position, o.Test.Vendor.Display ?? o.Test.Vendor.Code,
                 o.ResultKind, o.Value.RawText, o.Value.RawUnit, o.InstrumentStatus + " " + string.Join(", ", o.Flags.Select(f => f.Code)), JsonSerializer.Serialize(o, new JsonSerializerOptions(TraceJson.Options) { WriteIndented = true }))).ToArray();
             FindingsGrid.ItemsSource = analyzed.Diagnostics.TakeLast(2000).ToArray(); EventsGrid.ItemsSource = analyzed.Events.TakeLast(2000).ToArray();
+            QualityGrid.ItemsSource = analyzed.Observations.Where(o => o.Specimen.Role != SpecimenRole.Patient && (o.Quality is not null || o.Specimen.Role is SpecimenRole.Control or SpecimenRole.Calibrator))
+                .SelectMany(QualityRows).Concat(analyzed.QualityResources.Select(r => new QualityRow("Referencia externa", "", "Objetivos / límites de control", "Requiere anfitrión / ETL", "Lote",
+                    r.SourceField, JsonSerializer.Serialize(r, new JsonSerializerOptions(TraceJson.Options) { WriteIndented = true })))).TakeLast(2000).ToArray();
         }
         catch (Exception error) { ShowError(error); }
     }
     private void DetailSelected(object sender, SelectionChangedEventArgs e)
     {
         if (!_ready || sender is not DataGrid { SelectedItem: { } item }) return;
-        var text = item switch { TraceRow row => row.Details, ObservationRow row => row.Details, DiagnosticProfile profile => profile.Id + "\n" + profile.DisplayName + "\n" + profile.Evidence + "\n" + string.Join("\n", profile.AstmProfile?.Evidence ?? profile.ContentProfile?.Evidence ?? []), DecodedMessage message => message.Text.Replace("\r", "\r\n", StringComparison.Ordinal), _ => JsonSerializer.Serialize(item, new JsonSerializerOptions { WriteIndented = true }) };
+        var text = item switch { TraceRow row => row.Details, ObservationRow row => row.Details, QualityRow row => row.Details, DiagnosticProfile profile => profile.Id + "\n" + profile.DisplayName + "\n" + profile.Evidence + "\n" + string.Join("\n", profile.AstmProfile?.Evidence ?? profile.ContentProfile?.Evidence ?? []), DecodedMessage message => message.Text.Replace("\r", "\r\n", StringComparison.Ordinal), _ => JsonSerializer.Serialize(item, new JsonSerializerOptions { WriteIndented = true }) };
         DetailBox.Text = text.Length <= 65536 ? text : text[..65536] + "\n[Detalle visual limitado a 64 KiB; el caso conserva el contenido.]";
     }
     private void HexChanged(object sender, RoutedEventArgs e) { if (_ready) AnalyzeCurrent(); }
@@ -227,9 +231,9 @@ public partial class MainWindow : Window
     public void LoadDemo()
     {
         ProfileBox.SelectedItem = _catalog.Resolve(CfxPlugin.CsvProfileId);
-        var data = Encoding.UTF8.GetBytes("Well,Sample,Target,Cq,Fluor\r\nA01,CONTROL-SYN-1,TARGET-A,23.45,FAM\r\nA02,SAMPLE-SYN-2,TARGET-A,28.12,FAM\r\nA03,SAMPLE-SYN-3,TARGET-B,Undetermined,HEX\r\n");
+        var data = Encoding.UTF8.GetBytes("Well,Sample,Target,Cq,Fluor,Content,Cq Mean,Cq Std. Dev\r\nA01,CONTROL-SYN-1,TARGET-A,23.45,FAM,Pos-01,23.50,0.07\r\nA02,STANDARD-SYN-2,TARGET-A,28.12,FAM,Std-01,28.10,0.03\r\nA03,NTC-SYN-3,TARGET-B,Undetermined,HEX,NTC,Undetermined,\r\n");
         _case = DiagnosticReader.Read(data, DiagnosticInputFormat.Export, Profile, "Ejemplo sintético · Bio-Rad CFX", TimeSpan.FromHours(-3));
-        AnalyzeCurrent(); StatusText.Text = "Ejemplo sintético · Cq original, sin clasificación clínica ni datos de pacientes.";
+        AnalyzeCurrent(); QualityTab.IsSelected = true; StatusText.Text = "Ejemplo sintético · Datos y estadísticas reportados por el software; sin decisión QC ni datos de pacientes.";
     }
     public void SmokeCheckProtection(string directory)
     {
@@ -239,12 +243,31 @@ public partial class MainWindow : Window
             using (var journal = new ProtectedCaseJournal(File.Create(path), _protection, _case!.Header))
                 foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var read = ProtectedCaseJournal.Read(input, _protection);
-            if (read.Entries.Count != _case.Entries.Count || DiagnosticReader.Analyze(read, Profile, Timing()).Observations.Count != 3) throw new InvalidDataException("Smoke round trip failed.");
-            if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains("SAMPLE-SYN", StringComparison.Ordinal)) throw new InvalidDataException("Plaintext case content.");
+            var analyzed = DiagnosticReader.Analyze(read, Profile, Timing());
+            if (read.Entries.Count != _case.Entries.Count || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("Smoke round trip failed.");
+            if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("Unprotected case payload.");
         }
         finally { File.Delete(path); }
     }
     private sealed record InputChoice(DiagnosticInputFormat Value, string Label);
     private sealed record TraceRow(long Sequence, string Milliseconds, string Direction, int Length, string Preview, string Details);
     private sealed record ObservationRow(string Sample, string? Well, string Test, string? Kind, string Value, string? Unit, string Status, string Details);
+    private sealed record QualityRow(string Material, string Test, string Metric, string Value, string Scope, string Source, string Details);
+    private static IEnumerable<QualityRow> QualityRows(InstrumentObservation observation)
+    {
+        var context = observation.Quality; var material = context?.Material;
+        var label = (material?.Identifier ?? observation.Specimen.SpecimenId) + (material?.Lot is { } lot ? " / " + lot : "");
+        var details = JsonSerializer.Serialize(observation, new JsonSerializerOptions(TraceJson.Options) { WriteIndented = true });
+        if (observation.Value.RawText.Length > 0) yield return new(label, observation.Test.Vendor.Code,
+            "Medición · " + observation.ResultKind, observation.Value.RawText, "Individual", "Observación", details);
+        foreach (var statistic in context?.Statistics ?? [])
+            yield return new(label, observation.Test.Vendor.Code, statistic.Kind switch
+            {
+                ReportedStatisticKind.CqMean => "Cq · media", ReportedStatisticKind.CqStandardDeviation => "Cq · desvío estándar",
+                ReportedStatisticKind.EfficiencyPercent => "Eficiencia (%)", ReportedStatisticKind.Slope => "Pendiente",
+                ReportedStatisticKind.YIntercept => "Ordenada al origen", ReportedStatisticKind.RSquared => "R²",
+                ReportedStatisticKind.StartingQuantity => "Cantidad inicial (SQ)", ReportedStatisticKind.LogStartingQuantity => "Log cantidad inicial",
+                ReportedStatisticKind.StartingQuantityMean => "SQ · media", ReportedStatisticKind.StartingQuantityStandardDeviation => "SQ · desvío estándar", _ => statistic.Kind.ToString(),
+            }, statistic.Value.RawText, statistic.Scope switch { StatisticScope.ReplicateGroup => "Réplicas", StatisticScope.StandardCurve => "Curva", _ => "Pozo" }, statistic.SourceField, details);
+    }
 }

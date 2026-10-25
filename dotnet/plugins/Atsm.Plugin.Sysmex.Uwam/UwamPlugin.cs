@@ -23,6 +23,7 @@ public sealed class UwamPlugin : IInstrumentPlugin, ITraceLogAdapterProvider
         "Sysmex R315168 U-WAM ASTM Host Online Specifications rev. 22, 5.2.4: one record per message, at most 240 characters per frame text",
         "R315168 5.2.5: 15 s establishment, 30 s receiver; order inquiry answered within 8 s (with chemistry analyzer) or 18 s (without)",
         "R315168 5.2.5: in E1381-95 mode U-WAM performs no timeout processing (not covered by these profiles)",
+        "R315168 pp.39-40,47: QC identifier and serial in R.14; §5.3.3.7/Appendix J: S.7 points to external target/limit CSV; host resolves, ATSM never opens it.",
     ];
 
     // The host answer budget leaves margin below the instrument limit for framing and transfer.
@@ -51,7 +52,7 @@ public sealed class UwamPlugin : IInstrumentPlugin, ITraceLogAdapterProvider
 
     private static AstmProfile Profile(string id, TimeSpan budget) => new(
         id,
-        "1.0.0",
+        "1.1.0",
         Lis01Options.Default,
         Encoding.Latin1,
         new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
@@ -102,6 +103,9 @@ public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(co
     public override AstmInterpretation Interpret(Lis02Message message, TraceRef trace)
     {
         var interpretation = base.Interpret(message, trace);
+        interpretation = interpretation with { QualityResources = message.Records.Where(r => r.Type == 'S' && r.Field(7).Length > 0)
+            .Select(r => new QualityResourceReference(Guid.CreateVersion7(), interpretation.Instrument ?? Context.Instrument,
+                QualityResourceKind.ControlTargetLimits, r.Field(7), "S.7 (R315168 §5.3.3.7, Appendix J)", trace)).ToArray() };
         // A chemistry error may leave the results of that sample blank (R315168 B.1 note *2); the code maps through appendix K.
         var errors = interpretation.Observations
             .Where(o => o.Test.Vendor.Code == ChemistryErrorParameter && o.Value.RawText.Trim() is { Length: > 0 } code && code != "0000")
@@ -116,6 +120,17 @@ public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(co
 
     protected override SpecimenRef Specimen(OrderContext order) =>
         base.Specimen(order) with { Position = order.Rack is null ? null : $"{order.Rack}^{order.Position}" };
+
+    protected override InstrumentObservation ReadResult(InstrumentRef instrument, OrderContext order, Lis02Record result, TraceRef trace,
+        List<string> comments, List<Atsm.Abstractions.Diagnostics.AtsmDiagnostic> diagnostics)
+    {
+        var observation = base.ReadResult(instrument, order, result, trace, comments, diagnostics);
+        // R315168 pp.39-40: identifier combines lot/level/method and qualitative output can omit level.
+        // Keep it whole until external lot metadata supplied by the host resolves the components.
+        return order.Role != SpecimenRole.Control ? observation : observation with { Quality = new(
+            new(QualityMaterialKind.Control, order.SpecimenId), ModuleId: NullIfEmpty(result.Text(14)), Method: NullIfEmpty(result.Text(3, 5)))
+        { SourceFields = new Dictionary<string, string> { ["O.12"] = "Q", ["O.3"] = order.SpecimenId, ["R.3"] = result.Field(3), ["R.4"] = result.Field(4), ["R.14"] = result.Field(14) } } };
+    }
 
     protected override string? ResultKind(Lis02Record result)
     {

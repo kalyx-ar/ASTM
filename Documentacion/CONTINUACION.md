@@ -20,7 +20,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 142 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba DPAPI/render por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 159 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba DPAPI/render por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: `dotnet publish dotnet/tools/Atsm.Diagnostics.Windows/Atsm.Diagnostics.Windows.csproj -c Release --no-restore -p:AtsmRequireStrongName=true`; no forma parte del build multiplataforma `Atsm.slnx`. Ver [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) para uso, catálogo y evidencia por modelo.
 
@@ -113,6 +113,12 @@ Si `ILabWorkflowHost.IngestAsync` falla, hoy el lote sólo queda como diagnósti
 GUI Windows implementada con log/exportación y TCP/SerialTunnel, caso protegido preparado antes de conectar y simulación de host sin órdenes; 11 perfiles. Añadidos CFX CSV/RDML y perfiles de recepción Sysmex XN-L, CS-2500 y QWALYS. Fuentes, capacidades, presencia argentina y límites en [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 Continuar por validación real CFX/XN-L, kits P-03 y extensión por modelo/firmware (prioridad humana CFX → Sysmex → QWALYS); XN-1000/XN y SUIT requieren confirmar su interfaz antes de agregarlos. No declarar soporte de toda una marca por compartir protocolo. La GUI no completa P-04, P-05, P-09, P-10 ni P-13. Para EDC las trazas continúan siendo responsabilidad de Application/SQLCipher.
+
+### Datos QC y calibración (incremento 2026-10-24)
+
+Implementados contexto analítico tipado, lector opcional `IQualityDataSource` sobre lotes custodiados, recurso S.7 U-WAM en la misma frontera `IngestAsync` (lotes sin observaciones válidos), puerto opcional `IQualityResourceContent` del anfitrión, estadísticas/curva estándar CSV de CFX y pestaña Calidad. El catálogo pasa a 12 perfiles; no se abre ni descarga un recurso externo automáticamente. Matriz de fabricante, ejemplos y límites: [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md).
+
+Continuación: R24/ED de calibración ARCHITECT (incluido en P-02; puerto de informes documentado, sin implementar), importador/asociación de CSV de objetivos/límites U-WAM, señales/curvas RFU y SUIT con corpus por modelo. Reglas/estadísticas derivadas, valores asignados/versionados y almacenamiento/consulta autorizados son del anfitrión (P-13 para EDC), no criterios genéricos de aceptación ATSM.
 
 ### P-06 Build Windows XP
 

@@ -14,8 +14,9 @@ public sealed class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan resp
 {
     public const string ProfileId = "abbott.architect.hl7-2.5.1";
     public IReadOnlyList<Hl7Profile> Profiles { get; } =
-    [new(ProfileId, "1.0.0", new UTF8Encoding(false, true), Positive(queryAnswerBudget), Positive(responseTimeout),
+    [new(ProfileId, "1.1.0", new UTF8Encoding(false, true), Positive(queryAnswerBudget), Positive(responseTimeout),
         ["Abbott 206797-101 (2012) §1-2 MLLP, §1-5 original ACK, §2-8/2-9 ZOS queries, §2-13 OUL^R22, §2-3 OML^O33",
+         "§3-23/26 INV gives QC/calibrator identity/lot/expiry; §3-97 ZCL identifies calibration used by an OBR. R24 ED calibration reports are not decoded.",
          "Budgets must match deployed instrument settings; this manual does not define universal timeout defaults."])];
 
     private static TimeSpan Positive(TimeSpan value) => value > TimeSpan.Zero && value.TotalMilliseconds <= uint.MaxValue - 1
@@ -50,10 +51,18 @@ public sealed class ArchitectHl7Dialect(DialectContext context, TimeZoneInfo tim
         List<ReagentLot>? reagents = null;
         Hl7Segment? order = null;
         var seenSpecimen = false;
+        QualityMaterial? defaultMaterial = specimen.Role switch
+        { SpecimenRole.Control => new(QualityMaterialKind.Control, specimen.SpecimenId), SpecimenRole.Calibrator => new(QualityMaterialKind.Calibrator, specimen.SpecimenId), _ => null };
+        QualityMaterial? material = defaultMaterial;
+        CalibrationReference? calibration = null;
+        var orderFirst = 0;
         foreach (var segment in message.Segments)
         {
-            if (segment.Name == "SPM") { seenSpecimen = true; order = null; comments = null; reagents = null; }
-            if (segment.Name == "OBR") { order = segment; comments = null; reagents = null; }
+            if (segment.Name == "SPM") { seenSpecimen = true; order = null; comments = null; reagents = null; material = defaultMaterial; calibration = null; }
+            if (segment.Name == "INV" && specimen.Role is SpecimenRole.Control or SpecimenRole.Calibrator)
+                material = new(specimen.Role == SpecimenRole.Control ? QualityMaterialKind.Control : QualityMaterialKind.Calibrator,
+                    segment.Text(1), EmptyNull(segment.Text(16)), ExpirationRaw: EmptyNull(segment.Text(12)), TypeRaw: segment.Text(3));
+            if (segment.Name == "OBR") { order = segment; comments = null; reagents = null; calibration = null; orderFirst = observations.Count; }
             if (segment.Name == "OBX")
             {
                 if (!seenSpecimen || order is null || segment.Text(3).Length == 0 || segment.Field(5).Length == 0 || segment.Field(11).Length == 0)
@@ -99,13 +108,30 @@ public sealed class ArchitectHl7Dialect(DialectContext context, TimeZoneInfo tim
                         "R" => InstrumentStatusMeaning.PreviouslyTransmitted, "X" => InstrumentStatusMeaning.NotPerformed, _ => InstrumentStatusMeaning.Unknown },
                     kind, segment.Text(3, subcomponent: 2), resultTime, segment.Text(16), reagents, comments,
                     new(new Dictionary<string, string> { ["message.controlId"] = message.ControlId, ["result.sequence"] = segment.Text(1),
-                        ["order.sequence"] = order.Text(1), ["equipment"] = segment.Field(18) }), trace));
+                        ["order.sequence"] = order.Text(1), ["equipment"] = segment.Field(18) }), trace)
+                {
+                    Quality = new(material, ModuleId: EmptyNull(segment.Text(18)), Calibration: calibration)
+                    { SourceFields = new Dictionary<string, string> { ["SPM.11"] = specimens[0].Field(11), ["OBX.18"] = segment.Field(18) } },
+                });
             }
             if (segment.Name == "NTE") comments?.Add(segment.Text(3));
             if (segment.Name == "SID") reagents?.Add(new(segment.Text(2), segment.Text(3), segment.Field(1)));
+            if (segment.Name == "ZCL" && order is not null)
+            {
+                if (segment.Text(1) != order.Text(4, subcomponent: 1) || segment.Text(2).Length == 0 || segment.Text(3).Length == 0)
+                {
+                    findings.Add(new("ATSM-ARC-HL7-UNMATCHED-CALIBRATION", AtsmSeverity.Warning, "Calibration reference does not identify the current assay/lot/time; retained in the source trace without association."));
+                    continue;
+                }
+                calibration = new(segment.Text(1), EmptyNull(segment.Text(2)), segment.Text(3));
+                for (var i = orderFirst; i < observations.Count; i++)
+                    observations[i] = observations[i] with { Quality = observations[i].Quality! with { Calibration = calibration } };
+            }
         }
         return new(observations, null, findings);
     }
+
+    private static string? EmptyNull(string value) => value.Length == 0 ? null : value;
 
     public Hl7Message BuildQueryAnswer(Hl7Message request, OrderQueryAnswerContext answer)
     {
