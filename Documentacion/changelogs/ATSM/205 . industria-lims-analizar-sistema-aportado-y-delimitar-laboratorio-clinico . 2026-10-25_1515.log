@@ -1,0 +1,82 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 15:15 America/Buenos_Aires
+Tipo: feat / fix / docs
+Commits:
+- 59e7082153b16458b71287bb70f6c366b1171f9e: plugin de uroanálisis y mediana/DE.
+- 1613b77c6533f02f401c2c59daeb528a112a21bd: cualitativos y registros comunicados.
+- ebb27055ccbb2354773854bea6e7b1e2c2726a2a: frecuencias entre paréntesis.
+- 9fb24f4b5d771696f532b447ac48531444d0f622: estado Sin medir.
+- Este registro se incorpora en el commit docs que lo contiene.
+Registro previo: issuecomment-6400616298, issuecomment-6400698568,
+issuecomment-6401204744, issuecomment-6401289911, issuecomment-6401307492.
+Resumen funcional remoto: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6401330901
+
+Alcance autorizado y decisiones
+- U-WAM es una sola entrada principal: 8 familias, 13 perfiles técnicos.
+- Plugin Atsm.Plugin.Sysmex.Urinalysis con intérpretes U-WAM ASTM y UC serial;
+  se retiraron proyectos/DLL Uwam/Uc3500 redundantes, sin aliases.
+- IInstrumentKnowledge consulta conocimiento por perfil/protocolo, registro,
+  campo y código; no aplica un ER de orden a cualquier texto coincidente.
+- Interpretación automática por contenido y opción manual dentro de U-WAM.
+  Captura automática sin respuestas; simulación requiere perfil específico.
+- Hallazgos breves: Error relacionado con las tiras reactivas / Error de análisis /
+  Error del sistema óptico.
+- Calidad: material/lote literal, prueba, tipo/unidad, mínimo, mediana/resultado,
+  máximo, DE, Mediciones y señales. Registros originales en subfilas.
+- Mediana y DE priorizadas sobre media. Estadística descriptiva por series
+  separadas, sin inventar objetivos/límites de aceptación QC ni validar resultados.
+- Mediciones cuenta todos los registros comunicados, incluidos cualitativos,
+  duplicados y no realizados. NumericCount separado para mediana/DE; repeticiones
+  de la misma identidad no inflan el subconjunto numérico.
+- Textos/códigos cualitativos con frecuencias. Formato final:
+  normal (3) · Sin medir (1). Un vacío medido se distingue de Sin medir.
+- Alarmas y posibles atípicos resaltados sin eliminar los datos.
+- Valores originales, identificadores y estadísticas reportadas permanecen
+  accesibles; las estadísticas reportadas no se convierten en réplicas nuevas.
+
+Archivos
+- dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis/
+- dotnet/src/Atsm.Plugins/InstrumentKnowledgeContracts.cs
+- dotnet/tools/Atsm.Diagnostics.Core/{DiagnosticCatalog,DiagnosticGrouping,
+  DiagnosticInputDetector,ProtocolExplainer,QualitySeries}.cs
+- dotnet/tools/Atsm.Diagnostics.Maui/{MainPage,DiagnosticTable,Lang}.cs
+- CLI y pruebas de conocimiento, calidad, plugins, Lang y trazas.
+- Documentacion/{CALIDAD-DIAGNOSTICA,CALIDAD-Y-CALIBRACION,UC3500-PROTOCOLO,
+  ESTADO,CONTINUACION,USABILIDAD-DIAGNOSTICS,DIAGNOSTICO-MANTENIMIENTO}.md
+
+Verificación
+- 214/214 pruebas .NET, 0 omitidas; corridas finales repetidas (~1-2 s).
+  Diez casos nuevos en consolidación/mediana y tres en frecuencias cualitativas.
+- 542 checks nativos, 0 fallos, repetidos (~0,25-0,26 s).
+- Lang real con conexión sintética: 1 correcta (175 ms) en la continuación.
+- GUI final: PASS ventana/runtime privado/DPAPI, selección nativa de texto,
+  detección U-WAM automática/manual, siete vistas crudas/interpretadas,
+  mediana/DE y originales, normal (4) con cuatro mediciones comunicadas.
+- CLI NativeAOT final: self-test correcto; quality-summary=ok,
+  qualitative-count=ok; auditoría GUI ATSM_PUBLICATION_DEPENDENCIES_OK.
+- GUI y CLI ProductVersion: 0.1.0+9fb24f4b5d771696f532b447ac48531444d0f622.
+- 19 DLL propias GUI: token 066190A23251F202. Se mantienen cinco CS8002
+  de ensamblados MAUI oficiales sin Strong Name; Authenticode propio pendiente.
+  No se confunde firma de paquete NuGet con firma del ensamblado.
+- Tres carpetas de idioma; sin proyectos/DLL retirados ni ZIP bajo LIMS.
+- Comprobación local previa de selección cruzada: elegir U-WAM detecta UC y
+  elegir UC ante el log UF vuelve a ASTM; sólo agregados, sin datos publicados.
+- Los cuatro identificadores de control del UC llegan como asteriscos en la
+  captura original. Se conserva lo comunicado, no se aplica ofuscación de UI.
+
+Incidencias y límites
+- La regeneración post-commit del bloque anterior se había detenido por fallo
+  del revisor automático (límite de uso); se completó al retomar con autorización.
+- Un publish de esta continuación encontró DLL bloqueadas por la GUI abierta.
+  Se verificó el ejecutable y se solicitó CloseMainWindow, sin terminación
+  forzada; tras el cierre normal el publish y el self-test finalizaron bien.
+- Intermitencias previas TLS/HL7 continúan documentadas, no corregidas aquí.
+- Sin dependencias nuevas, spool, datos reales publicados, cambios de Identidades,
+  push ni PR. El issue #205 sigue abierto por su alcance LIMS restante.
+- El trabajo ajeno detectado en el checkout EDC (Cryptology/Documents/LIMS.Tests)
+  se conservó intacto.
+
+Entrega
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- Sin rutas publish, wrappers de empaquetado ni comprimidos.
