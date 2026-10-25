@@ -5,6 +5,8 @@
     <RootNamespace>Atsm.Tools.Trace</RootNamespace>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>atsm-trace</ToolCommandName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <InvariantGlobalization>true</InvariantGlobalization>
     <Description>Import, anonymize, summarize and interpret ATSM traces.</Description>
   </PropertyGroup>

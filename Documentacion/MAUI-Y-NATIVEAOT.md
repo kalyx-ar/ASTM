@@ -25,10 +25,10 @@ Se reemplazó la serialización por reflexión por metadatos generados: `AtsmJso
 Desde la raíz ATSM:
 
 ```powershell
-.\tools\Publish-Diagnostics.ps1
+dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true
 ```
 
-Entrega: `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/atsm-diagnostics.exe` y `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/ATSM-Diagnostics-MAUI-Windows-x64.zip`. Conservar toda la carpeta. El script publica en un directorio nuevo, aísla también la compilación para no bloquear una instancia abierta y verifica referencias propias por metadatos PE **sin cargar código**, comprueba runtime y WinUI incluidos y ejecuta `--self-test`. Sólo entonces reemplaza el destino generado y elimina la publicación anterior; no mantiene aliases ni archivos obsoletos. Se bloquea el reemplazo si encuentra casos/logs/bases del usuario dentro del destino generado. Los temporales de la publicación se eliminan al finalizar. La regla humana posterior retiró las copias de compatibilidad de la primera migración. `SHA256SUMS.txt` detecta modificaciones accidentales; no sustituye firma/admisión.
+Entrega directa: dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe y sus dependencias. No se generan comprimidos ni se mantiene un script para mover/comprimir. La verificación usa los comandos self-test y verify-publication sobre la salida real. PublicationAudit inspecciona metadatos PE sin cargar código; la prueba propia comprueba CLR/WinUI privados y casos protegidos.
 
 Prueba de publicación: la aplicación crea la ventana MAUI y su handler, valida HWND propietario de diálogos, comprueba que usa .NET y WinUI privados, abre el catálogo, interpreta datos CFX/QC sintéticos y guarda/reabre un caso cifrado DPAPI. Informa sólo PASS/FAIL y nombres de pruebas; no vuelca datos sensibles. El control visual asistido de Windows agotó su autorización: no se afirma inspección manual de los diálogos ni del diseño. En errores de inicio la aplicación muestra un código seguro en un diálogo nativo, sin generar fallback de logs planos.
 
@@ -38,7 +38,7 @@ CLI nativa:
 dotnet publish dotnet/tools/Atsm.Tools.Trace/Atsm.Tools.Trace.csproj -c Release -r win-x64 -p:PublishProfile=NativeAot -p:AtsmRequireStrongName=true
 ```
 
-Resultado en `dotnet/tools/Atsm.Tools.Trace/bin/Release/net10.0/win-x64/publish/atsm-trace.exe`. `self-test` ejercita contenido sintético en memoria. `verify-publication <directorio>` detecta referencias propias faltantes, incluida la publicación anterior rota. No se interpreta el tamaño del EXE como prueba de AOT: se verifica la compilación nativa y se ejecuta el artefacto.
+Resultado en `dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe`. `self-test` ejercita contenido sintético en memoria. `verify-publication <directorio>` detecta referencias propias faltantes, incluida la publicación anterior rota. No se interpreta el tamaño del EXE como prueba de AOT: se verifica la compilación nativa y se ejecuta el artefacto.
 
 ## Firma y alcance de verificación
 

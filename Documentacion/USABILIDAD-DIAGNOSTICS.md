@@ -70,12 +70,12 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 ## Verificación y límites
 
-181 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; 19 pruebas nuevas de detección/dirección, ambigüedad, agrupación sin pérdida, vocabulario y columnas automáticas. Prueba opcional Lang adicional: 1 correcta. La publicación verifica idiomas, dependencias y arranque/DPAPI; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+181 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; 19 pruebas nuevas de detección/dirección, ambigüedad, agrupación sin pérdida, vocabulario y columnas automáticas. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 
 ## Destino único y retiro de compatibilidad
 
-Decisión humana posterior: sólo se mantiene legacy por traspaso activo o fuerza mayor (ejemplo Windows XP). La salida única es dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/atsm-diagnostics.exe, con el ZIP junto a publish. Se retiraron el alias Atsm.Diagnostics.Windows y las copias de publicaciones anteriores. El publicador valida el candidato y reemplaza la salida vigente; no archiva entregas obsoletas y limpia sus temporales. No se eliminan datos de usuario ni se reescribe el historial de changelogs.
+Decisión humana posterior: sólo se mantiene legacy por traspaso activo o fuerza mayor (ejemplo Windows XP). La salida única es dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe. Se eliminaron el alias Windows, salidas anteriores, los comprimidos de entrega y tools/Publish-Diagnostics.ps1. Se compila directamente con .NET y se verifica el ejecutable resultante; sin mover, duplicar ni comprimir salidas. No se eliminan datos de usuario ni se reescribe el historial de changelogs.
 
 La detección preserva también HL7/MLLP dentro de un log: infiere el lado del registrador por OUL/QBP cuando hay evidencia, conserva el perfil HL7 seleccionado y nunca lo reemplaza por U-WAM por encontrar un nombre de equipo. Reconocer MSH no elige una marca: sin configuración HL7 compatible del equipo se solicita seleccionarla, en vez de interpretar con otro fabricante. La prueba adicional cubre ambas direcciones y el rechazo de esa suposición.

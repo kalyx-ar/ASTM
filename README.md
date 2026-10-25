@@ -39,6 +39,6 @@ The first CMake configure downloads Mbed TLS 4.1.1 and checks its SHA-256 (offli
 
 Instrument traces may contain patient data. Real traces and vendor manuals are kept out of version control (`Documentacion/trazas_externas/`, `Documentacion/manuales/`); only anonymized corpora are published. Use `atsm-trace anonymize` and review its report before sharing a trace.
 
-Distribución verificada: `tools/Publish-Diagnostics.ps1`; ejecutable `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/atsm-diagnostics.exe`. [MAUI y NativeAOT](Documentacion/MAUI-Y-NATIVEAOT.md): WPF retirado, CLI NativeAOT y catálogo compilado; carga en caliente sólo en EDC.
+Distribución verificada: la herramienta estándar .NET; ejecutable `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe`. [MAUI y NativeAOT](Documentacion/MAUI-Y-NATIVEAOT.md): WPF retirado, CLI NativeAOT y catálogo compilado; carga en caliente sólo en EDC.
 
 Mejoras de Diagnostics: interpretación por defecto, grupos completos, detección de logs, columnas automáticas/redimensionables, equipos con configuraciones internas y Lang opcional. Ver [usabilidad](Documentacion/USABILIDAD-DIAGNOSTICS.md).

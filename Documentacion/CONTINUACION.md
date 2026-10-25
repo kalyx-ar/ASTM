@@ -22,7 +22,7 @@ ctest --test-dir native/build/win-x64 -C Release
 
 Al cerrar: 181 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
-Aplicación Windows: `.\tools\Publish-Diagnostics.ps1`; no forma parte del build multiplataforma `Atsm.slnx`. Ver [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) para uso, catálogo y evidencia por modelo.
+Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
 Verificación local con trazas reales (no se publican; imprimir sólo agregados):
 
