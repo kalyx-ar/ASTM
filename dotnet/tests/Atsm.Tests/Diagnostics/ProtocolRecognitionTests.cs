@@ -83,7 +83,7 @@ public sealed class ProtocolRecognitionTests
         Assert.False(validated.Header.Properties!.ContainsKey("unsupportedProtocol")); Assert.Equal("keep", validated.Header.Properties["other"]);
         Assert.Equal("true", capture.Header.Properties!["unsupportedProtocol"]); Assert.Same(capture.Entries, validated.Entries);
         var result = DiagnosticReader.Analyze(capture, profile, Timing); Assert.Single(result.Observations);
-        Assert.Equal("Original", ProtocolExplainer.ResultKind(result.Observations[0], profile));
+        Assert.Equal("Numérico", ProtocolExplainer.ResultKind(result.Observations[0], profile));
         Assert.Equal("1.1", result.Observations[0].Value.RawText); Assert.Equal("S/RAW", result.Observations[0].ResultKind);
         Assert.Equal(Message("UF-5000"), Assert.Single(validated.Entries).Data.ToArray());
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL");

@@ -53,7 +53,7 @@ public static class QualitySeriesBuilder
                 }
                 return new QualitySeries(group.Key, first.Quality?.Material?.Identifier ?? first.Specimen.SpecimenId,
                     first.Quality?.Material?.Lot, first.Quality?.Material?.Level, first.Test.Vendor.Display ?? first.Test.Vendor.Code,
-                    first.ResultKind ?? "", first.Value.RawUnit ?? first.Value.Unit?.Code ?? "", records, numeric.Length,
+                    first.ResultKind ?? "", InstrumentUnits.Symbol(first.Value) ?? "", records, numeric.Length,
                     measured.Length - numeric.Length, records.Length - unique.Length,
                     unique.Count(o => ProtocolExplainer.RequiresAttention(o, knowledge as IInstrumentFlagKnowledge)),
                     sorted.Length == 0 ? null : sorted[0], sorted.Length == 0 ? null : Quantile(sorted, 0.5m),
@@ -71,13 +71,13 @@ public static class QualitySeriesBuilder
                 };
             }).ToArray();
     }
-    private static bool IsNumeric(InstrumentObservation o) => o.Value.Numeric is not null && string.IsNullOrEmpty(o.Value.Comparator)
+    private static bool IsNumeric(InstrumentObservation o) => o.Value.Numeric is not null && o.Value.Coded is null && string.IsNullOrEmpty(o.Value.Comparator)
         && InstrumentNumericValue.Parse(o.Value.RawText).Comparator is null;
     private static string Key(InstrumentObservation o) => DiagnosticGrouping.Key(o.Instrument.InstrumentId, o.Instrument.SerialNumber,
         o.Specimen.Role.ToString(), o.Quality?.Material?.Kind.ToString(), o.Quality?.Material?.Identifier ?? o.Specimen.SpecimenId,
         o.Quality?.Material?.Lot, o.Quality?.Material?.Level, o.Quality?.Material?.TypeRaw, o.Quality?.Method, o.Quality?.ModuleId,
         o.Quality?.Calibration?.PerformedAtRaw, string.Join(";", o.Reagents.Select(r => DiagnosticGrouping.Key(r.Lot, r.Serial, r.Kind)).Order(StringComparer.Ordinal)),
-        o.Test.Vendor.System, o.Test.Vendor.Code, o.ResultKind, o.Value.RawUnit, o.Value.Unit?.System, o.Value.Unit?.Code);
+        o.Test.Vendor.System, o.Test.Vendor.Code, o.ResultKind, InstrumentUnits.Symbol(o.Value), o.Value.Unit?.System);
     // R7: linear interpolation at (n-1)p. Median is exact decimal; SD uses Welford in double.
     private static decimal Quantile(decimal[] sorted, decimal fraction)
     {

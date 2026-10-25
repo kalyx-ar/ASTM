@@ -25,6 +25,7 @@ internal sealed partial class UwamInterpreter(IInstrumentKnowledge knowledge) : 
         "R315168 5.2.5: in E1381-95 mode U-WAM performs no timeout processing (not covered by these profiles)",
         "R315168 pp.39-40,47: QC identifier and serial in R.14; §5.3.3.7/Appendix J: S.7 points to external target/limit CSV; host resolves, ATSM never opens it.",
         "R315168 rev.22 appendices B/K: UF-3000/3000x/4000/5000, UC-1000/3500 and UD-10 on the U-WAM host link; not qualification of each analyzer's direct protocol.",
+        "Local UF-5000 trace: O.4.3 identifies QC when O.3 is empty; composite QC R.4/R.5 retained in source fields. Only documented R.4.2 format codes are classified as formats; other components are not invented statistics.",
     ];
 
     // The host answer budget leaves margin below the instrument limit for framing and transfer.
@@ -141,8 +142,14 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
         return errors.Count == 0 ? interpretation : interpretation with { Diagnostics = [.. interpretation.Diagnostics, .. errors] };
     }
 
-    protected override OrderContext ReadOrder(Lis02Record record) =>
-        base.ReadOrder(record) with { Rack = NullIfEmpty(record.Text(3, 2)), Position = NullIfEmpty(record.Text(3, 3)) };
+    protected override OrderContext ReadOrder(Lis02Record record)
+    {
+        var order = base.ReadOrder(record);
+        if (record.Field(3).Length == 0 && record.Text(4, 3).Trim().Length > 0)
+            return order with { SpecimenId = record.Text(4, 3).Trim(), InstrumentSpecimenId = record.Field(4),
+                Rack = NullIfEmpty(record.Text(4, 1)), Position = NullIfEmpty(record.Text(4, 2)) };
+        return order with { Rack = NullIfEmpty(record.Text(3, 2)), Position = NullIfEmpty(record.Text(3, 3)) };
+    }
 
     protected override SpecimenRef Specimen(OrderContext order) =>
         base.Specimen(order) with { Position = order.Rack is null ? null : $"{order.Rack}^{order.Position}" };
@@ -151,6 +158,8 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
         List<string> comments, List<Atsm.Abstractions.Diagnostics.AtsmDiagnostic> diagnostics)
     {
         var observation = base.ReadResult(instrument, order, result, trace, comments, diagnostics);
+        var symbol = InstrumentUnits.Symbol(observation.Value);
+        if (symbol is not null) observation = observation with { Value = observation.Value with { Unit = new(symbol, symbol, VendorSystem + ":unit") } };
         // R315168 pp.39-40: identifier combines lot/level/method and qualitative output can omit level.
         // Keep it whole until external lot metadata supplied by the host resolves the components.
         return order.Role != SpecimenRole.Control ? observation : observation with { Quality = new(
@@ -162,7 +171,7 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
     {
         var type = result.Text(3, 7);
         var format = result.Text(4, 2);
-        return format.Length == 0 ? NullIfEmpty(type) : $"{type}/{format}";
+        return format is "RAW" or "MAINFORMAT" or "RAW_Q" or "RAW_C" or "RAW_R1" or "RAW_R2" ? $"{type}/{format}" : NullIfEmpty(type);
     }
 
     protected override string InstrumentStatus(Lis02Record result, OrderContext order) => order.ReportType;
@@ -176,6 +185,9 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
     {
         var identity = base.Identity(result, order);
         identity["analysis.method"] = result.Text(3, 5);
+        identity["result.identifier.raw"] = result.Field(3);
+        identity["result.value.raw"] = result.Field(4);
+        identity["result.unit.raw"] = result.Field(5);
         identity["dilution"] = result.Text(3, 6);
         if (result.Field(9).Length > 0)
             identity["ud10.cell"] = result.Field(9);

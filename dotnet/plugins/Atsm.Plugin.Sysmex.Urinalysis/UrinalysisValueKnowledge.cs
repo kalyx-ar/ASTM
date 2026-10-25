@@ -5,6 +5,19 @@ namespace Atsm.Plugin.Sysmex.Urinalysis;
 
 internal static class UrinalysisValueKnowledge
 {
+    internal static ProtocolText? Unit(InstrumentObservation observation, IReadOnlyDictionary<string, ProtocolText> vocabulary)
+    {
+        if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
+            return observation.ResultKind?.Split('/')[0] is "IF" or "RC" ? vocabulary["unit.NonMeasurement"] : null;
+        if (observation.Test.Vendor.System != CodeSystems.Vendor(Uc3500Interpreter.PluginId)) return null;
+        return vocabulary[observation.ResultKind switch
+        {
+            "REFLECTANCE1" or "REFLECTANCE2" => "unit.Percent",
+            _ when observation.Test.Vendor.Code is "pH" or "SG.strip" or "SG.refractometer" => "unit.Dimensionless",
+            "QUALITATIVE" or "TURBIDITY" or "COLOR" or "COLOR-RANK" => "unit.None",
+            _ => "unit.NotTransmitted",
+        }];
+    }
     // UC table 6-18, and table 6-17 for turbidity. An index expresses order only.
     // Unknown levels are not assigned a rank or converted to a concentration.
     private static readonly Dictionary<string, string[]> CrossScales = new(StringComparer.Ordinal)

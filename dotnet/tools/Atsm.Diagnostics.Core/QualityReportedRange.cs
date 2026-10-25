@@ -22,7 +22,7 @@ public sealed record QualityReportedRange(string? Minimum, string? Median, strin
         }
         var points = measured.Select(o =>
         {
-            if (knowledge?.DescribeValue(o)?.IsStructuredContent == true) return null;
+            if (o.Value.Coded is not null || knowledge?.DescribeValue(o)?.IsStructuredContent == true) return null;
             var parsed = InstrumentNumericValue.Parse(o.Value.RawText);
             var number = o.Value.Numeric ?? parsed.Numeric;
             var comparison = o.Value.Comparator switch { "≥" => ">=", "≤" => "<=", _ => o.Value.Comparator ?? parsed.Comparator };

@@ -22,6 +22,8 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.N")] = "ESTADO TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Image")] = "IMAGEN TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UWAM-CHEMISTRY-UC3500-9902")] = "ERROR TRADUCIDO";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.UC3500.00CC")] = "ESTADO DE ERROR TRADUCIDO";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "unit.NotTransmitted")] = "UNIDAD NO INFORMADA TRADUCIDA";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -39,6 +41,11 @@ public sealed class LangIntegrationTests
         Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultKind(observation, profile));
         Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultValue(observation, profile));
         Assert.Equal("ERROR TRADUCIDO", DiagnosticText.Finding(new("ATSM-UWAM-CHEMISTRY-UC3500-9902", AtsmSeverity.Warning, "Original"), profile));
+        var direct = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("BLD", null, "urn:atsm:vendor:sysmex.uc3500")),
+            ResultKind = "CONCENTRATION", Flags = [new("00CC", null, "urn:atsm:vendor:sysmex.uc3500")], InstrumentStatusMeaning = Atsm.Abstractions.Model.InstrumentStatusMeaning.Warning };
+        var directProfile = catalog.Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
+        Assert.Equal("ESTADO DE ERROR TRADUCIDO", ProtocolExplainer.Status(direct, directProfile));
+        Assert.Equal("UNIDAD NO INFORMADA TRADUCIDA", ProtocolExplainer.Unit(direct, directProfile));
         Assert.Equal(ConnectionState.Open, database.State);
     }
 

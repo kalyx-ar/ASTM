@@ -16,6 +16,17 @@ internal sealed partial class Uc3500Interpreter
         Add("value.Crosses", "Semicuantitativo (cruces)", "tabla 6-18: valores cualitativos ordenados en cruces");
         Add("value.BinaryCrosses", "Cualitativo (cruces)", "tabla 6-18: NIT negativo/positivo");
         Add("value.SemiQuantitative", "Valor semicuantitativo", "tabla 6-18: valores con comparadores/límites");
+        Add("unit.Percent", "%", "tabla 6-17: reflectancia R%(1)/R%(2)");
+        Add("unit.Dimensionless", "Adimensional", "tabla 6-18: pH y densidad relativa");
+        Add("unit.None", "—", "tabla 6-17: dato cualitativo/color, sin unidad física");
+        Add("unit.NotTransmitted", "No informada", "tabla 6-17: el mensaje no incluye un campo de unidad de concentración");
+        Add("state.UC3500.Analysed", "Analizado", "tabla 6-17: estado 0 = analizado; no implica validación clínica");
+        Add("flag.UC3500.00BB", "Error de lectura del código de barras (00BB)", "§7, tablas 7-1 y 7-2");
+        Add("flag.UC3500.00CC", "Error de solicitud (00CC)", "§7, tablas 7-1 y 7-2");
+        Add("flag.UC3500.00DD", "Tira reactiva vencida (00DD)", "§7, tablas 7-1 y 7-2");
+        Add("flag.UC3500.*", "Positivo", "tabla 6-17, marca de comentario");
+        Add("flag.UC3500.?", "Coloración anormal baja", "tabla 6-17, marca de comentario");
+        Add("flag.UC3500.!", "Coloración anormal alta", "tabla 6-17, marca de comentario");
         foreach (var (key, label) in new (string, string)[] { ("QUALITATIVE", "Valor cualitativo"), ("CONCENTRATION", "Concentración informada"),
             ("REFLECTANCE1", "Reflectancia R%(1)"), ("REFLECTANCE2", "Reflectancia R%(2)"), ("COLOR", "Color informado"), ("COLOR-RANK", "Código de evaluación del color"), ("TURBIDITY", "Turbidez informada") })
             Add("resultKind." + key, label, "tabla 6-17");

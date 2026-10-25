@@ -1,5 +1,6 @@
 using Atsm.Diagnostics;
 using Atsm.Plugin.BioRad.Cfx;
+using Atsm.Plugins;
 
 namespace Atsm.Tools.Trace;
 
@@ -18,6 +19,9 @@ internal static class InspectInput
             var analysis = DiagnosticReader.Analyze(input, profile, new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), TimeZoneInfo.Utc));
             // Aggregates only: safe for checking private local corpora without printing patient fields or file names.
             Console.WriteLine($"ATSM_INPUT format={detected.Format} profile={profile.Id} recorder={input.Header.Properties?.GetValueOrDefault("recordedBy") ?? "none"} entries={analysis.Entries.Count} messages={analysis.Messages.Count} observations={analysis.Observations.Count} findings={analysis.Diagnostics.Count} findingGroups={analysis.Diagnostics.Select(d => d.Code).Distinct().Count()} unsupported={detected.UnsupportedProtocol}");
+            var knowledge = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
+            var quality = QualitySeriesBuilder.Build(analysis.Observations, knowledge as IInstrumentValueKnowledge);
+            Console.WriteLine($"ATSM_QUALITY groups={quality.Count} records={quality.Sum(s => s.MeasurementCount)} flagged={quality.Sum(s => s.Flagged)} missingMaterial={quality.Count(s => string.IsNullOrWhiteSpace(s.Material))} observationAlerts={analysis.Observations.Count(o => ProtocolExplainer.RequiresAttention(o, knowledge as IInstrumentFlagKnowledge))}");
             foreach (var group in analysis.Diagnostics.GroupBy(d => d.Code).OrderBy(g => g.Key, StringComparer.Ordinal))
                 Console.WriteLine($"ATSM_FINDING code={group.Key} count={group.Count()}");
             if (profile.TracePlugin is not null)

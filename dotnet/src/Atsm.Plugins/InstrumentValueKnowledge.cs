@@ -15,6 +15,22 @@ public sealed record InstrumentValueMeaning(ProtocolText Kind, string Scale, boo
 public interface IInstrumentValueKnowledge
 {
     InstrumentValueMeaning? DescribeValue(InstrumentObservation observation);
+    /// <summary>Unit presentation is separate from the value's type. Never infers a configurable unit from its magnitude.</summary>
+    ProtocolText? DescribeUnit(InstrumentObservation observation) => null;
+}
+
+public static class InstrumentUnits
+{
+    /// <summary>Collapse only empty/duplicated components; preserve genuine expressions such as 10^3/uL.</summary>
+    public static string? Symbol(ObservationValue value)
+    {
+        if (value.Unit?.Display is { Length: > 0 } display) return display;
+        if (value.Unit?.Code is { Length: > 0 } code) return code;
+        var raw = value.RawUnit?.Trim();
+        if (string.IsNullOrEmpty(raw)) return null;
+        var parts = raw.Split('^').Select(p => p.Trim()).Where(p => p.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
+        return parts.Length switch { 0 => null, 1 => parts[0], _ => raw };
+    }
 }
 
 public readonly record struct InstrumentNumericValue(decimal? Numeric, string? Comparator)

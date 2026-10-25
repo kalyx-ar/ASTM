@@ -31,6 +31,7 @@ public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTrace
         InstrumentRef instrument, Guid traceId, TimeZoneInfo timeZone) => serial.Interpret(profile, entries, instrument, traceId, timeZone);
     public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code) => knowledge.Lookup(context, code);
     public InstrumentValueMeaning? DescribeValue(InstrumentObservation observation) => UrinalysisValueKnowledge.Describe(observation, DiagnosticVocabulary);
+    public ProtocolText? DescribeUnit(InstrumentObservation observation) => UrinalysisValueKnowledge.Unit(observation, DiagnosticVocabulary);
     public ProtocolExplanation? ExplainFinding(AtsmDiagnostic finding)
     {
         if (DiagnosticVocabulary.TryGetValue("finding." + finding.Code, out var text)) return new(text, []);
@@ -42,7 +43,9 @@ public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTrace
         var samples = message.OfType('Q').SelectMany(q => q.Repeats(3)).Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
         return samples.Length == 0 ? null : new(DiagnosticVocabulary["message.QuerySamples"], [string.Join(", ", samples)]);
     }
-    public InstrumentFlagMeaning? DescribeFlag(InstrumentObservation observation, CodedValue flag) => UrinalysisFlags.Describe(observation, flag, DiagnosticVocabulary);
+    public InstrumentFlagMeaning? DescribeFlag(InstrumentObservation observation, CodedValue flag) => UrinalysisFlags.Describe(observation, flag, DiagnosticVocabulary, knowledge);
+    public ProtocolText? DescribeState(InstrumentObservation observation) => observation.Test.Vendor.System == CodeSystems.Vendor(Uc3500Interpreter.PluginId)
+        && observation.VendorIdentity["analysis.state"] == "0" ? DiagnosticVocabulary["state.UC3500.Analysed"] : null;
     // R315168 rev.22, §5.3.3.1 and appendices B/K: sender identity on the U-WAM link.
     // This does not claim that every analyzer's direct serial protocol is LIS02.
     public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().ToUpperInvariant()

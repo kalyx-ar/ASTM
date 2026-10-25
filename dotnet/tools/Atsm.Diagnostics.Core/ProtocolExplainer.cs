@@ -89,23 +89,33 @@ public static class ProtocolExplainer
     }
     public static string ResultKind(InstrumentObservation observation, DiagnosticProfile profile)
     {
-        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin;
+        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
         if (plugin is IInstrumentValueKnowledge knowledge && knowledge.DescribeValue(observation) is { } valueMeaning)
             return DiagnosticText.Plugin(plugin, valueMeaning.Kind);
         var raw = observation.ResultKind ?? "";
-        if (raw.Length == 0) return "";
+        if (raw.Length == 0) return DataKind(observation);
         if (profile.TracePlugin is { } trace && trace.DiagnosticVocabulary.TryGetValue("resultKind." + raw, out var traceKind)) return DiagnosticText.Plugin(trace, traceKind);
         if ((profile.AstmPlugin as IInstrumentDiagnosticVocabulary)?.DiagnosticVocabulary is { } vocabulary)
         {
             if (vocabulary.TryGetValue("resultKind." + raw, out var kind)) return DiagnosticText.Plugin(profile.AstmPlugin!, kind);
-            if (raw.Contains('/', StringComparison.Ordinal) && vocabulary.TryGetValue("resultFormat." + raw.Split('/')[^1], out var format))
+            if (raw.Contains('/', StringComparison.Ordinal) && raw.Split('/')[^1] is not ("RAW" or "MAINFORMAT") && vocabulary.TryGetValue("resultFormat." + raw.Split('/')[^1], out var format))
                 return DiagnosticText.Plugin(profile.AstmPlugin!, format);
         }
-        return DiagnosticText.Format("Raw.Kind", raw);
+        return DataKind(observation);
+    }
+    private static string DataKind(InstrumentObservation observation) => DiagnosticText.Text(observation.Value.Coded is not null ? "Value.Coded" : observation.Value.Numeric is not null
+        ? string.IsNullOrEmpty(observation.Value.Comparator) ? "Value.Numeric" : "Value.Bounded" : string.IsNullOrWhiteSpace(observation.Value.RawText)
+            ? observation.Quality?.Statistics.Count > 0 ? "Value.Statistics" : "Value.Empty" : "Value.Text");
+    public static string Unit(InstrumentObservation observation, DiagnosticProfile profile)
+    {
+        if (InstrumentUnits.Symbol(observation.Value) is { } symbol) return symbol;
+        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
+        if (plugin is IInstrumentValueKnowledge knowledge && knowledge.DescribeUnit(observation) is { } unit) return DiagnosticText.Plugin(plugin, unit);
+        return DiagnosticText.Text(observation.Value.Numeric is null || observation.Value.Coded is not null ? "Unit.None" : "Unit.NotReported");
     }
     public static string ResultValue(InstrumentObservation observation, DiagnosticProfile profile)
     {
-        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin;
+        var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
         var meaning = (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation);
         return meaning?.DisplayValue is { } display ? display == meaning.Kind.Fallback ? DiagnosticText.Plugin(plugin!, meaning.Kind) : display : observation.Value.RawText;
     }
@@ -116,10 +126,13 @@ public static class ProtocolExplainer
             ? observation.Flags.Where(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false) : observation.Flags;
         var flags = meaningfulFlags.Select(f => knowledge?.DescribeFlag(observation, f) is { } meaning
             ? DiagnosticText.Plugin(((object?)profile!.TracePlugin ?? profile.AstmPlugin)!, meaning.Text) : DiagnosticText.Format("Flag.Unknown", f.Code)).Distinct(StringComparer.Ordinal).ToList();
-        if (observation.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed) return DiagnosticText.Text("State.NotPerformed");
+        if (observation.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed)
+            return DiagnosticText.Text("State.NotPerformed") + (observation.Flags.Any(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false) && flags.Count > 0
+                ? " · " + string.Join(" · ", flags) : "");
         // Final/Unknown add no information to a documented analyzer flag such as N = Normal.
-        if (flags.Count > 0 && observation.InstrumentStatusMeaning is InstrumentStatusMeaning.Final or InstrumentStatusMeaning.Unknown) return string.Join(" · ", flags);
-        var state = DiagnosticText.Text("State." + observation.InstrumentStatusMeaning);
+        if (flags.Count > 0 && observation.InstrumentStatusMeaning is InstrumentStatusMeaning.Final or InstrumentStatusMeaning.Unknown or InstrumentStatusMeaning.Warning) return string.Join(" · ", flags);
+        var state = knowledge?.DescribeState(observation) is { } stateMeaning
+            ? DiagnosticText.Plugin(((object?)profile!.TracePlugin ?? profile.AstmPlugin)!, stateMeaning) : DiagnosticText.Text("State." + observation.InstrumentStatusMeaning);
         return flags.Count == 0 ? state : state + " · " + string.Join(" · ", flags);
     }
 }

@@ -5,8 +5,14 @@ namespace Atsm.Plugin.Sysmex.Urinalysis;
 
 internal static class UrinalysisFlags
 {
-    internal static InstrumentFlagMeaning? Describe(InstrumentObservation observation, CodedValue flag, IReadOnlyDictionary<string, ProtocolText> vocabulary)
+    internal static InstrumentFlagMeaning? Describe(InstrumentObservation observation, CodedValue flag, IReadOnlyDictionary<string, ProtocolText> vocabulary, IInstrumentKnowledge knowledge)
     {
+        if (observation.Test.Vendor.System == CodeSystems.Vendor(Uc3500Interpreter.PluginId) && flag.System == CodeSystems.Vendor(Uc3500Interpreter.PluginId))
+        {
+            if (vocabulary.TryGetValue("flag.UC3500." + flag.Code, out var text)) return new(text, true, flag.Code != "*");
+            var fact = knowledge.Lookup(new(Uc3500Interpreter.ProfileId, "RESULT", "error"), flag.Code);
+            return fact is null ? null : new(fact.Text, fact.Severity != Atsm.Abstractions.Diagnostics.AtsmSeverity.Information, true);
+        }
         if (observation.Test.Vendor.System != CodeSystems.Vendor(UwamInterpreter.PluginId)) return null;
         var code = flag.Code.Trim(); var system = CodeSystems.Vendor(UwamInterpreter.PluginId);
         if (flag.System == system + ":lh-flag")

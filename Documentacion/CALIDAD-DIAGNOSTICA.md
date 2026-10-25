@@ -4,7 +4,7 @@ Decisión humana de EDC#205 (2026-10-25): priorizar **mediana y desviación est�
 
 La vista resume por material, lote/nivel, prueba, representación y unidad. También separa instrumento/serial, método, módulo, reactivos y referencia de calibración, para no mezclar series diferentes. El identificador recibido se muestra literalmente; si falta lote, se indica, sin inferirlo del nombre.
 
-Columnas: material/lote, prueba, tipo/unidad, mínimo, mediana/resultado, máximo, DE, mediciones, Sin medir y señales. Desplegar muestra cada observación original; la columna mediana/resultado contiene entonces su valor recibido. El detalle conserva estado, flags, fecha, identificación y estadísticas informadas por el equipo.
+Columnas: material/lote, prueba, Tipo, Unidad, mínimo, mediana/resultado, máximo, DE, Mediciones, Sin medir y Estado. Tipo y Unidad son datos independientes, compartidos con Observaciones. Desplegar muestra cada observación original con su estado; la columna mediana/resultado contiene entonces su valor recibido. Fecha/secuencia, flags, identificación y estadísticas reportadas permanecen en detalle.
 
 ## Indicadores
 
@@ -12,10 +12,10 @@ Columnas: material/lote, prueba, tipo/unidad, mínimo, mediana/resultado, máxim
 - DE: desviación estándar muestral con denominador n−1; Welford en double. No disponible con menos de dos mediciones numéricas.
 - Mediciones: total de registros comunicados de la serie, incluidos cualitativos, duplicados, vacíos y no realizados. Cada registro permanece en una subfila; el contador no depende de que el valor sea numérico.
 - Resultado compacto: mediana numérica, categoría ordinal central o categoría cualitativa más frecuente (p. ej., normal). Si hay empate cualitativo se indica Mixto. Las frecuencias completas quedan en detalle y los valores originales en subfilas; no se enumeran todos en la celda principal.
-- Sin medir: columna con el total de registros comunicados cuyo estado es NotPerformed, incluso retransmitidos. No se repite en Mediana/resultado ni en Señales. Si todos están sin medir, el resultado queda vacío (—) y el conteo comunica la situación. Se distingue un valor vacío recibido de un análisis no realizado.
+- Sin medir: columna con el total de registros comunicados cuyo estado es NotPerformed, incluso retransmitidos. No se repite en Mediana/resultado. Estado conserva ese dato y su error asociado cuando existe. Si todos están sin medir, el resultado queda vacío (—) y el conteo comunica la situación. Se distingue un valor vacío recibido de un análisis no realizado.
 - Subconjunto numérico para las estadísticas: identidades de observación numéricas únicas. Comparadores/censurados, cualitativos y no realizados no entran en mediana/DE. Los duplicados cuentan como registros comunicados, pero no se convierten en réplicas numéricas nuevas. El detalle indica ambos conteos.
 - Posibles atípicos: con al menos cuatro valores, se marcan los que están fuera de Q1−1,5·RIC y Q3+1,5·RIC. Cuartiles R7; los puntos siguen dentro del resumen y conservan sus alarmas. No es una regla de aceptación QC.
-- Señales: posibles atípicos, alarmas/estados de advertencia del instrumento, escalas de orden no definido, duplicados y existencia de estadísticas del equipo en detalle.
+- Estado: Normal, Baja fiabilidad, Error de análisis u otro significado documentado. Un grupo homogéneo muestra sólo ese estado; si mezcla estados conserva sus frecuencias, con las alertas primero. Las subfilas muestran el estado del registro. Ya no se muestra Una medición ni un listado de avisos técnicos en esta columna; atípicos, duplicados, escalas sin orden y estadísticas reportadas permanecen en detalle/resaltado.
 - Detalle del resumen: media, último registro y método de cálculo. La media no ocupa una columna principal. La mediana numérica y DE muestran seis cifras significativas; extremos ordinales/límites mantienen su representación. El detalle conserva mayor precisión y las subfilas el texto original.
 
 El resumen describe los datos de la captura seleccionada; no acredita un histórico completo. No se aplican límites de aceptación, objetivos ni reglas Westgard sin los datos y contexto correspondientes. Las estadísticas que el equipo ya envía en Quality.Statistics permanecen como metadatos de sus registros: no se convierten en réplicas adicionales.
@@ -60,3 +60,17 @@ Sin medir sigue dependiendo del estado de análisis explícito. Un campo vacío 
 El contador y el resaltado usan IInstrumentFlagKnowledge del plugin. N en U-WAM se interpreta como Normal y no es una alarma. Los indicadores LH conservan su propio contexto, incluso con el componente del analizador vacío; H no se convierte por ello en un error del analizador. Se mantienen los indicadores originales en el caso y el detalle.
 
 IF es una imagen: tipo y resultado compactos «Imagen» en resumen y subfilas, con referencia/contenido original en detalle y modo técnico. IsStructuredContent impide calcular estadísticas numéricas de sus identificadores. No se abre ningún recurso externo ni se lo convierte en una medición. Los parámetros RP se identifican como parámetros de sensibilidad; no se inventan límites u objetivos.
+
+## Tipo y Unidad independientes (2026-10-25)
+
+La representación usa ResultKind/DescribeValue para Tipo y ObservationValue.RawUnit/Unit/DescribeUnit para Unidad. DescribeUnit es un puerto opcional independiente: no se concatena la unidad al tipo. Los códigos técnicos desconocidos se conservan en el original, mientras la vista interpretada usa Numérico, Semicuantitativo, Texto, Cualitativo o Estadísticas según la representación disponible; no muestra Tipo informado por el equipo seguido de valores mezclados. El comportamiento compartido se verifica contra todos los perfiles del catálogo.
+
+En el corpus UF-5000, los 33 registros QC tienen R.4 compuesto y R.5 con unidades repetidas o componentes vacíos. R.4.2 no se considera formato salvo los códigos documentados RAW/MAINFORMAT/RAW_Q/RAW_C/RAW_R1/RAW_R2; los componentes originales se conservan sin atribuirles estadísticas no confirmadas. La identificación QC situada en O.4.3 cuando O.3 está vacío se conserva literalmente, sin inferir lote. Estos dos ajustes corrigen el tipo dependiente del valor y el material vacío; evidencia derivada de la traza, no homologación del protocolo directo.
+
+La unidad ch^ se presenta como ch y /uL^/uL como /uL, conservando el campo original. No se elimina un exponente legítimo como 10^3/uL. Sólo se colapsan componentes vacíos o duplicados, sin conversiones ni equivalencias físicas inventadas.
+
+Un resultado Coded conserva su carácter cualitativo aunque su código sea un dígito y exista un Numeric derivado. Ese código no participa en mediana, DE ni extremos numéricos; permanece en los originales y frecuencias. La regla compartida evita interpretar categorías codificadas de otros plugins como cantidades.
+
+UC-3500: el manual v0.0.5 tabla 6-17 define reflectancias R%(1)/R%(2) en %, y pH/densidad relativa son adimensionales; los cualitativos/color no tienen unidad física. El registro no transmite un campo de unidad de concentración, por lo que se muestra No informada; no se deduce mg/dL, mmol/L u otra unidad por magnitud, nombre de archivo o valores típicos. Una unidad presente en el mensaje tiene prioridad sobre la presentación del plugin. 00CC se interpreta como Error de solicitud (00CC), sin Advertencia ni Código sin interpretar; estado 0 sin flags se presenta como Analizado, sin equipararlo a validación clínica.
+
+En UF-5000 local los 33 registros de control llevan N. Los indicadores W (1), > (1) y A (26) pertenecen a otras observaciones de la captura; no se trasladan artificialmente a un grupo QC. Las mediciones recibidas con alertas conservan sus valores y participan en las estadísticas descriptivas salvo NotPerformed; no se filtran silenciosamente ni se aceptan clínicamente.

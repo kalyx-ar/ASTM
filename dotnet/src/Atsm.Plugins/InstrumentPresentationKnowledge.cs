@@ -13,4 +13,5 @@ public sealed record InstrumentFlagMeaning(ProtocolText Text, bool RequiresAtten
 public interface IInstrumentFlagKnowledge
 {
     InstrumentFlagMeaning? DescribeFlag(InstrumentObservation observation, CodedValue flag);
+    ProtocolText? DescribeState(InstrumentObservation observation) => null;
 }

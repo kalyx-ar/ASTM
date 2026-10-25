@@ -18,6 +18,7 @@ internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
         void Add(string key, string text, string evidence) => result[key] = new(key, text, evidence);
         Add("message.QuerySamples", "Consulta {0} por número de muestra", "R315168 rev.22 §5.3.3.5, Q.3");
         Add("value.Image", "Imagen", "R315168 rev.22 §5.3.3.4, R.3 result type IF / appendix E");
+        Add("unit.NonMeasurement", "—", "R315168 rev.22 §5.3.3.4, IF/RC: imagen o comentario, sin magnitud física");
         foreach (var (key, label) in new (string, string)[] { ("S", "Resultado"), ("RC", "Comentario de revisión"), ("RP", "Parámetro de sensibilidad") })
             Add("resultKind." + key, label, "R315168 rev.22 §5.3.3.4, R.3.7");
         Add("method.A", "Equipo", "R315168 rev.22 §5.3.3.4, R.3.5");
