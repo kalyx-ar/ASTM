@@ -24,6 +24,8 @@ ctest --test-dir native/build/win-x64 -C Release
 
 Al cerrar la revisión de Calidad: 290 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado; el self-test incluye once columnas de Calidad, Tipo/Unidad separados y Estado real, además de lote ausente «-», N = Normal, IF = Imagen, consulta sin H/L y transición desde binario no compatible. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
+Última salida verificada: GUI y CLI 0.1.0+ba8b2f405480c05fa1671005029b791df4c97756; self-tests, auditoría de referencias y corpus agregado correctos. Lang real: 1 prueba correcta (170 ms). [Informe de Calidad en #205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405151002). El perfil se detecta por contenido, nunca por nombre de archivo; P-15 sigue pendiente para el contenido binario UF-5000Control.
+
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
 Verificación local con trazas reales (no se publican; imprimir sólo agregados):

@@ -1,0 +1,109 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 20:55 America/Buenos_Aires
+Tipo: fix / docs
+Commits de implementación:
+- 594c9f5d54c4263423296ab858de50e1cc7341b6
+- ba8b2f405480c05fa1671005029b791df4c97756
+Commit del registro: el commit docs que incorpora este archivo.
+Registro previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6404679813
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405151002
+
+Alcance humano
+- Sustituir textos técnicos poco útiles de Calidad por el estado real de la
+  medición; conservar Normal, baja fiabilidad y errores en resumen/subfilas.
+- Separar Tipo y Unidad reutilizando los campos ya presentes en Observaciones;
+  corregir los puertos y la interpretación de los plugins, no sólo la etiqueta.
+- Corregir tipos mezclados con valores (/73.5, /208.6) y unidades repetidas.
+- Interpretar UC-3500 00CC en lugar de Advertencia / Código sin interpretar.
+- Investigar UF-5000Control dentro de la misma familia, sin decidir por nombre.
+
+Cambios
+- Puerto opcional IInstrumentValueKnowledge.DescribeUnit independiente de
+  DescribeValue y ResultKind; InstrumentUnits conserva unidad codificada y
+  normaliza sólo componentes repetidos/vacíos, sin convertir magnitudes.
+- Puerto opcional IInstrumentFlagKnowledge.DescribeState para estados propios.
+- Tipo genérico legible para todos los perfiles; formatos RAW/MAINFORMAT no
+  sustituyen la naturaleza del dato. Se elimina Tipo informado por el equipo.
+- Calidad tiene once columnas de datos: Material/lote, Prueba, Tipo, Unidad,
+  Mínimo, Mediana/resultado, Máximo, DE, Mediciones, Sin medir y Estado.
+  Se retira Una medición. Estados homogéneos sin conteo redundante; mixtos
+  con frecuencias y alertas primero, estado original por subfila.
+- Valores codificados con un dígito no participan como mediciones numéricas
+  en mediana, DE ni extremos. Los valores con alertas se conservan y no se
+  filtran silenciosamente; NotPerformed sigue fuera de la estadística numérica.
+- UF-5000: R.4.2 sólo es formato si está documentado; componentes originales
+  conservados. Material QC en O.4.3 si O.3 vacío, derivado de la traza.
+  R.3.5 sólo se interpreta como método A/M, sin convertir RBC/etc en método.
+  Campos crudos R.3/R.4/R.5 preservados en VendorIdentity.
+- UC-3500: 00CC -> Error de solicitud (00CC); estado 0 sin flags -> Analizado.
+  Reflectancia %, pH/densidad adimensionales; cualitativos sin unidad física.
+  Concentración sin campo de unidad: No informada, sin deducir mg/dL/mmol/L.
+- Traducciones en el seed de su ensamblado con Lang; datos originales intactos.
+- CLI inspect-input añade sólo agregados QC, material vacío y observaciones
+  con alertas; no imprime identificadores de material/paciente ni valores.
+
+Fuentes y límites
+- U-WAM R315168 rev.22 y manual UC-3500 v0.0.5, tablas 6-17/6-18 y sección 7.
+- Correcciones del formato directo UF-5000 derivadas del corpus local; no son
+  homologación física ni atribuyen significado estadístico a campos desconocidos.
+- Todos los 33 registros QC UF-5000 del corpus llevan N (Normal). W (1), > (1)
+  y A (26) pertenecen a otras observaciones; no se trasladan a los grupos QC.
+- UF-5000Control: 34.058 entradas binarias, sin mensajes/observaciones inventados.
+  El perfil usa bytes, nunca el nombre. Retirar NUL/interpretar UTF-16 no recupera
+  cabeceras ASTM/HL7. No se ha identificado encuadre/codificación ni un título
+  concreto de especificación faltante. La hipótesis de tráfico de control no
+  acredita su contenido ni ausencia de datos sensibles; P-15 sigue pendiente.
+
+Verificación
+- 290/290 pruebas .NET, 0 omitidas; suites completas repetidas antes de commits,
+  incluyendo dos corridas tras el ajuste final de método (~1 s de pruebas).
+  Diecinueve casos nuevos: estados simples/mixtos y originales, formato/material
+  UF-5000 QC, unidades repetidas/vacías/exponentes, los 13 perfiles, unidades UC,
+  00CC y valores codificados excluidos del subconjunto numérico.
+- 542 comprobaciones nativas correctas, repetidas (~0,25-0,31 s).
+- Lang real en artifacts/lang-quality (salida aislada): 1 prueba correcta en
+  170 ms, con unidad no transmitida y 00CC además del conocimiento anterior.
+- GUI MAUI final: PASS/salida 0 en 6,79 s. Self-test incluye once columnas,
+  Tipo/Unidad, estado Baja fiabilidad en grupo/subfila, atención y render de
+  Calidad/Observaciones, además de ventana/runtime privado/DPAPI/siete vistas.
+- CLI NativeAOT: ATSM_NATIVE_SELFTEST_OK. Auditoría GUI:
+  ATSM_PUBLICATION_DEPENDENCIES_OK.
+- Corpus privado verificado desde el ejecutable final, sólo agregados:
+  UF-5000: 7.089 entradas / 425 mensajes / 5.006 observaciones;
+    Calidad 33 grupos / 33 registros / 0 material vacío / 0 alertas QC;
+    28 observaciones con alertas en el resto de la captura.
+  UC-3500: 2.006 / 501 / 2.251;
+    Calidad 26 grupos / 78 registros / 0 material vacío;
+    111 resultados 00CC interpretados y 501 BCC correctos.
+  AMS: 20.929 / 118 / 9.572;
+    Calidad 81 grupos / 129 registros / 0 material vacío;
+    220 códigos 9902 con correspondencia UC-3500/00CC.
+  UF-5000Control: 34.058 entradas / 0 mensajes / 0 observaciones;
+    aviso de protocolo sin intérprete documentado conservado.
+- GUI y CLI ProductVersion 0.1.0+ba8b2f405480c05fa1671005029b791df4c97756.
+- 19 DLL propias con token 066190A23251F202. Cinco advertencias CS8002 MAUI
+  oficiales sin Strong Name conocidas y visibles; Authenticode propio NotSigned,
+  pendiente del release. Sin nuevas dependencias ni cambios de confianza.
+- La primera copia GUI falló por DLL bloqueadas por la instancia abierta.
+  Se verificó la ruta del proceso y cerró normalmente con CloseMainWindow;
+  sin force-kill. Recompilación y publicación final correctas, sin procesos
+  ejecutando la salida durante la copia final.
+
+Archivos principales
+- SDK: InstrumentValueKnowledge, InstrumentPresentationKnowledge.
+- Plugin Sysmex.Urinalysis: UwamInterpreter, Uc3500Vocabulary,
+  UrinalysisValueKnowledge, UrinalysisFlags, SysmexUrinalysisPlugin,
+  UwamVocabulary.
+- Diagnostics.Core: ProtocolExplainer, QualityStatus, QualitySeries,
+  QualityReportedRange, DiagnosticText; MAUI: MainPage, Lang.
+- CLI: InspectInput; pruebas: QualityPresentationTests,
+  ProtocolRecognitionTests y LangIntegrationTests.
+- Documentacion/{ESTADO,CONTINUACION,CALIDAD-DIAGNOSTICA}.md.
+
+Entrega y estado
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- #205 abierto/In Progress por el alcance restante. Informe publicado según
+  autorización previa del usuario e instrucciones de trazabilidad.
+- Sin ZIP, wrappers, cambios de Identidades, push ni PR. Sin manuales ni
+  trazas privadas publicados. No se modificó el checkout padre de EDC.
