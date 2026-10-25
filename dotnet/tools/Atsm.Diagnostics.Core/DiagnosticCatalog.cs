@@ -2,7 +2,7 @@ using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugin.Abbott.CellDynRuby;
 using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Plugin.Diagast.Qwalys;
-using Atsm.Plugin.Glyms.Testing;
+using Atsm.Plugin.Legacy.Testing;
 using Atsm.Plugin.Sysmex.Cs2500;
 using Atsm.Plugin.Sysmex.Uwam;
 using Atsm.Plugin.Sysmex.XnL;
@@ -69,7 +69,7 @@ public sealed class DiagnosticCatalog
         profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP", "Manual + pruebas sintéticas; ZOS, no actor LAW completo") { IsHl7 = true });
         if (profiles.Select(p => p.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != profiles.Count) throw new InvalidOperationException("Duplicate profile ID.");
         Profiles = profiles;
-        LogAdapters = AstmPlugins.OfType<ITraceLogAdapterProvider>().Append(new GlymsTestingPlugin()).SelectMany(p => p.LogAdapters).ToArray();
+        LogAdapters = AstmPlugins.OfType<ITraceLogAdapterProvider>().Append(new LegacyTestingPlugin()).SelectMany(p => p.LogAdapters).ToArray();
     }
     public DiagnosticProfile Resolve(string id) => Profiles.Single(p => p.Id == id);
 }

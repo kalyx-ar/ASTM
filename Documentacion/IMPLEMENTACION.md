@@ -57,9 +57,9 @@ Usar el mismo corpus, configuración serial, hardware, tamaño de buffers y cifr
 
 Los límites de aceptación proceden del instrumento y de su perfil validado, no de un número universal ni del lenguaje. Conservar versión del binario, compilador, bibliotecas TLS, firmware, adaptador y condiciones de carga junto con el informe.
 
-## Migración desde Glyms
+## Migración desde el sistema legacy
 
-1. Leer [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md) y verificar la procedencia del binario/código utilizado.
+1. Leer [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md) y verificar la procedencia del binario/código utilizado.
 2. Seleccionar un proceso de un instrumento y reunir mensajes de referencia y su configuración efectiva.
 3. Separar mecanismo de protocolo, particularidades del fabricante y reglas de negocio que hoy están mezclados.
 4. Registrar el comportamiento legacy, su evidencia, la decisión de conservar/corregir/retirar y el destino en EDC.
@@ -69,7 +69,7 @@ Los límites de aceptación proceden del instrumento y de su perfil validado, no
 
 Los plugins originales generan también tramas y checksums. Esa lógica debe ubicarse conscientemente entre motor y dialecto. El contrato legacy `IPlugin` contiene UI, strings y arrays por referencia; se conserva como evidencia y se transforma a contratos adecuados para el nuevo host.
 
-El plugin Architect tiene una diferencia previa de hash en su archivo decompilado. La validación de esa pieza debe volver al ensamblado original o a una decompilación aislada, conservando las modificaciones existentes. GlymsInter mantiene ofuscación residual y no basta para afirmar que se reconstruyeron todos sus caminos.
+El plugin Architect tiene una diferencia previa de hash en su archivo decompilado. La validación de esa pieza debe volver al ensamblado original o a una decompilación aislada, conservando las modificaciones existentes. El host de interfaces legacy mantiene ofuscación residual y no basta para afirmar que se reconstruyeron todos sus caminos.
 
 ## Registro por regla o particularidad
 

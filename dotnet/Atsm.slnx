@@ -6,7 +6,7 @@
     <Project Path="plugins/Atsm.Plugin.Diagast.Qwalys/Atsm.Plugin.Diagast.Qwalys.csproj" />
     <Project Path="plugins/Atsm.Plugin.Abbott.Architect/Atsm.Plugin.Abbott.Architect.csproj" />
     <Project Path="plugins/Atsm.Plugin.Abbott.CellDynRuby/Atsm.Plugin.Abbott.CellDynRuby.csproj" />
-    <Project Path="plugins/Atsm.Plugin.Glyms.Testing/Atsm.Plugin.Glyms.Testing.csproj" />
+    <Project Path="plugins/Atsm.Plugin.Legacy.Testing/Atsm.Plugin.Legacy.Testing.csproj" />
     <Project Path="plugins/Atsm.Plugin.Sysmex.Uwam/Atsm.Plugin.Sysmex.Uwam.csproj" />
   </Folder>
   <Folder Name="/src/">

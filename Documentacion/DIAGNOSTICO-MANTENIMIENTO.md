@@ -16,7 +16,7 @@ El ejecutable es `dotnet/tools/Atsm.Diagnostics.Windows/bin/Release/net10.0-wind
 
 Uso:
 
-1. Elegir el perfil del instrumento y el tipo de entrada; abrir una exportación, mensaje completo, bytes de cable, log Sysmex/Glyms o traza ATSM. `Ejemplo CFX` permite probar con datos sintéticos (`--demo` también).
+1. Elegir el perfil del instrumento y el tipo de entrada; abrir una exportación, mensaje completo, bytes de cable, log Sysmex/legacy o traza ATSM. `Ejemplo CFX` permite probar con datos sintéticos (`--demo` también).
 2. Inspeccionar trama, mensajes, observaciones, hallazgos y eventos. Seleccionar una fila muestra su detalle. El catálogo indica evidencia y alcance; un perfil genérico no acredita compatibilidad de todos los equipos ASTM.
 3. Guardar un caso `.atsmcase` si se necesita conservar la captura. Los originales permanecen intactos; abrir un archivo no activa una interfaz ni publica resultados.
 4. Para captura en vivo, seleccionar TCP cliente/servidor o SerialTunnel, endpoint, identidad y TLS según la configuración real. El servidor escucha en una IP local literal. Un servidor TLS exige PFX; mTLS cliente puede utilizar PFX, con clave efímera y contraseña sólo en memoria. La validación TLS usa la plataforma, sin bypass ni degradación automática.
@@ -51,7 +51,7 @@ Entrada/captura: máximo 32 MiB y 100.000 entradas; CFX: 16 MiB de contenido/XML
 | DIAGAST QWALYS 3 | Recepción ASTM ASCII; muestra O.4, reacción R.4.7, identidad R.3, comentarios C.3 | Connection Manual local. Estados R/M se preservan como automatizado/modificado; R.5 es soporte, no unidad de medida. Sin órdenes, interpretación clínica de grupos ni manejo de archivos. Fecha de modificación preservada cruda. |
 | Abbott ARCHITECT | ASI ASTM y HL7/MLLP original ZOS | ASTM con manual/trazas; HL7 con manual y pruebas sintéticas. LAW completo pendiente. |
 | Abbott CELL-DYN Ruby | ASTM derivado de trazas | Hipótesis de encuadre/respuesta pendientes de manual. |
-| Estándar LIS02 y adaptadores de logs | Perfil genérico, Sysmex port monitor y Glyms sólo como fuente de pruebas/diagnóstico | No prueban compatibilidad de otro modelo por sí solos. |
+| Estándar LIS02 y adaptadores de logs | Perfil genérico, Sysmex port monitor y el legacy sólo como fuente de pruebas/diagnóstico | No prueban compatibilidad de otro modelo por sí solos. |
 
 CFX soporta **exportaciones de Maestro**, sin recalcular Cq ni asignar positividad. El manual de [Bio-Rad CFX Maestro 2.3](https://www.bio-rad.com/sites/default/files/webroot/web/pdf/lsr/literature/10000126764.pdf) enumera CFX96/384 Touch, Connect, Opus 96/384/Deepwell y Duet; compartir exportación no acredita control directo ni homologación de cada hardware. `.pcrd`, otros formatos propietarios, versiones RDML distintas y software Dx específico quedan fuera. Cq no disponible, valores originales, exclusiones y falta de identificador de muestra permanecen visibles; un pozo no se transforma en muestra clínica por inferencia.
 

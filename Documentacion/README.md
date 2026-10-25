@@ -38,7 +38,7 @@ flowchart LR
 | [ARQUITECTURA](ARQUITECTURA.md) | Responsabilidades, despliegues, plataformas, TLS, latencia |
 | [CONTRATOS](CONTRATOS.md) | Identidades, arbitraje, generaciones, transferencia de control, estados |
 | [TRAZAS-Y-RECUPERACION](TRAZAS-Y-RECUPERACION.md) | Niveles de traza, checkpoints, herramientas y recuperación por operación |
-| [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde Glyms |
+| [IMPLEMENTACION](IMPLEMENTACION.md) | Etapas, matriz de aceptación, migración desde el sistema legacy |
 | [ESTADO](ESTADO.md) | Qué está implementado, qué se verificó y qué falta |
 | [CONTINUACION](CONTINUACION.md) | Pendientes con alcance y criterios de aceptación, para retomar el trabajo |
 | [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) | GUI Windows, casos protegidos, catálogo real por modelo y prioridad Argentina |
@@ -46,7 +46,7 @@ flowchart LR
 | [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |
-| [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md) · [referencias-glyms.json](referencias-glyms.json) | Ensamblados legacy en producción, código decompilado y hashes (material local) |
+| [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md) · manifiesto local | Ensamblados legacy en producción, código decompilado y hashes (material local) |
 | [CONTEXTO-PARA-EDC](CONTEXTO-PARA-EDC.md) | Texto para transferir a la sesión que implemente en EDC |
 | [ejemplos/](ejemplos/README.md) | Configuración sintética de agente e instrumento |
 
@@ -66,7 +66,7 @@ flowchart LR
 - **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
 - **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
 - **Host query sincrónico con plazo** y **resultados durables idempotentes**: dos caminos distintos hacia el anfitrión.
-- Mensajes completos del anfitrión (P-01 resuelto, sin gestión de archivos en ATSM) y canal `Replay`; **importadores** de logs de Glyms y Sysmex al formato de traza ATSM.
+- Mensajes completos del anfitrión (P-01 resuelto, sin gestión de archivos en ATSM) y canal `Replay`; **importadores** de logs del sistema legacy y Sysmex al formato de traza ATSM.
 - **Kit de conformidad por plugin** ejecutado con `dotnet test` sobre corpus anonimizado.
 
 ## Estructura propuesta del repositorio

@@ -5,7 +5,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugin.Abbott.CellDynRuby;
-using Atsm.Plugin.Glyms.Testing;
+using Atsm.Plugin.Legacy.Testing;
 using Atsm.Plugin.Sysmex.Uwam;
 using Atsm.Plugins;
 using Atsm.Runtime.Tracing;

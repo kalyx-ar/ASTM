@@ -1,0 +1,18 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (repositorio modificado: kalyx-ar/ATSM)
+Tipo: refactor / documentación
+
+Decisión humana (2026-10-24): ATSM y EDC no nombran el LIMS legacy; se lo llama "sistema legacy". Autorización explícita para renombrar las referencias en ATSM, incluida la corrección de changelogs existentes.
+
+Cambios:
+- Plugin de pruebas renombrado a Atsm.Plugin.Legacy.Testing (proyecto, namespace, LegacyTestingPlugin, LegacyInterfaceLogAdapter). Id del adaptador de log: legacy.interface-log. DiagnosticInputFormat.LegacyLog y etiqueta de la GUI "Log legacy · interfaz".
+- Evidencia de los plugins Architect y CELL-DYN Ruby cita "Legacy host Plugin_… (legacy reference)".
+- El documento y el JSON de referencias al legacy salen del repositorio: se conservan sin cambios en el workspace local excluido EDC/LIMS/LEGACY/Referencias-ATSM/ (renombrados a REFERENCIAS-LEGACY.md y referencias-legacy.json). Nuevo Documentacion/REFERENCIAS-LEGACY.md genérico que apunta ahí. verificacion-propuesta.json apunta a esas copias; sus hashes históricos no se recalculan.
+- Documentación (AGENTS, CONTEXTO-PARA-EDC, CONTINUACION, DATOS-DE-PRUEBA, DIAGNOSTICO-MANTENIMIENTO, ESTADO, IMPLEMENTACION, INTEGRACION-EDC, MODELO-CANONICO, PLUGINS, README) y changelog 2026-10-24_1943 con "sistema legacy". Carpeta local ignorada trazas_externas con el nombre anterior renombrada a trazas_externas/legacy.
+
+Verificación:
+- dotnet build dotnet/Atsm.slnx -c Release -p:AtsmRequireStrongName=true: 0 advertencias, 0 errores.
+- dotnet test dotnet/Atsm.slnx -c Release: 159 correctas, 0 omitidas, ~1 s; repetido tres veces. Pruebas del plugin renombrado: 2/2.
+- ctest native/build/win-x64 -C Release: correcto (sin cambios nativos).
+- git grep -i del nombre del legacy: sin coincidencias en archivos versionados. Salidas bin/obj con el nombre anterior eliminadas y recompiladas.
+
+Límites: el historial de git ya publicado conserva el nombre anterior. El ZIP local de diagnóstico publicado antes (ignorado) contiene el ensamblado con el nombre anterior; regenerarlo cambia el hash registrado en ESTADO.

@@ -57,11 +57,11 @@ Evaluación exigida por [creación de módulos](../../../Documentacion/Arquitect
 - Según `Documentacion/agente.md` §7, incorporarlos requiere aprobación humana registrada en el Issue con origen, versión, licencia, consumidores y transitivas. Mbed TLS sólo afecta al agente nativo, que EDC distribuye como binario aparte.
 - El agente C++ se distribuye por plataforma (Windows x86 para XP, Windows x64, Linux x64/ARM, firmware ESP32) con su propio versionado.
 
-## Correspondencia con Glyms
+## Correspondencia con el sistema legacy
 
-| Glyms | Destino |
+| Sistema legacy | Destino |
 |---|---|
-| `GlymsInter` (host, serial/TCP, carga de plugins) | `Atsm.Runtime` + agente |
+| Host de interfaces legacy (host, serial/TCP, carga de plugins) | `Atsm.Runtime` + agente |
 | `Plugin.dll` `IPlugin` | `IInstrumentPlugin` / `IDialect` |
 | `Plugin_Architect`, `Plugin_Celldyn_Ruby` | `Atsm.Plugin.Abbott.*` |
 | `RS232.dll` | Agente nativo / `LocalSerial` |

@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         ProfileBox.ItemsSource = _catalog.Profiles; ProfileBox.SelectedIndex = 0;
         FormatBox.ItemsSource = new[] { new InputChoice(DiagnosticInputFormat.Export, "Exportación del plugin (CSV / RDML)"),
             new(DiagnosticInputFormat.AstmMessage, "Mensaje ASTM completo (texto)"), new(DiagnosticInputFormat.Hl7Message, "Mensaje HL7 completo (texto)"),
-            new(DiagnosticInputFormat.SysmexLog, "Log Sysmex · monitor de puertos"), new(DiagnosticInputFormat.GlymsLog, "Log Glyms · interfaz"),
+            new(DiagnosticInputFormat.SysmexLog, "Log Sysmex · monitor de puertos"), new(DiagnosticInputFormat.LegacyLog, "Log legacy · interfaz"),
             new(DiagnosticInputFormat.WireBytes, "Bytes de cable (.bin)"), new(DiagnosticInputFormat.AtsmTrace, "Traza ATSM (.atsmtrace)") };
         CatalogGrid.ItemsSource = _catalog.Profiles; ControllerBox.Text = Environment.MachineName;
         _refresh.Tick += (_, _) => RefreshCapture();

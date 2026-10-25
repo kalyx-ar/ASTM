@@ -59,7 +59,7 @@ public sealed record PatientContext(string? Id, string? FamilyName, string? Give
 
 `ReagentLot`, `VendorIdentity`, `TraceRef` y los estados de operación se detallan en `spec/model-v1`. Las firmas son indicativas y se cerrarán con el primer plugin.
 
-**Datos de paciente mínimos:** el modelo sólo transporta lo que el instrumento necesita o envía. El host decide qué enviar en `PatientContext`; la decisión de Architect de forzar sexo `U` (ver [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md)) se resuelve allí, no en el plugin.
+**Datos de paciente mínimos:** el modelo sólo transporta lo que el instrumento necesita o envía. El host decide qué enviar en `PatientContext`; la decisión de Architect de forzar sexo `U` (ver [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md)) se resuelve allí, no en el plugin.
 
 ## Puertos que implementa el host
 
@@ -89,7 +89,7 @@ public interface ILabWorkflowHost
 ## Mapeo de códigos
 
 - `CodeMappingSet` es un artefacto versionado: `{instrumentModel, vendorCode, loinc?, ucum?, localCode?, validFrom, source}`.
-- Se puede importar desde archivos LIVD (JSON/CSV del fabricante) o desde las equivalencias del host (en Glyms, `lims.interface_analito`).
+- Se puede importar desde archivos LIVD (JSON/CSV del fabricante) o desde las equivalencias del host (en el sistema legacy, `lims.interface_analito`).
 - El mapeo se aplica en el runtime, después del plugin: el plugin sólo entiende el dialecto, no los catálogos del laboratorio.
 
 ## Proyección FHIR (opcional)

@@ -13,7 +13,7 @@ Estado: contratos de motor implementados; manifiestos/carga dinámica y kits for
 | Evaluar recuperación con evidencia | Acceder a la base del host |
 | Aportar corpus de conformidad | Mostrar UI |
 
-Comparado con el `IPlugin` de Glyms (strings, arrays posicionales por `ref`, caracteres de control y checksum dentro del plugin, `About()` con UI), todo lo de framing pasa al motor y la salida pasa a ser tipada.
+Comparado con el `IPlugin` del sistema legacy (strings, arrays posicionales por `ref`, caracteres de control y checksum dentro del plugin, `About()` con UI), todo lo de framing pasa al motor y la salida pasa a ser tipada.
 
 ## Dos niveles
 
@@ -91,7 +91,7 @@ conformance/
 
 Ordenado por evidencia disponible (manual + traza + plugin legacy):
 
-| Plugin | Equipos | Protocolo | Manual | Trazas | Legacy Glyms | Prioridad |
+| Plugin | Equipos | Protocolo | Manual | Trazas | Sistema legacy | Prioridad |
 |---|---|---|---|---|---|---|
 | `Abbott.Architect` | ARCHITECT i1000SR, c4000 | ASI: LIS1-A / LIS2-A2 (RS232) | 91407-108 | `I1000Interface.log`, `C4000Interface.log`, `Importar/*` | `Plugin_Architect` | **1** |
 | `Abbott.CellDynRuby` | CELL-DYN Ruby | LIS2-A | — (falta) | `Celldyn RUBYInterface.log` | `Plugin_Celldyn_Ruby` | 2 |
@@ -102,11 +102,11 @@ Ordenado por evidencia disponible (manual + traza + plugin legacy):
 | `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | Sintéticas | — | Recepción implementada, pendiente de equipo |
 | `Sysmex.Suit` | Middleware SUIT | E1381/E1394-91 + extensiones | v8.0 | — | — | Pendiente de equipo |
 | `Diagast.Qwalys` | QWALYS 3 | E1381-95 / ASTM ASCII | Connection Manual | Sintéticas | — | Recepción implementada, pendiente de equipo |
-| DeltaLab (fuera de ATSM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | GlymsInter | No es un plugin instrumental |
+| DeltaLab (fuera de ATSM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | Host de interfaces legacy | No es un plugin instrumental |
 
 Architect primero: es el único con manual, trazas abundantes y plugin productivo. Ruby segundo: confirma que el motor generaliza (terminador vacío, comparadores, `FLAG`). U-WAM tercero: aporta TCP nativo y host query real.
 
-## Migración desde Glyms, por plugin
+## Migración desde el sistema legacy, por plugin
 
 1. Convertir las trazas del equipo al formato ATSM con el adaptador de log del plugin (`atsm-trace extract`) o como contenido puro (`from-text`, `from-binary`).
 2. Ejecutar el plugin legacy (o leer su código decompilado) para obtener la salida de referencia por mensaje.
@@ -127,4 +127,4 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 | `abbott.celldyn-ruby` | Implementado desde trazas: cada mensaje en un frame, `^ALL`, alarmas `FLAG`; pendiente de confirmar con el manual |
 | `biorad.cfx` | `IInstrumentContentPlugin`: cuantificación CSV/RDML 1.0/1.1; recibe contenido, sin archivos/control directo ni clasificación clínica |
 | `sysmex.xnl`, `sysmex.cs2500`, `diagast.qwalys3` | Recepción según manual con pruebas sintéticas; sin consultas/órdenes, hardware o corpus real verificado |
-| `Atsm.Plugin.Glyms.Testing` | Sólo pruebas: adaptador `glyms.interface-log` para los logs del LIMS Glyms. Un plugin de integración con Glyms (pedidos desde su interfaz o su log) sería un trabajo aparte |
+| `Atsm.Plugin.Legacy.Testing` | Sólo pruebas: adaptador `legacy.interface-log` para los logs del LIMS legacy. Un plugin de integración con el sistema legacy (pedidos desde su interfaz o su log) sería un trabajo aparte |

@@ -38,7 +38,7 @@ dotnet run --project dotnet/tools/Atsm.Tools.Trace -- extract sysmex.port-monito
 dotnet run --project dotnet/tools/Atsm.Tools.Trace -- metrics ams.atsmtrace --profile sysmex.uwam.lis2a2.without-chemistry
 ```
 
-Los mismos pasos sirven con `glyms.interface-log` (logs `Documentacion/trazas_externas/glyms/Logs/*.log`) y los perfiles `abbott.architect.asi-rs232` o `abbott.celldyn-ruby.lis2a`. `theoretical` y `compare` construyen la traza teórica y la comparan con la real. Las cifras de referencia están en ESTADO § Verificación.
+Los mismos pasos sirven con `legacy.interface-log` (logs `Documentacion/trazas_externas/legacy/Logs/*.log`) y los perfiles `abbott.architect.asi-rs232` o `abbott.celldyn-ruby.lis2a`. `theoretical` y `compare` construyen la traza teórica y la comparan con la real. Las cifras de referencia están en ESTADO § Verificación.
 
 ## Mapa rápido
 
@@ -51,12 +51,12 @@ Los mismos pasos sirven con `glyms.interface-log` (logs `Documentacion/trazas_ex
 | Sesión ASTM | `dotnet/src/Atsm.Runtime/Sessions/AstmInstrumentSession.cs` |
 | Canales (Stream, TCP, Replay, SerialTunnel) | `dotnet/src/Atsm.Channels` |
 | Trazas real/teórica, pila, métricas, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `dotnet/tools/Atsm.Tools.Trace` |
-| Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y Glyms de pruebas) |
+| Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y legacy de pruebas) |
 | Catálogo compartido y anfitrión de mantenimiento | `dotnet/tools/Atsm.Diagnostics.Core` |
 | GUI Windows WPF | `dotnet/tools/Atsm.Diagnostics.Windows` (DPAPI del usuario; no depende de EDC) |
 | Agente nativo | `native/core`, `native/platform`, `native/tls`, `native/app` |
 | Protocolo agente ↔ host | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` |
-| Legado Glyms (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-GLYMS](REFERENCIAS-GLYMS.md)) |
+| Sistema legacy (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md)) |
 
 ## Pendientes
 

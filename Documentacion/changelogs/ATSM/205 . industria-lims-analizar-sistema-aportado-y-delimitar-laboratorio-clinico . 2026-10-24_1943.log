@@ -6,7 +6,7 @@ Mensaje: feat: diagnóstico Windows y perfiles CFX Sysmex y Qwalys (#205)
 Tipos: feat, test, build, docs. Sin push, PR ni release remoto.
 
 Entrega:
-- GUI WPF .NET 10 de mantenimiento independiente de EDC, con 11 perfiles integrados. Lee exportaciones, mensajes, bytes, logs Sysmex/Glyms y trazas ATSM; trama/mensaje/observación/hallazgo/evento y detalle.
+- GUI WPF .NET 10 de mantenimiento independiente de EDC, con 11 perfiles integrados. Lee exportaciones, mensajes, bytes, logs Sysmex/del sistema legacy y trazas ATSM; trama/mensaje/observación/hallazgo/evento y detalle.
 - Captura propia TCP cliente/servidor o SerialTunnel, TLS opcional sin degradación, PFX efímero. Captura sin respuestas predeterminada o simulación de host explícita, sin órdenes ni publicación en LIMS. No es observador de otra sesión; SerialTunnel toma control exclusivo.
 - Aplicación prepara journal protegido antes de conectar. DPAPI CurrentUser, registros cifrados autenticados y cadena por caso/secuencia/hash, flush durable antes de aceptar custodia. Recuperación de registros previos a corte final, incompletitud conservada al guardar, corrupción/reordenamiento rechazados. Límites 32 MiB/100.000 entradas; UI 2.000 filas/64 KiB de detalle.
 - Plugin Bio-Rad CFX: CSV de cuantificación Maestro (columnas/cultura configurables por API; GUI predeterminada en inglés) y RDML 1.0/1.1 XML/ZIP, referencias/exclusiones/sentinelas conservados. Sin .pcrd, control directo, cálculo de Cq ni positividad.

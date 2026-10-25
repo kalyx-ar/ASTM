@@ -3,27 +3,27 @@ using System.Text.RegularExpressions;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins.Tracing;
 
-namespace Atsm.Plugin.Glyms.Testing;
+namespace Atsm.Plugin.Legacy.Testing;
 
 /// <summary>
-/// Test plugin for the proprietary logs of the Glyms LIMS (<c>…Interface.log</c>). It only extracts segments;
+/// Test plugin for the proprietary logs of the legacy LIMS (<c>…Interface.log</c>). It only extracts segments;
 /// the instrument dialect (for example ARCHITECT) interprets them.
 /// </summary>
-public sealed class GlymsTestingPlugin : ITraceLogAdapterProvider
+public sealed class LegacyTestingPlugin : ITraceLogAdapterProvider
 {
-    public IReadOnlyList<ITraceLogAdapter> LogAdapters { get; } = [new GlymsInterfaceLogAdapter()];
+    public IReadOnlyList<ITraceLogAdapter> LogAdapters { get; } = [new LegacyInterfaceLogAdapter()];
 }
 
 /// <summary>
 /// Entry: <c>LEVEL yyyy-MM-dd h:mm:ss.fff AM|PM – Instrument TAG &gt;content&lt;count</c> in Windows-1252.
-/// <c>&lt;&lt;&lt;</c> is data received from the instrument; <c>Host.EC</c> and <c>Host ECACK</c> are data sent by Glyms;
+/// <c>&lt;&lt;&lt;</c> is data received from the instrument; <c>Host.EC</c> and <c>Host ECACK</c> are data sent by the legacy host;
 /// other tags are host events. The CR LF that ends a frame is also the log line break, so the payload runs until the next entry.
 /// </summary>
-public sealed partial class GlymsInterfaceLogAdapter() : RegexLogAdapter(LogFormat)
+public sealed partial class LegacyInterfaceLogAdapter() : RegexLogAdapter(LogFormat)
 {
     public static readonly RegexLogFormat LogFormat = new(
-        "glyms.interface-log",
-        "Glyms LIMS interface log (host side)",
+        "legacy.interface-log",
+        "Legacy LIMS interface log (host side)",
         EntryPattern(),
         "yyyy-MM-dd h:mm:ss.fff tt",
         Encoding.Latin1,

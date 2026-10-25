@@ -11,7 +11,7 @@ public enum SexPolicy
     /// <summary>Send M or F when the host provides it, U otherwise.</summary>
     Send,
 
-    /// <summary>Always U. Reproduces the legacy Glyms plugin, whose condition <c>sex != M || sex != F</c> was always true.</summary>
+    /// <summary>Always U. Reproduces the legacy host plugin, whose condition <c>sex != M || sex != F</c> was always true.</summary>
     AlwaysUnknown,
 }
 
@@ -61,7 +61,7 @@ public sealed class ArchitectPlugin(ArchitectDialectOptions? options = null) : I
         PluginApi.Version,
         "Abbott",
         ["ARCHITECT i1000SR", "ARCHITECT i2000SR", "ARCHITECT c4000", "ARCHITECT c8000", "ARCHITECT c16000", "ARCHITECT ci-series"],
-        ["Abbott Standard Interface RS-232 Manual, ARCHITECT System Edition, 91407-108, January 2012", "Glyms Plugin_Architect 1.0.0.1 (legacy reference)"]);
+        ["Abbott Standard Interface RS-232 Manual, ARCHITECT System Edition, 91407-108, January 2012", "Legacy host Plugin_Architect 1.0.0.1 (legacy reference)"]);
 
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context)
     {

@@ -13,7 +13,7 @@ namespace Atsm.Plugin.Abbott.CellDynRuby;
 
 /// <summary>
 /// CELL-DYN Ruby. No vendor manual is available in this repository yet: the profile and the dialect are derived from
-/// production traces and from the legacy Glyms plugin, and every point not confirmed by the manual is marked as such.
+/// production traces and from the legacy host plugin, and every point not confirmed by the manual is marked as such.
 /// </summary>
 public sealed class CellDynRubyPlugin : IInstrumentPlugin
 {
@@ -48,7 +48,7 @@ public sealed class CellDynRubyPlugin : IInstrumentPlugin
         PluginApi.Version,
         "Abbott",
         ["CELL-DYN Ruby"],
-        ["Production traces (local, anonymized for the corpus)", "Glyms Plugin_Celldyn_Ruby 1.0.0.0 (legacy reference)"]);
+        ["Production traces (local, anonymized for the corpus)", "Legacy host Plugin_Celldyn_Ruby 1.0.0.0 (legacy reference)"]);
 
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context)
     {

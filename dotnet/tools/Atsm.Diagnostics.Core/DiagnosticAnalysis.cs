@@ -11,7 +11,7 @@ using Atsm.Tracing;
 
 namespace Atsm.Diagnostics;
 
-public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, GlymsLog, WireBytes, AtsmTrace }
+public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace }
 public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text);
 public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IReadOnlyList<StackEvent> Events,
     IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
@@ -33,9 +33,9 @@ public static class DiagnosticReader
         }
         IReadOnlyList<TraceSegment> segments;
         var limitations = new List<string> { "Diagnostic import; no external effects." };
-        if (format is DiagnosticInputFormat.SysmexLog or DiagnosticInputFormat.GlymsLog)
+        if (format is DiagnosticInputFormat.SysmexLog or DiagnosticInputFormat.LegacyLog)
         {
-            var adapterId = format == DiagnosticInputFormat.SysmexLog ? "sysmex.port-monitor" : "glyms.interface-log";
+            var adapterId = format == DiagnosticInputFormat.SysmexLog ? "sysmex.port-monitor" : "legacy.interface-log";
             var adapter = new DiagnosticCatalog().LogAdapters.Single(a => a.Id == adapterId);
             var extracted = adapter.Extract(bytes, new(RecordedBy: format == DiagnosticInputFormat.SysmexLog ? RecordedBy.Instrument : RecordedBy.Host) { UtcOffset = utcOffset });
             if (extracted.Segments.Count == 0) throw new InvalidDataException("ATSM-DIAG-NO-LOG-ENTRIES");

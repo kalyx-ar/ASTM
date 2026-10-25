@@ -62,12 +62,12 @@
       "sha256": "638F84BF27D484EC771F08CA01E4862F0DE7C1CEE80F065C8B88E351F838F16B"
     },
     {
-      "archivo": "referencias-glyms.json",
+      "archivo": "../../LEGACY/Referencias-ATSM/referencias-legacy.json",
       "bytes": 24382,
       "sha256": "CF9A716A8FDA3481B7CA143869B0C29C8ACD5D3907B4CF562ECCAAF1ECA77BEB"
     },
     {
-      "archivo": "REFERENCIAS-GLYMS.md",
+      "archivo": "../../LEGACY/Referencias-ATSM/REFERENCIAS-LEGACY.md",
       "bytes": 16189,
       "sha256": "D7D81789695F6ADD93AAA54730984BD500FDD09DAE85F6E3515DBCA85D062DD3"
     },

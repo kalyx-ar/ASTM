@@ -22,7 +22,7 @@
     <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Uwam\Atsm.Plugin.Sysmex.Uwam.csproj" />
-    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Glyms.Testing\Atsm.Plugin.Glyms.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Atsm.Plugin.Legacy.Testing\Atsm.Plugin.Legacy.Testing.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.CellDynRuby\Atsm.Plugin.Abbott.CellDynRuby.csproj" />
   </ItemGroup>
 </Project>

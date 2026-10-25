@@ -1,19 +1,19 @@
 using System.Text;
 using Atsm.Abstractions.Tracing;
-using Atsm.Plugin.Glyms.Testing;
+using Atsm.Plugin.Legacy.Testing;
 using Atsm.Protocol.Lis01;
 using Atsm.Tracing;
 
 namespace Atsm.Tests.Plugins;
 
-public class GlymsTestingPluginTests
+public class LegacyTestingPluginTests
 {
     private const string Dash = "\u0096";
 
     private static readonly byte[] PatientFrame = Lis01Frame.Build(2, Encoding.Latin1.GetBytes("P|1||12345678|12345678|Doe^John|||U\r"), isFinal: true);
     private static readonly byte[] ResultFrame = Lis01Frame.Build(3, Encoding.Latin1.GetBytes("R|1|^^^651^B-hCG^UNDILUTED^P^78462UD00^07081^^F|< 1.20|mIU/mL||||F\r"), isFinal: true);
 
-    // Synthetic log with the layout of a Glyms interface log (Windows-1252, en dash, 12-hour clock).
+    // Synthetic log with the layout of a legacy interface log (Windows-1252, en dash, 12-hour clock).
     private static byte[] SyntheticLog()
     {
         var log = new StringBuilder();
@@ -33,9 +33,9 @@ public class GlymsTestingPluginTests
     }
 
     [Fact]
-    public void Glyms_log_is_extracted_byte_exact_through_the_generic_adapter()
+    public void Legacy_log_is_extracted_byte_exact_through_the_generic_adapter()
     {
-        var adapter = new GlymsTestingPlugin().LogAdapters.Single();
+        var adapter = new LegacyTestingPlugin().LogAdapters.Single();
 
         var extraction = adapter.Extract(SyntheticLog(), new LogAdapterOptions());
 
@@ -53,7 +53,7 @@ public class GlymsTestingPluginTests
     [Fact]
     public void Extracted_log_feeds_the_neutral_stack_and_anonymizer()
     {
-        var extraction = new GlymsTestingPlugin().LogAdapters.Single().Extract(SyntheticLog(), new LogAdapterOptions());
+        var extraction = new LegacyTestingPlugin().LogAdapters.Single().Extract(SyntheticLog(), new LogAdapterOptions());
         var (_, entries) = TraceReconstruction.Real(extraction.Segments, "synthetic", extraction.InstrumentHint);
 
         var stack = new TraceStackBuilder(Encoding.Latin1).Build(entries);

@@ -4,7 +4,7 @@ Estado: política propuesta, 24 de octubre de 2026.
 
 ## Hallazgo
 
-Las trazas de `trazas_externas/` son capturas reales de producción. Contienen **datos personales y clínicos**: nombres y apellidos, DNI, fechas de nacimiento, sexo, obra social, números de orden y resultados (incluidos serológicos). Se encontraron en los logs de interfaz de Glyms, en `glyms/Pedidos`, `glyms/Resultados` y en los logs de Sysmex. Los archivos de `Importar/` muestran principalmente controles de calidad, pero también llevan identificadores de muestra.
+Las trazas de `trazas_externas/` son capturas reales de producción. Contienen **datos personales y clínicos**: nombres y apellidos, DNI, fechas de nacimiento, sexo, obra social, números de orden y resultados (incluidos serológicos). Se encontraron en los logs de interfaz del sistema legacy, en `legacy/Pedidos`, `legacy/Resultados` y en los logs de Sysmex. Los archivos de `Importar/` muestran principalmente controles de calidad, pero también llevan identificadores de muestra.
 
 Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de Sysmex XN-L está marcado *Classified as Internal*.
 
@@ -14,9 +14,9 @@ Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de S
 
 | Carpeta | Archivos | Origen | Uso |
 |---|---|---|---|
-| `trazas_externas/glyms/Logs/*.log` | 3 | Host Glyms: C4000, CELL-DYN Ruby, I1000 | Conversación LIS01 con controles, reintentos y errores (`Parsing Error`, cola borrada por reintentos) |
-| `trazas_externas/glyms/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan mensajes completos del anfitrión y el plugin Architect; no un watcher ATSM |
-| `trazas_externas/glyms/Pedidos/`, `Resultados/` | 6 + 6 | Intercambio por archivo con formato propio (`H|DeltaLab…`, `H|glyms…`) | Candidato a plugin de archivo; a confirmar |
+| `trazas_externas/legacy/Logs/*.log` | 3 | Host legacy: C4000, CELL-DYN Ruby, I1000 | Conversación LIS01 con controles, reintentos y errores (`Parsing Error`, cola borrada por reintentos) |
+| `trazas_externas/legacy/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan mensajes completos del anfitrión y el plugin Architect; no un watcher ATSM |
+| `trazas_externas/legacy/Pedidos/`, `Resultados/` | 6 + 6 | Intercambio por archivo con formato propio (`H|DeltaLab…`, `H|<legacy>…`) | Candidato a plugin de archivo; a confirmar |
 | `trazas_externas/Sysmex/` | 8 | Sysmex OnlineInterface/U-WAM: UF-5000, UC-3500, AMS | Host query (`Q`), respuesta con `P/C/O`, resultados de orina |
 | `manuales/` | 11 | Fabricantes | Ver [ESTANDARES § Evidencia](ESTANDARES.md) |
 

@@ -14,14 +14,14 @@ Instantánea del 24 de octubre de 2026. Describe lo que existe y lo que se compr
 | LAW LAB-27 parcial | `LawQueryMessages` | WOS por contenedor y RSP/K11; no actor LAW/AWOS completo |
 | Custodia de trazas | `ITraceSink.EnsureReady`, `InstrumentCommunicationHost` | Comprobación anterior a la fábrica/canal, fallos propagados; persistencia/UI del anfitrión |
 | Framing MLLP | `dotnet/src/Atsm.Protocol.Mllp` | Bloques partidos, ruido, desbordamiento |
-| SDK de plugins: perfil declarativo, dialecto LIS02-A2 estándar, adaptador regex de logs | `dotnet/src/Atsm.Plugins` | Usado por los plugins Architect, U-WAM y Glyms (pruebas) |
+| SDK de plugins: perfil declarativo, dialecto LIS02-A2 estándar, adaptador regex de logs | `dotnet/src/Atsm.Plugins` | Usado por los plugins Architect, U-WAM y legacy (pruebas) |
 | Runtime de sesión ASTM | `dotnet/src/Atsm.Runtime` | Sesión completa con simulador: resultados, consulta con presupuesto, respuesta negativa, descarga de órdenes, reproducción de traza |
 | Canales: Stream, TCP nativo (TLS 1.2/1.3 por endpoint), Replay, SerialTunnel (Link v1) | `dotnet/src/Atsm.Channels` | Vectores compartidos con C++; prueba cruzada con el agente nativo |
 | Trazas neutrales: real y teórica por el mismo método, pila de eventos, métricas, comparación, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `atsm-trace` | Pruebas sintéticas y trazas reales locales (ver abajo) |
 | Plugin Abbott ARCHITECT (ASI RS-232) | `dotnet/plugins/Atsm.Plugin.Abbott.Architect` | Mensajes sintéticos según el manual 91407-108 y trazas reales locales |
 | Plugin Sysmex U-WAM (LIS2-A2 / E1381-02) y adaptador del monitor de puertos de Sysmex | `dotnet/plugins/Atsm.Plugin.Sysmex.Uwam` | Mensajes sintéticos según R315168 rev. 22 y trazas reales locales |
 | Plugin Abbott CELL-DYN Ruby (LIS2-A, derivado de trazas) | `dotnet/plugins/Atsm.Plugin.Abbott.CellDynRuby` | Mensajes sintéticos con la estructura de las trazas y trazas reales locales |
-| Plugin de pruebas Glyms (sólo adaptador de log, fuera del motor neutral) | `dotnet/plugins/Atsm.Plugin.Glyms.Testing` | Log sintético y logs reales locales |
+| Plugin de pruebas legacy (sólo adaptador de log, fuera del motor neutral) | `dotnet/plugins/Atsm.Plugin.Legacy.Testing` | Log sintético y logs reales locales |
 | Bio-Rad CFX Maestro, CSV/RDML 1.0/1.1 | `dotnet/plugins/Atsm.Plugin.BioRad.Cfx` | Exportaciones sintéticas; referencias/exclusiones/Cq original, sin control directo ni homologación de modelos |
 | Sysmex XN-L y CS-2500 | `dotnet/plugins/Atsm.Plugin.Sysmex.XnL`, `Atsm.Plugin.Sysmex.Cs2500` | Perfiles de recepción según manual; componentes de prueba/muestra y estados crudos; consultas/órdenes sin implementar |
 | DIAGAST QWALYS 3 | `dotnet/plugins/Atsm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |
@@ -44,9 +44,9 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 | Sysmex UF-5000 ↔ U-WAM (log de registros, sin frames) | 425 mensajes, 5.006 resultados y 155 consultas; la traza teórica reconstruye el cable completo (7.354 frames) |
 | Real vs teórica (mismo método) | Mensajes idénticos en todos los casos; la comparación aísla lo que hizo el enlace real (reintentos, frames alterados, tiempos de reacción del LIS) |
 | Exportaciones ARCHITECT (`Importar/`) | 1.071 resultados; 309 avisos de archivos de control sin registro P |
-| Log Glyms I1000 (adaptador del plugin de pruebas) | 837 mensajes recibidos, 4.753 resultados, 648 consultas, 1 sin respuesta |
-| CELL-DYN Ruby (log Glyms, plugin `abbott.celldyn-ruby`) | 7.492 transmisiones con mensajes completos en un frame y sondeos vacíos; 10.962 resultados, 336 alarmas, 2.361 consultas (1.989 `^ALL`), 1.309 respondidas (p50 120 ms) y 18 sin respuesta; los 1.316 mensajes del host legacy fueron rechazados por el equipo (`Parsing Error^RecordID`) |
-| Anonimización de las trazas Sysmex y Glyms | 0 hallazgos residuales; ningún nombre real de los registros P en la salida; interpretación idéntica antes y después |
+| Log legacy I1000 (adaptador del plugin de pruebas) | 837 mensajes recibidos, 4.753 resultados, 648 consultas, 1 sin respuesta |
+| CELL-DYN Ruby (log legacy, plugin `abbott.celldyn-ruby`) | 7.492 transmisiones con mensajes completos en un frame y sondeos vacíos; 10.962 resultados, 336 alarmas, 2.361 consultas (1.989 `^ALL`), 1.309 respondidas (p50 120 ms) y 18 sin respuesta; los 1.316 mensajes del host legacy fueron rechazados por el equipo (`Parsing Error^RecordID`) |
+| Anonimización de las trazas Sysmex y del sistema legacy | 0 hallazgos residuales; ningún nombre real de los registros P en la salida; interpretación idéntica antes y después |
 
 ## Diferencias con la propuesta
 
@@ -76,7 +76,7 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 - **Licencia:** libre uso, según el responsable del proyecto. No hay archivo de licencia formal.
 - **Firma:** Strong Name con la misma SNK que EDC; Authenticode en el release.
 - **Valores de interfaz:** los fija la documentación de cada marca o serie de equipos, en el perfil del plugin y con su cita.
-- **Trazas:** ATSM genérico es neutral. Reconstruye trazas reales y teóricas a partir de contenido puro, y los plugins aportan adaptadores de log de su serie de equipos. El código de Glyms vive sólo en un plugin de pruebas; un plugin de integración con Glyms sería un trabajo aparte.
+- **Trazas:** ATSM genérico es neutral. Reconstruye trazas reales y teóricas a partir de contenido puro, y los plugins aportan adaptadores de log de su serie de equipos. El código del sistema legacy vive sólo en un plugin de pruebas; un plugin de integración con el sistema legacy sería un trabajo aparte.
 - **Architect:** se envía el sexo del paciente (`SexPolicy.AlwaysUnknown` reproduce el comportamiento legacy); el tipo de resultado F/P/I va en `ResultKind`; página de códigos MS-DOS 850.
 - **xUnit 2.9.3** sólo en pruebas, misma versión que EDC.
 - **Mbed TLS 4.1 LTS** aprobado para el agente; se usa el parche 4.1.1 ([DEPENDENCIAS](DEPENDENCIAS.md)).
