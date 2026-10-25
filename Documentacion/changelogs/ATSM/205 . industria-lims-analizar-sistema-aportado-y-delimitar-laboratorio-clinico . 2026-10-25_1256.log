@@ -1,0 +1,59 @@
+Issue propietario: https://github.com/kalyx-ar/EDC/issues/205 (repositorio modificado: kalyx-ar/ATSM)
+Tipo: feat / fix / build / documentación
+Fecha local: 2026-10-25 12:56 (America/Buenos_Aires)
+
+Alcance y decisiones humanas previas:
+- Usabilidad, interpretación predeterminada y Lang: issuecomment-6398309342.
+- Dependencias condicionales de Lang precisadas: issuecomment-6398449976.
+- Retiro de compatibilidad y política global de legacy: issuecomment-6399020022.
+- Rutas cortas, sin ZIP ni wrapper: issuecomment-6399437288.
+- Borrado específico del ZIP de propuesta antigua tras rechazo de revisión automática: issuecomment-6399594274; respuesta humana literal «Sí, borrar ese ZIP». Se conservan documentos y fuentes originales.
+
+Commits ATSM:
+- 297dd3c5cff8e15a33cf96d6b0baf3522a3370ec: interpretación/grupos, vocabulario por plugin, detección, UI/columnas y Lang opcional.
+- 5bde531: retiro de salidas obsoletas y soporte de HL7 en logs sin asumir otro fabricante.
+- 9f267c4e8da7e19f3c890887e2ac7547156de8e1: salida corta, elimina ZIP/publicador PowerShell.
+- 6dae1e0d45c0cdab391fd3f917db15a8441653f2: filtro de idiomas también en los elementos de copia de la compilación directa.
+- 919375231bd0f37422d693f53e0d9ae8678ed06b: separa el temporal del enlazador AOT de su destino; evita colisión native/Native en Windows.
+
+Reglas globales EDC, commits propios limitados a documentación:
+- 5d3cee33190947d84f84d03782876638b15f0a84 y changelog 2c4a1a6: legacy sólo por traspaso activo o fuerza mayor, ejemplo Windows XP.
+- 4761dc95bea1a20876c671c3aa074ffc83e18e91 y changelog 5bcfb30: no generar entregas comprimidas sin pedido explícito; rutas cortas. No se incluyeron cambios de trabajo ajenos.
+
+Cambios funcionales:
+- Interpretación activada por defecto y desactivable; controles de enlace, mensajes y registros con significado español y vocabulario documentado de cada plugin. Desconocidos explícitos; originales/códigos intactos en detalle y modo técnico. No se atribuye validación clínica a estados del instrumento.
+- Grupos predeterminados con cantidad, resumen de valores diferentes y subfilas completas. Se elimina el recorte de las últimas 2.000 filas; paginación de 300 filas visibles conservando todos los hijos. Prueba de grupo con 10.001 registros.
+- Mensajes en una línea en la lista. Columnas automáticas según contenido/ventana, tabla desde la izquierda, ancho manual y doble clic; sin botón de ajuste. Encabezados discretos, agarre de columna al pasar el puntero, tema claro coherente, casillas junto al texto y campos laterales con borde/fondo. Hexadecimal tiene casilla activa y actúa sobre el detalle de bytes.
+- Catálogo muestra 8 equipos/familias con 12 perfiles técnicos. U-WAM es un plugin/dialecto/comunicación, con configuración interna de consulta: límite 8/18 s y presupuesto 6/15 s. No se duplican equipos. Si la importación sugiere U-WAM sin variante previa se usa el presupuesto conservador; no demuestra hardware instalado.
+- Formato automático por firmas, no extensión. Sysmex/legacy, traza/caso, CSV/RDML y ASTM/HL7; ambigüedad o falta de perfil compatibles visibles. Infieren lado del registrador por R/Q u OUL/QBP cuando hay evidencia, con override manual. Reconocer MSH no elige fabricante; HL7 dentro de log conserva protocolo/perfil y no se reemplaza por un intérprete ASTM.
+- Protocolo interno no documentado se conserva como bytes sin fabricar registros/observaciones ASTM ni cascadas de errores. inspect-input comparte detector/lector y emite sólo agregados.
+- Seeds español neutral por ensamblado y claves estables; bridge condicional al Kalyx.Globalization existente. Inicialización asíncrona anterior a MainPage, conexión del anfitrión, sin crear otra base ni editar Lang. Distribución estándar sin Lang/SQLite, con fallback español.
+
+Pruebas y verificación:
+- Últimas dos corridas completas: 181/181 .NET, 0 omitidas, ~1 s cada una; TRX en artifacts/final-test-results. Incluye 19 nuevas pruebas de usabilidad y 7 contra el agente compilado, 5 TLS.
+- Reapareció una vez la intermitencia conocida de Certificate_must_identify_the_declared_controller (180/181); repetición aislada correcta en 749 ms y ambas corridas finales correctas. Sin modificar test, agente ni timeouts; causa no establecida, registrada para P-12. No se afirma corregida ni estabilidad absoluta de TLS.
+- ctest repetido: 542 verificaciones, 0 fallos, ~0,43/0,30 s. Sin cambios de código nativo.
+- Core y GUI compilan con EnableKalyxLang=true contra la biblioteca existente. Prueba adicional del Lang real y una DbConnection sintética: 1 correcta (~144 ms), traducción de diagnóstico/vocabulario, seeds por plugin y conexión abierta. No acredita integración SQLCipher/UI de EDC ni descarga de traducciones.
+- Regresión con los dos logs privados del usuario, sólo cantidades: UF-5000 7.089 entradas, 425 mensajes, 5.006 observaciones, registrador Host; UC-3500 2.006 entradas, 0 observaciones ASTM inferidas, 6 hallazgos en 2 grupos (limitaciones/protocolo sin intérprete). Archivos originales fuera de Git, sin publicar datos clínicos.
+- CLI NativeAOT real: generación nativa observada; self-test correcto (catálogo 12, CFX/QC, JSON, caso cifrado y procesador ASTM/anfitrión). Sin runtimeconfig externo. Verificador de referencias del destino MAUI correcto.
+- GUI ejecutada desde bin/Release: ventana/handler, propietario de diálogos, CLR y WinUI privados, catálogo 8/12, defaults interpretación/grupos, siete vistas en ambos modos, tabla alineada, CFX 3/QC 6 y guardado/reapertura DPAPI correctos. Sin datos sensibles en el reporte de prueba.
+- Se inspeccionó un primer candidato mediante Computer Use y accesibilidad. El usuario detuvo el control con Esc antes del arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores se comprobaron por compilación/prueba interna; no se afirma revisión visual manual ni arrastre manual del diseño final.
+
+Distribución final, sin ZIP, aliases ni scripts propios de empaquetado:
+- GUI: dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe, con las dependencias en esa misma carpeta.
+- NativeAOT CLI: dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe; compilador/enlazador usan obj, sin colisión con el destino.
+- Compilación estándar dotnet publish; Windows MAUI .NET 10 self-contained/ReadyToRun, no se declara GUI NativeAOT. No requiere instalar .NET/Windows App SDK aparte.
+- Idiomas finales: en-us, es, es-ES; 4 MUI. WinAppSDK copia desde obj/MsixContent por otro grupo de MSBuild: se filtra allí también, sin borrar recursos después de compilar. DLL/PRI y carpetas funcionales se conservan.
+- Eliminados físicamente Atsm.Diagnostics.Windows, 21 directorios de salidas/temporales, 4 archivos históricos de entrega y 448 archivos de build MAUI desactualizado; luego se eliminaron el ZIP vigente de Diagnostics y el ZIP documental autorizado. La revisión completa de LIMS terminó con 0 archivos .zip. No se eliminaron documentos/fuentes originales ni datos del usuario; rutas absolutas y ausencia de datos verificadas antes de la limpieza.
+- tools/Publish-Diagnostics.ps1 eliminado. Sin niveles TFM/RID/publish en la salida de MAUI. No se mantienen enlaces de entregas anteriores.
+
+Procedencia y firma:
+- MAUI 10.0.110 y Windows App SDK oficiales ya inventariados. 37 paquetes NuGet de GUI verificados; Lang opcional usa Kalyx.Globalization propio y Microsoft.Data.Sqlite.Core 10.0.13 / SQLitePCLRaw.core 2.1.13 existentes, con firmas NuGet y hashes documentados en DEPENDENCIAS.
+- Cinco CS8002 visibles: Controls, Maui, Graphics, Essentials y Controls.Xaml oficiales sin Strong Name. Sin NoWarn. Ensamblados propios con token 066190a23251f202 y SNK existente; Authenticode propio pendiente del release, sin admitir nuevos editores/hashes.
+- Ambos artefactos verificados tienen ProductVersion 0.1.0+6dae1e0d45c0cdab391fd3f917db15a8441653f2; el commit posterior sólo fija la ubicación temporal AOT.
+- SHA256 GUI DLL: 403e88c87d9e8b07c48ab1a92071c0ed2b4e6149e8ad7b8e0fdf0902f9ca4ddd.
+- SHA256 CLI nativa: 46b2d171e59d4bafdb369384ac445d774f5e3e05d408c3616cf9ce6f8f9cb868; 11744768 bytes.
+
+Rutas principales: SDK/plug-ins DiagnosticVocabulary, Diagnostics.Core (detector, agrupación, proyección y localización), Diagnostics.Maui (tabla, controles y Lang), pruebas de Diagnostics, perfil NativeAot y documentación ESTADO/CONTINUACION/USABILIDAD-DIAGNOSTICS/DEPENDENCIAS/MAUI-Y-NATIVEAOT.
+
+Estado final: cambios entregados localmente y verificados. Issue #205 permanece abierto y Project propietario In Progress por el alcance LIMS restante. Sin push, PR ni release remoto. No se modificaron GetKey, DeriveSessionKeyAsync, SNK, Identidades, baselines/admisión, SQLCipher de EDC ni spool de SerialTunnel. Sin homologación adicional de instrumentos físicos.
