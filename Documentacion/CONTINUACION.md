@@ -4,6 +4,8 @@ Guía para retomar ATSM desde otra sesión o agente. Estado al 25 de octubre de 
 
 ## Cómo retomar
 
+Presentación UC-3500: los hallazgos genéricos usan frases breves; la conservación de códigos/originales se explica en el detalle, sin repetirla en cada fila.
+
 ```bash
 dotnet test dotnet/Atsm.slnx
 ```
@@ -20,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar: 201 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar: 211 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas, ambas repetidas. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Aplicación Windows: dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true; salida directa en dotnet/tools/Atsm.Diagnostics.Maui/bin/Release. No hay script de empaquetado ni ZIP.
 
@@ -198,3 +200,10 @@ P-12: investigar la intermitencia de Certificate_must_identify_the_declared_cont
 Resuelta la brecha del protocolo directo que la entrega de usabilidad conservaba como incompatible: plugin sysmex.uc3500.serial, puerto neutral IInstrumentTracePlugin, 9 equipos/13 perfiles. Mensajes RQ02/CM00/ER y resultados/reflectancias/serie C, comprobación del checksum separado del monitor, correlación y diagnósticos en español. Captura directa sin envío; simulación activa rechazada antes de conectar. MAUI habilita selección nativa en etiquetas y celdas; detalle conserva copia. Ver [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).
 
 Dos corridas finales 201/201, 0 omitidas; nativo 542/542 repetido, GUI self-test seleccionable y CLI NativeAOT correctos; Lang opcional 1 correcta. No afirmar host activo UC-3500, homologación física, estadística QC calculada ni interpretación de siglo/orden de fechas abreviadas. Revisar tabla original para significados específicos de errores cuya extracción pierde columnas; 8010 sólo tiene familia de tira. La prueba HL7 Fragmented_MLLP_and_coalesced_blocks_are_acknowledged_individually falló una vez, pasó aislada (122 ms) y en las corridas finales; causa sin confirmar, sin cambiar timeouts.
+
+
+### U-WAM único y calidad descriptiva (2026-10-25)
+
+Atsm.Plugin.Sysmex.Urinalysis reúne ASTM U-WAM y serial UC; retirados proyectos/DLL redundantes. Una entrada U-WAM, ocho familias/trece perfiles. Interpretación automática por contenido, opción manual y conocimiento contextual por perfil/registro/campo/código. Captura automática sin enviar ACK supuestos; simulación exige configuración expresa.
+
+Calidad prioriza mediana y DE, con material/lote literal, mínimo/máximo/n, señales y originales en subfilas. Media/último/método y estadísticas informadas en detalle. Los cálculos descriptivos pertenecen al diagnosticador, sin reglas de aceptación QC. Diez pruebas nuevas: 211 en total; ver [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).

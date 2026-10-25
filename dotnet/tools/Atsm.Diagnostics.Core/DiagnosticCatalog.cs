@@ -4,11 +4,11 @@ using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Plugin.Diagast.Qwalys;
 using Atsm.Plugin.Legacy.Testing;
 using Atsm.Plugin.Sysmex.Cs2500;
-using Atsm.Plugin.Sysmex.Uwam;
-using Atsm.Plugin.Sysmex.Uc3500;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugin.Sysmex.XnL;
 using Atsm.Plugins;
 using Atsm.Abstractions.Tracing;
+using Atsm.Tracing;
 
 namespace Atsm.Diagnostics;
 
@@ -24,8 +24,8 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public string InstrumentId => AstmPlugin?.Describe().Id ?? ContentPlugin?.Describe().Id ?? TracePlugin?.Describe().Id ?? (IsHl7 ? "abbott.architect" : Id);
     public string Configuration => Id switch
     {
-        UwamPlugin.WithChemistryProfile => DiagnosticText.Text("Configuration.WithChemistry"),
-        UwamPlugin.WithoutChemistryProfile => DiagnosticText.Text("Configuration.WithoutChemistry"),
+        SysmexUrinalysisPlugin.WithChemistryProfile => DiagnosticText.Text("Configuration.WithChemistry"),
+        SysmexUrinalysisPlugin.WithoutChemistryProfile => DiagnosticText.Text("Configuration.WithoutChemistry"),
         _ => Protocol,
     };
     public string DisplayName => $"{Manufacturer} · {Name} · {Configuration}";
@@ -53,14 +53,17 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
 /// admission of arbitrary DLLs or a trust-store update. Evidence does not imply hardware qualification.</summary>
 public sealed class DiagnosticCatalog
 {
-    public IReadOnlyList<IInstrumentPlugin> AstmPlugins { get; } = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), new UwamPlugin(), new XnLPlugin(), new Cs2500Plugin(), new QwalysPlugin()];
+    public IReadOnlyList<IInstrumentPlugin> AstmPlugins { get; }
     public IReadOnlyList<IInstrumentContentPlugin> ContentPlugins { get; } = [new CfxPlugin()];
-    public IReadOnlyList<IInstrumentTracePlugin> TracePlugins { get; } = [new Uc3500Plugin()];
+    public IReadOnlyList<IInstrumentTracePlugin> TracePlugins { get; }
     public IReadOnlyList<ITraceLogAdapter> LogAdapters { get; }
     public IReadOnlyList<DiagnosticProfile> Profiles { get; }
     public IReadOnlyList<DiagnosticInstrument> Instruments { get; }
     public DiagnosticCatalog()
     {
+        var urinalysis = new SysmexUrinalysisPlugin();
+        AstmPlugins = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), urinalysis, new XnLPlugin(), new Cs2500Plugin(), new QwalysPlugin()];
+        TracePlugins = [urinalysis];
         var profiles = new List<DiagnosticProfile>();
         foreach (var plugin in TracePlugins)
         foreach (var profile in plugin.Profiles)
@@ -79,7 +82,7 @@ public sealed class DiagnosticCatalog
             {
                 "abbott.celldyn-ruby" => "Trazas locales; hipótesis pendientes de manual",
                 "abbott.architect" => "Manual y trazas locales; sin homologación en hardware",
-                "sysmex.uwam" => "Manual y trazas de la interfaz U-WAM ↔ LIS. Para el enlace directo del analizador, seleccione UC-3500. Sin homologación en hardware.",
+                SysmexUrinalysisPlugin.PluginId => "Conocimiento de U-WAM y sus analizadores; interpretación por contexto del enlace. Sin homologación en hardware.",
                 "clsi.lis02" => "Estándar genérico; no valida un equipo particular",
                 _ => "Manual + pruebas sintéticas; sólo recepción de resultados",
             };
@@ -91,12 +94,23 @@ public sealed class DiagnosticCatalog
         Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,
             g.First().Manufacturer + " · " + (g.Key switch
             {
-                "biorad.cfx" => "CFX Maestro", "abbott.architect" => "ARCHITECT", "sysmex.uwam" => "U-WAM (UF-5000, UC-3500, UD-10)",
+                "biorad.cfx" => "CFX Maestro", "abbott.architect" => "ARCHITECT", SysmexUrinalysisPlugin.PluginId => "U-WAM (UF-5000, UC-3500, UD-10)",
                 "clsi.lis02" => DiagnosticText.Text("Catalog.Generic"), _ => g.First().Name,
-            }), g.ToArray())).ToArray();
+            }), g.OrderBy(p => p.TracePlugin is not null).ToArray())).ToArray();
         LogAdapters = AstmPlugins.OfType<ITraceLogAdapterProvider>().Append(new LegacyTestingPlugin()).SelectMany(p => p.LogAdapters).ToArray();
     }
     public DiagnosticProfile Resolve(string id) => Profiles.Single(p => p.Id == id);
+    public DiagnosticProfile ResolveInterpretation(DiagnosticCase input, DiagnosticProfile selected)
+    {
+        var family = Instruments.Single(i => i.Id == selected.InstrumentId);
+        var segments = input.Entries.Select(e => new TraceSegment(e.Utc, e.Direction,
+            e.Code == TraceReconstruction.MessageCode ? SegmentContent.Message : SegmentContent.Wire, e.Data)).ToArray();
+        var matched = family.Profiles.Where(p => p.TracePlugin?.Recognizes(segments) == true).ToArray();
+        var astm = DiagnosticInputDetector.HasAstmHeader(segments);
+        if (matched.Length > 1 || matched.Length == 1 && astm) throw new InvalidDataException("ATSM-DIAG-AMBIGUOUS-INPUT");
+        if (matched.Length == 1) return matched[0];
+        return astm && selected.AstmProfile is null ? family.Profiles.FirstOrDefault(p => p.AstmProfile is not null) ?? selected : selected;
+    }
 }
 
 public sealed record DiagnosticInstrument(string Id, string DisplayName, IReadOnlyList<DiagnosticProfile> Profiles);

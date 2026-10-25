@@ -1,11 +1,11 @@
 using Atsm.Plugins;
 
-namespace Atsm.Plugin.Sysmex.Uc3500;
+namespace Atsm.Plugin.Sysmex.Urinalysis;
 
-public sealed partial class Uc3500Plugin
+internal sealed partial class Uc3500Interpreter
 {
-    public IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary { get; } = Vocabulary();
-    private static Dictionary<string, ProtocolText> Vocabulary()
+    public IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary { get; } = CreateVocabulary();
+    internal static Dictionary<string, ProtocolText> CreateVocabulary()
     {
         var result = new Dictionary<string, ProtocolText>(StringComparer.Ordinal);
         void Add(string key, string text, string section) => result[key] = new(key, text, Manual + " " + section);
@@ -34,9 +34,9 @@ public sealed partial class Uc3500Plugin
         Add("finding.ATSM-UC3500-ANALYSIS-00BB", "Error de lectura del código de barras (00BB). Puede persistir aunque se corrija manualmente la identificación antes del reenvío.", "§7, tablas 7-1 y 7-2");
         Add("finding.ATSM-UC3500-ANALYSIS-00CC", "Error de orden (00CC). El equipo puede medir con su tira configurada si ORDER ERROR está en MEASURE; el código no acredita la aceptación de la orden del anfitrión.", "§6.1.2.6 / §7, tablas 7-1 y 7-2");
         Add("finding.ATSM-UC3500-ANALYSIS-00DD", "Advertencia de vencimiento de las tiras (00DD).", "§7, tablas 7-1 y 7-2");
-        Add("finding.ATSM-UC3500-ANALYSIS-STRIP", "El código informado corresponde a un error relacionado con las tiras; se conservan código y estados originales.", "§7, tabla 7-1, patrón X0X0");
-        Add("finding.ATSM-UC3500-ANALYSIS-MEASUREMENT", "El código informado corresponde a un error de análisis; se conservan código y estados originales.", "§7, tabla 7-1, patrón YY00");
-        Add("finding.ATSM-UC3500-ANALYSIS-LIGHT", "El código informado corresponde a un error del sistema óptico; se conservan código y estados originales.", "§7, tabla 7-1, patrón 0X0X");
+        Add("finding.ATSM-UC3500-ANALYSIS-STRIP", "Error relacionado con las tiras reactivas", "§7, tabla 7-1, patrón X0X0");
+        Add("finding.ATSM-UC3500-ANALYSIS-MEASUREMENT", "Error de análisis", "§7, tabla 7-1, patrón YY00");
+        Add("finding.ATSM-UC3500-ANALYSIS-LIGHT", "Error del sistema óptico", "§7, tabla 7-1, patrón 0X0X");
         Add("finding.ATSM-UC3500-ER01", "El equipo informó un error de formato en la orden (ER01).", "tabla 6-16");
         Add("finding.ATSM-UC3500-ER03", "El equipo informó que la orden no coincide con la consulta (ER03).", "tabla 6-16");
         Add("finding.ATSM-UC3500-ER04", "La tira solicitada no está colocada en el rack de botellas (ER04). Revise la tira pedida por el anfitrión y la configuración/carga del equipo.", "tabla 6-16");

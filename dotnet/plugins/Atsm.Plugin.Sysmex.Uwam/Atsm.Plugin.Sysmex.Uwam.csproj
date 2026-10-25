@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>Sysmex U-WAM (UF-5000 / UC-3500 urinalysis work area) host interface, LIS2-A2 / E1381-02 mode, and the Sysmex port monitor log.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" />
-  </ItemGroup>
-</Project>

@@ -97,3 +97,6 @@ Validación: casos sintéticos de CFX/roles/estadísticas, mapeos QC por fabrica
 ## UC-3500 directo (2026-10-25)
 
 El nuevo intérprete pasivo conserva las representaciones cualitativa/concentración y reflectancias R%(1)/R%(2), estados, flags, tira utilizada y serie/número de análisis. Serie C identifica control; no se inventan lote, nivel, vencimiento, unidades de concentración ni medias/DE/CV. La reflectancia conserva unidad %, tipo de representación y valor crudo. Quality.SourceFields mantiene el contexto; el anfitrión puede consultar las observaciones custodiadas mediante el puerto de calidad existente. Códigos ER y errores de resultado se diagnostican por separado; no son una aceptación QC ni validación clínica. Evidencia, encuadre y limitaciones: [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).
+
+
+El diagnosticador calcula ahora resúmenes descriptivos con mediana/DE, material/lote literal y registros desplegables, separados de las estadísticas reportadas por el equipo y de las decisiones QC del anfitrión. [Vista Calidad y fórmulas](CALIDAD-DIAGNOSTICA.md).

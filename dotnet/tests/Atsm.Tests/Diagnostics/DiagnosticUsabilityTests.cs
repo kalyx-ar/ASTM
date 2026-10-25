@@ -3,7 +3,7 @@ using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Tracing;
 using Atsm.Diagnostics;
 using Atsm.Plugin.BioRad.Cfx;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 
 namespace Atsm.Tests.Diagnostics;
@@ -33,7 +33,7 @@ public sealed class DiagnosticUsabilityTests
     [Fact]
     public void Manual_recorder_override_is_respected_and_unknown_side_is_explicit()
     {
-        var profile = new DiagnosticCatalog().Resolve(UwamPlugin.WithoutChemistryProfile);
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.WithoutChemistryProfile);
         var input = DiagnosticReader.Read(Log('R'), DiagnosticInputFormat.SysmexLog, profile, "log", TimeSpan.Zero, RecordedBy.Instrument);
         Assert.All(input.Entries, e => Assert.Equal(TraceDirection.Transmitted, e.Direction));
         var idle = Encoding.ASCII.GetBytes("2026/10/25 10:00:00.000 S 001{[ENQ]}\r\n");
@@ -65,7 +65,7 @@ public sealed class DiagnosticUsabilityTests
     public void Unsupported_internal_binary_log_keeps_bytes_without_inventing_ASTM_records()
     {
         var bytes = Encoding.Latin1.GetBytes("2026/10/25 10:00:00.000 S 007{[STX]Y<8~\\[ETX]}\r\n");
-        var catalog = new DiagnosticCatalog(); var profile = catalog.Resolve(UwamPlugin.WithChemistryProfile);
+        var catalog = new DiagnosticCatalog(); var profile = catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile);
         var detection = DiagnosticInputDetector.Detect(bytes, profile, catalog); Assert.True(detection.UnsupportedProtocol);
         var capture = DiagnosticReader.Read(bytes, DiagnosticInputFormat.Auto, profile, "internal.log", TimeSpan.Zero);
         var analysis = DiagnosticReader.Analyze(capture, profile, Timing);
@@ -119,18 +119,20 @@ public sealed class DiagnosticUsabilityTests
     [Fact]
     public void Uwam_is_one_instrument_with_two_query_deadlines_in_the_same_plugin()
     {
-        var catalog = new DiagnosticCatalog(); var uwam = Assert.Single(catalog.Instruments, i => i.Id == UwamPlugin.PluginId);
-        Assert.Equal(9, catalog.Instruments.Count); Assert.Equal(2, uwam.Profiles.Count);
-        Assert.Same(uwam.Profiles[0].AstmPlugin, uwam.Profiles[1].AstmPlugin);
-        Assert.Equal(new[] { 6d, 15d }, uwam.Profiles.Select(p => p.AstmProfile!.QueryAnswerBudget.TotalSeconds));
-        Assert.Equal(uwam.Profiles[0].AstmProfile!.Link, uwam.Profiles[1].AstmProfile!.Link);
-        Assert.NotEqual(uwam.Profiles[0].Configuration, uwam.Profiles[1].Configuration);
+        var catalog = new DiagnosticCatalog(); var uwam = Assert.Single(catalog.Instruments, i => i.Id == SysmexUrinalysisPlugin.PluginId);
+        Assert.Equal(8, catalog.Instruments.Count); Assert.Equal(3, uwam.Profiles.Count);
+        var astm = uwam.Profiles.Where(p => p.AstmProfile is not null).ToArray();
+        Assert.Same(astm[0].AstmPlugin, astm[1].AstmPlugin);
+        Assert.Same(astm[0].AstmPlugin, uwam.Profiles.Single(p => p.TracePlugin is not null).TracePlugin);
+        Assert.Equal(new[] { 6d, 15d }, astm.Select(p => p.AstmProfile!.QueryAnswerBudget.TotalSeconds));
+        Assert.Equal(astm[0].AstmProfile!.Link, astm[1].AstmProfile!.Link);
+        Assert.NotEqual(astm[0].Configuration, astm[1].Configuration);
     }
 
     [Fact]
     public void Expert_meanings_use_plugin_vocabulary_and_keep_raw_record_text()
     {
-        var catalog = new DiagnosticCatalog(); var uwam = catalog.Resolve(UwamPlugin.WithChemistryProfile);
+        var catalog = new DiagnosticCatalog(); var uwam = catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile);
         var raw = "H|\\^&\rS|1|||||SYN-RESOURCE\rL|1\r";
         Assert.Contains("control de calidad", ProtocolExplainer.RecordNames(raw, uwam));
         Assert.Contains("R315168", ProtocolExplainer.RecordEvidence(raw, uwam));

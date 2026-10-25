@@ -11,6 +11,7 @@ using Atsm.Abstractions.Tracing;
 using Atsm.Channels;
 using Atsm.Channels.SerialTunnel;
 using Atsm.Plugin.BioRad.Cfx;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Runtime.Tracing;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Dispatching;
@@ -50,9 +51,14 @@ public sealed class MainPage : ContentPage
     private bool _ready, _settingsVisible, _selfTestStarted, _selecting;
     private byte[]? _sourceBytes;
     private string? _sourceName;
+    private string? _detectedProfile;
     private int _tab = 2, _lastCount = -1;
     public bool IsCapturing => _liveStop is not null;
-    private DiagnosticProfile Profile => _catalog.Instruments[_profiles.SelectedIndex].Profiles[_configurations.SelectedIndex];
+    private DiagnosticInstrument SelectedInstrument => _catalog.Instruments[_profiles.SelectedIndex];
+    private bool HasAutomaticInterpretation => SelectedInstrument.Id == SysmexUrinalysisPlugin.PluginId;
+    private bool AutomaticInterpretation => HasAutomaticInterpretation && _configurations.SelectedIndex == 0;
+    private DiagnosticProfile Profile => AutomaticInterpretation ? _catalog.Resolve(_detectedProfile ?? SysmexUrinalysisPlugin.WithChemistryProfile)
+        : SelectedInstrument.Profiles[_configurations.SelectedIndex - (HasAutomaticInterpretation ? 1 : 0)];
 
     public MainPage(IDiagnosticPlatformServices platform)
     {
@@ -118,7 +124,7 @@ public sealed class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=9, profiles=13, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=13, family-auto-and-manual, quality-median-sd-with-originals, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
             });
         }
@@ -135,6 +141,8 @@ public sealed class MainPage : ContentPage
     {
         if (_profiles.SelectedIndex < 0 || _selecting) return;
         _selecting = true; _configurations.Items.Clear();
+        _detectedProfile = null;
+        if (HasAutomaticInterpretation) _configurations.Items.Add(T("Source.AutomaticInterpretation"));
         foreach (var profile in _catalog.Instruments[_profiles.SelectedIndex].Profiles) _configurations.Items.Add(profile.Configuration);
         _configurations.SelectedIndex = 0; _selecting = false; SetProfile();
     }
@@ -142,7 +150,7 @@ public sealed class MainPage : ContentPage
     {
         if (!_ready || _selecting || _profiles.SelectedIndex < 0 || _configurations.SelectedIndex < 0) return;
         _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect;
-        _mode.IsEnabled = Profile.CanSimulateHost; if (!Profile.CanSimulateHost) _mode.SelectedIndex = 0;
+        _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
         _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
         if (_case is not null && !IsCapturing) Analyze();
     }
@@ -150,10 +158,12 @@ public sealed class MainPage : ContentPage
     {
         var model = _catalog.Instruments.Single(instrument => instrument.Profiles.Any(p => p.Id == id));
         _selecting = true; _profiles.SelectedIndex = _catalog.Instruments.ToList().IndexOf(model);
-        _configurations.Items.Clear(); foreach (var profile in model.Profiles) _configurations.Items.Add(profile.Configuration);
-        _configurations.SelectedIndex = model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
+        _configurations.Items.Clear(); if (HasAutomaticInterpretation) _configurations.Items.Add(T("Source.AutomaticInterpretation"));
+        foreach (var profile in model.Profiles) _configurations.Items.Add(profile.Configuration);
+        _detectedProfile = id;
+        _configurations.SelectedIndex = HasAutomaticInterpretation ? 0 : model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
         _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
-        _mode.IsEnabled = Profile.CanSimulateHost; if (!Profile.CanSimulateHost) _mode.SelectedIndex = 0;
+        _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
     }
     private RecordedBy? Recorder => _recorder.SelectedIndex switch { 1 => RecordedBy.Host, 2 => RecordedBy.Instrument, _ => null };
     private TimeSpan LogOffset()
@@ -200,7 +210,8 @@ public sealed class MainPage : ContentPage
                 if (format == DiagnosticInputFormat.Auto)
                 {
                     if (!detected.Recognized) throw new InvalidDataException(DiagnosticText.Text(detected.Candidates.Count == 0 ? "Detection.Unknown" : "Detection.Ambiguous"));
-                    format = detected.Format; if (detected.ProfileId is { } profileId) SelectProfile(profileId);
+                    format = detected.Format;
+                    if (detected.ProfileId is { } profileId && !(HasAutomaticInterpretation && !AutomaticInterpretation)) SelectProfile(profileId);
                 }
                 if (format == DiagnosticInputFormat.ProtectedCase)
                 {
@@ -311,6 +322,12 @@ public sealed class MainPage : ContentPage
         if (!_ready || _case is null) return;
         try
         {
+            if (AutomaticInterpretation)
+            {
+                var detected = _catalog.ResolveInterpretation(_case, Profile); _detectedProfile = detected.Id;
+                _case = _case with { Header = _case.Header with { Profile = detected.Id } };
+                _evidence.Text = detected.Evidence;
+            }
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
             _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
         }
@@ -371,9 +388,11 @@ public sealed class MainPage : ContentPage
                         Detail(meaning, finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
                 }); break;
             case 4:
-                headers = [T("Column.Material"), T("Column.Test"), T("Column.Statistic"), T("Column.Value"), T("Column.Scope"), T("Column.SourceField")];
-                rows = (_analysis?.Observations ?? []).Where(o => o.Specimen.Role != SpecimenRole.Patient && (o.Quality is not null || o.Specimen.Role is SpecimenRole.Control or SpecimenRole.Calibrator)).SelectMany(QualityRows)
-                    .Concat((_analysis?.QualityResources ?? []).Select(resource => Row([T("Quality.External"), "", T("Quality.Targets"), T("Quality.RequiresHost"), T("Quality.Batch"), resource.SourceField], Json(resource), resource.SourceField))); break;
+                headers = [T("Quality.MaterialLot"), T("Column.Test"), T("Quality.DataType"), T("Quality.Minimum"), T("Quality.MedianValue"), T("Quality.Maximum"), T("Quality.SD"), T("Quality.N"), T("Quality.Signals")];
+                var quality = QualityGroups();
+                _table.SetGroups("quality:" + interpreted + ":" + _group.IsChecked, headers,
+                    _group.IsChecked ? quality : DiagnosticGrouping.Build(quality.SelectMany(g => g.Children), false), 8);
+                return;
             case 5:
                 headers = interpreted ? [T("Column.Layer"), T("Column.Sequence"), T("Column.Detail")] : [T("Column.Layer"), T("Column.Sequence"), T("Column.Code"), T("Column.Detail")];
                 rows = (_analysis?.Events ?? []).Select(item =>
@@ -393,13 +412,45 @@ public sealed class MainPage : ContentPage
         var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 2 };
         _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible);
     }
-    private IEnumerable<DiagnosticRow> QualityRows(InstrumentObservation observation)
+    private IReadOnlyList<DiagnosticRowGroup> QualityGroups()
     {
-        var context = observation.Quality; var material = context?.Material;
-        var label = (material?.Identifier ?? observation.Specimen.SpecimenId) + (material?.Lot is { } lot ? " / " + lot : ""); var detail = Json(observation);
-        if (observation.Value.RawText.Length > 0) yield return Row([label, observation.Test.Vendor.Code, F("Quality.Measurement", ProtocolExplainer.ResultKind(observation, Profile)), observation.Value.RawText, T("Quality.Individual"), T("Quality.Observation")], detail, label, observation.Test.Vendor.Code, observation.ResultKind);
-        foreach (var statistic in context?.Statistics ?? []) yield return Row([label, observation.Test.Vendor.Code, T("Statistic." + statistic.Kind), statistic.Value.RawText,
-            T("Scope." + statistic.Scope), statistic.SourceField], detail, label, observation.Test.Vendor.Code, statistic.Kind.ToString(), statistic.Scope.ToString());
+        static string Number(decimal? n) => n?.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
+        static string Approximate(double? n) => n?.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
+        var groups = new List<DiagnosticRowGroup>();
+        foreach (var series in QualitySeriesBuilder.Build(_analysis?.Observations ?? []))
+        {
+            var material = series.Material + (string.IsNullOrWhiteSpace(series.Lot) ? " / " + T("Quality.NoLot") : " / " + series.Lot)
+                + (string.IsNullOrWhiteSpace(series.Level) ? "" : " / " + series.Level);
+            var kind = ProtocolExplainer.ResultKind(series.Records[0], Profile) + (series.Unit.Length == 0 ? "" : " · " + series.Unit);
+            var signals = new List<string>();
+            if (series.Count == 0) signals.Add(T("Quality.NoNumeric")); else if (series.Count == 1) signals.Add(T("Quality.Single"));
+            if (series.PotentialOutliers.Count > 0) signals.Add(F("Quality.Outliers", series.PotentialOutliers.Count));
+            if (series.Flagged > 0) signals.Add(F("Quality.Flagged", series.Flagged));
+            if (series.NonNumeric > 0) signals.Add(F("Quality.NonNumeric", series.NonNumeric));
+            if (series.NotPerformed > 0) signals.Add(F("Quality.NotPerformed", series.NotPerformed));
+            if (series.Repeated > 0) signals.Add(F("Quality.Repeated", series.Repeated));
+            var reported = series.Records.Sum(o => o.Quality?.Statistics.Count ?? 0);
+            if (reported > 0) signals.Add(F("Quality.Reported", reported));
+            var detail = string.Join("\n", material, series.Test + " · " + kind,
+                T("Quality.Minimum") + ": " + series.Minimum?.ToString("G29"), T("Quality.Median") + ": " + series.Median?.ToString("G29"),
+                T("Quality.Maximum") + ": " + series.Maximum?.ToString("G29"), T("Quality.SD") + ": " + series.StandardDeviation?.ToString("G17"),
+                T("Quality.Mean") + ": " + series.Mean?.ToString("G17"), T("Quality.N") + ": " + series.Count,
+                F("Quality.Last", series.Last.Value.RawText, series.Last.ResultTime?.ToString("O") ?? "#" + series.Last.Trace.LastSequence),
+                T("Quality.Method"), string.Join(" · ", signals));
+            var children = series.Records.Select(o => new DiagnosticRow([material, series.Test, kind, "", o.Value.RawText, "", "", "",
+                "#" + o.Trace.LastSequence + (o.ResultTime is { } time ? " · " + time.ToString("g") : "") + " · " + ProtocolExplainer.Status(o)
+                    + (series.PotentialOutliers.Contains(o.ObservationId) ? " · " + T("Quality.Outlier") : "")], Json(o), series.Key)
+                { Attention = o.Flags.Count > 0 || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
+            groups.Add(new(series.Key, children) { SummaryRow = new([material, series.Test, kind, Number(series.Minimum), Number(series.Median), Number(series.Maximum),
+                Approximate(series.StandardDeviation), series.Count.ToString(CultureInfo.CurrentCulture), signals.Count == 0 ? T("Quality.NoSignals") : string.Join(" · ", signals)], detail, series.Key)
+                { Attention = series.Flagged > 0 || series.PotentialOutliers.Count > 0 } });
+        }
+        foreach (var resource in _analysis?.QualityResources ?? [])
+        {
+            var row = Row([T("Quality.External"), "", T("Quality.Targets"), "", "", "", "", "", T("Quality.RequiresHost")], Json(resource), resource.SourceField);
+            groups.Add(new(row.GroupKey, [row]));
+        }
+        return groups;
     }
     public void LoadDemo()
     {
@@ -417,7 +468,9 @@ public sealed class MainPage : ContentPage
         {
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
-            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 9 || _catalog.Instruments.Count(i => i.Id == "sysmex.uwam") != 1 || _catalog.Profiles.Count != 13 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
+            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 13 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
+            var quality = QualitySeriesBuilder.Build(analyzed.Observations);
+            if (quality.Sum(s => s.Count) != 2 || quality.Sum(s => s.Records.Count) != 3 || QualityGroups().Any(g => g.SummaryRow is null)) throw new InvalidDataException("ATSM-MAUI-QUALITY-SELFTEST");
             if (Encoding.UTF8.GetString(File.ReadAllBytes(path)).Contains(Convert.ToBase64String(_case.Entries[0].Data.Span), StringComparison.Ordinal)) throw new InvalidDataException("ATSM-UNPROTECTED-CASE");
         }
         finally { File.Delete(path); }
@@ -428,6 +481,19 @@ public sealed class MainPage : ContentPage
         }
         if (_title.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.TextBlock { IsTextSelectionEnabled: true })
             throw new InvalidOperationException("ATSM-MAUI-TEXT-NOT-SELECTABLE");
+        SelectProfile(SysmexUrinalysisPlugin.WithChemistryProfile);
+        _case = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.WireBytes, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        if (!AutomaticInterpretation || Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile || SelectedInstrument.Id != SysmexUrinalysisPlugin.PluginId)
+            throw new InvalidDataException("ATSM-MAUI-AUTO-INTERPRETATION-SELFTEST");
+        _configurations.SelectedIndex = 1;
+        if (AutomaticInterpretation || Profile.TracePlugin is not null) throw new InvalidDataException("ATSM-MAUI-MANUAL-INTERPRETATION-SELFTEST");
+        _configurations.SelectedIndex = 0;
+        if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile) throw new InvalidDataException("ATSM-MAUI-AUTO-RESTORE-SELFTEST");
+        foreach (var interpreted in new[] { false, true })
+        {
+            _interpret.IsChecked = interpreted;
+            for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
+        }
         _tab = 4; ShowTable();
     }
     private void ShowError(Exception error)

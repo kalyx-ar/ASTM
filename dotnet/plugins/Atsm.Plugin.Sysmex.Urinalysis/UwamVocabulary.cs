@@ -1,10 +1,11 @@
 using Atsm.Plugins;
 
-namespace Atsm.Plugin.Sysmex.Uwam;
+namespace Atsm.Plugin.Sysmex.Urinalysis;
 
-public sealed partial class UwamPlugin : IInstrumentDiagnosticVocabulary
+internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
 {
-    public IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary { get; } = StandardDiagnosticVocabulary.Create(
+    public IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary { get; } = CreateVocabulary();
+    internal static IReadOnlyDictionary<string, ProtocolText> CreateVocabulary() => StandardDiagnosticVocabulary.Create(
         "Sysmex R315168 rev.22 §5.3.3",
         ("record.S", "Datos del control de calidad y referencia de objetivos/límites"),
         ("record.O", "Muestra, tipo de análisis y estado de la solicitud"),

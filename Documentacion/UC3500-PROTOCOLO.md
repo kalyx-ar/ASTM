@@ -40,9 +40,9 @@ Serie C identifica material de control; lote, nivel y vencimiento no se infieren
 
 ## Integración y uso
 
-`IInstrumentTracePlugin` es un puerto neutral en Atsm.Plugins para detección, reconstrucción e interpretación pasiva. El fabricante implementa `Atsm.Plugin.Sysmex.Uc3500`; devuelve mensajes, eventos, observaciones y diagnósticos. No abre conexiones ni administra archivos. Core compone el catálogo; MAUI y la CLI usan el mismo intérprete. Vocabulario y diagnósticos tienen seed español por ensamblado y adaptación Lang opcional.
+`IInstrumentTracePlugin` es un puerto neutral en Atsm.Plugins para detección, reconstrucción e interpretación pasiva. El fabricante implementa `Atsm.Plugin.Sysmex.Urinalysis`; devuelve mensajes, eventos, observaciones y diagnósticos. No abre conexiones ni administra archivos. Core compone el catálogo; MAUI y la CLI usan el mismo intérprete. Vocabulario y diagnósticos tienen seed español por ensamblado y adaptación Lang opcional.
 
-Abrir el archivo con formato **Automático** selecciona UC-3500 y el lado del registrador cuando hay evidencia. También se puede elegir UC-3500 para reanalizar un caso previamente marcado incompatible. La vista Mensajes explica los registros, Hallazgos agrupa códigos y el detalle conserva correlación, tiras y originales. Las etiquetas y celdas MAUI permiten seleccionar texto y copiarlo; los controles editables y el detalle mantienen su copia nativa.
+Abrir el archivo con formato **Automático** resuelve el perfil UC dentro de U-WAM y el lado del registrador cuando hay evidencia. También se puede elegir U-WAM con interpretación automática para reanalizar un caso previamente marcado incompatible. La vista Mensajes explica los registros, Hallazgos agrupa códigos y el detalle conserva correlación, tiras y originales. Las etiquetas y celdas MAUI permiten seleccionar texto y copiarlo; los controles editables y el detalle mantienen su copia nativa.
 
 Captura directa TCP/SerialTunnel disponible sin respuestas, con custodia previa del anfitrión. La simulación activa se rechaza antes de abrir el canal: no hay envío de órdenes ni ACK UC-3500 implementados. La captura directa no es un sniffer; un equipo en HANDSHAKE puede esperar ACK y detener su transmisión. No se acredita homologación en hardware.
 
@@ -53,3 +53,6 @@ La captura privada permanece ignorada. Agregados: 2.006 entradas, **501 mensajes
 En las 111 órdenes que reciben ER04, el anfitrión solicita ` Strip  9A`; sus resultados informan ` Strip 11A` y 00CC. Es consistente con la tira pedida ausente y la medición con otra tira configurada. No prueba por sí solo la causa de configuración/carga. Las otras órdenes tienen tira vacía (15) o Strip 11A (2). También hay tres resultados 00BB, uno 8010 y dos 0000. Son códigos de equipo agregados, sin identificaciones de muestra.
 
 Pruebas sintéticas: fragmentación en todos los puntos, checksum separado/control, tramas concatenadas, cuatro modalidades de comprobación, CRLF de longitud completa, códigos conocidos/desconocidos, correlación, sentidos, resultados/reflectancias/serie C, corrupción y truncamiento sin observaciones, captura sin escrituras y rechazo de simulación activa. Validación de entrega y límites restantes en ESTADO/CONTINUACION.
+
+
+El intérprete serial convive con ASTM U-WAM en el mismo plugin; el selector principal ya no separa UC-3500. La base de conocimiento interpreta códigos según su contexto; un texto coincidente en otro campo no hereda el significado. Véase [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).

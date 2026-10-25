@@ -1,7 +1,7 @@
 using System.Text;
 using Atsm.Abstractions.Tracing;
 
-namespace Atsm.Plugin.Sysmex.Uc3500;
+namespace Atsm.Plugin.Sysmex.Urinalysis;
 
 public enum Uc3500CheckMode { Auto, None, Bcc, Sum, Sum2 }
 

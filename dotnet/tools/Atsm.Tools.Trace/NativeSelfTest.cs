@@ -4,7 +4,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Diagnostics;
 using Atsm.Plugin.BioRad.Cfx;
-using Atsm.Plugin.Sysmex.Uc3500;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Runtime.Tracing;
 using Atsm.Runtime.Sessions;
 using Atsm.Testing;
@@ -44,11 +44,13 @@ internal static class NativeSelfTest
         processor.ProcessAsync(selected.AstmProfile!.Encoding.GetBytes(message), Guid.NewGuid()).AsTask().GetAwaiter().GetResult();
         if (host.Batches.Single().Observations.Single().Value.Numeric != 1.2m) throw new InvalidDataException("Native ASTM host mismatch.");
         var ucInput = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, profile, "synthetic", TimeSpan.Zero);
-        var ucProfile = catalog.Resolve(Uc3500Plugin.ProfileId);
+        var ucProfile = catalog.Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         var uc = DiagnosticReader.Analyze(ucInput, ucProfile, timing);
         if (ucInput.Header.Profile != ucProfile.Id || uc.Messages.Count != 1 || !ProtocolExplainer.MessageContent(uc.Messages[0], ucProfile, []).Contains("Consulta", StringComparison.Ordinal))
             throw new InvalidDataException("Native UC-3500 mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok");
+        var quality = QualitySeriesBuilder.Build(analysis.Observations).Single();
+        if (quality.Count != 1 || quality.Median != 23.4m || quality.StandardDeviation is not null) throw new InvalidDataException("Native quality summary mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

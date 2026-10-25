@@ -10,9 +10,9 @@ using Atsm.Plugins.Tracing;
 using Atsm.Protocol.Lis01;
 using Atsm.Protocol.Lis02;
 
-namespace Atsm.Plugin.Sysmex.Uwam;
+namespace Atsm.Plugin.Sysmex.Urinalysis;
 
-public sealed partial class UwamPlugin : IInstrumentPlugin, ITraceLogAdapterProvider
+internal sealed partial class UwamInterpreter : IInstrumentPlugin, ITraceLogAdapterProvider
 {
     public const string PluginId = "sysmex.uwam";
     public const string WithChemistryProfile = "sysmex.uwam.lis2a2.with-chemistry";
@@ -94,7 +94,7 @@ public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogForm
 /// R.4 is value^format (RAW / MAINFORMAT, one record each), R.7 is analyzer flag^LH flag, R.9 carries the UD-10 cell,
 /// R.14 names the analyzer, Q.3 is the sample number alone, Q.13 the device type, and O.26 is always F (final).
 /// </summary>
-public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor(UwamPlugin.PluginId))
+public sealed class UwamDialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor(UwamInterpreter.PluginId))
 {
     /// <summary>Parameter through which U-WAM reports errors of the urine chemistry analyzer (UC-3500 / UC-1000), R315168 appendix B.1.</summary>
     public const string ChemistryErrorParameter = "C-Error Code";

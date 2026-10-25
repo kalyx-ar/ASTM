@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Sysmex urinalysis knowledge and profiles for U-WAM ASTM and direct UC serial communication.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" /></ItemGroup>
+</Project>

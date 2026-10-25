@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/plugins/">
-    <Project Path="plugins/Atsm.Plugin.Sysmex.Uc3500/Atsm.Plugin.Sysmex.Uc3500.csproj" />
+    <Project Path="plugins/Atsm.Plugin.Sysmex.Urinalysis/Atsm.Plugin.Sysmex.Urinalysis.csproj" />
     <Project Path="plugins/Atsm.Plugin.BioRad.Cfx/Atsm.Plugin.BioRad.Cfx.csproj" />
     <Project Path="plugins/Atsm.Plugin.Sysmex.XnL/Atsm.Plugin.Sysmex.XnL.csproj" />
     <Project Path="plugins/Atsm.Plugin.Sysmex.Cs2500/Atsm.Plugin.Sysmex.Cs2500.csproj" />
@@ -8,7 +8,6 @@
     <Project Path="plugins/Atsm.Plugin.Abbott.Architect/Atsm.Plugin.Abbott.Architect.csproj" />
     <Project Path="plugins/Atsm.Plugin.Abbott.CellDynRuby/Atsm.Plugin.Abbott.CellDynRuby.csproj" />
     <Project Path="plugins/Atsm.Plugin.Legacy.Testing/Atsm.Plugin.Legacy.Testing.csproj" />
-    <Project Path="plugins/Atsm.Plugin.Sysmex.Uwam/Atsm.Plugin.Sysmex.Uwam.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Atsm.Abstractions/Atsm.Abstractions.csproj" />

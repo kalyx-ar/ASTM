@@ -1,0 +1,50 @@
+using Atsm.Abstractions.Diagnostics;
+using Atsm.Plugins;
+
+namespace Atsm.Plugin.Sysmex.Urinalysis;
+
+/// <summary>Compiled, evidence-backed knowledge. A code is meaningful only in its decoded context.</summary>
+internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
+{
+    private readonly Dictionary<(InstrumentKnowledgeContext Context, string Code), InstrumentKnowledgeFact> facts = [];
+    public IReadOnlyDictionary<string, ProtocolText> Vocabulary { get; }
+    public UrinalysisKnowledge()
+    {
+        var vocabulary = new Dictionary<string, ProtocolText>(UwamInterpreter.CreateVocabulary(), StringComparer.Ordinal);
+        foreach (var (key, value) in Uc3500Interpreter.CreateVocabulary()) vocabulary.Add(key, value);
+        Vocabulary = vocabulary;
+        foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
+        foreach (var (key, value) in vocabulary.Where(p => p.Key.StartsWith("record.", StringComparison.Ordinal)))
+            facts.Add((new(profile, "record", "type"), key[7..]), new(value));
+        foreach (var code in new[] { "RQ02", "CM00" })
+            facts.Add((new(Uc3500Interpreter.ProfileId, "command", "code"), code), new(vocabulary[code]));
+        facts.Add((new(Uc3500Interpreter.ProfileId, "CM00", "strip"), ""), new(vocabulary["CM00.EMPTY"]));
+        facts.Add((new(Uc3500Interpreter.ProfileId, "record", "type"), "RESULT"), new(vocabulary["RESULT"]));
+        foreach (var code in new[] { "ACK", "NAK", "EOT" })
+            facts.Add((new(Uc3500Interpreter.ProfileId, "control", "code"), code), new(vocabulary[code]));
+        foreach (var code in new[] { "ER00", "ER01", "ER03", "ER04", "ER05" })
+            facts.Add((new(Uc3500Interpreter.ProfileId, "ER", "code"), code), new(vocabulary[code],
+                code == "ER00" ? null : "ATSM-UC3500-" + code, code == "ER00" ? AtsmSeverity.Information : AtsmSeverity.Warning));
+        foreach (var code in new[] { "00BB", "00CC", "00DD" })
+        {
+            var finding = "ATSM-UC3500-ANALYSIS-" + code;
+            facts.Add((new(Uc3500Interpreter.ProfileId, "RESULT", "error"), code), new(vocabulary["finding." + finding], finding, AtsmSeverity.Warning));
+        }
+    }
+    public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code)
+    {
+        if (facts.TryGetValue((context, code), out var exact)) return exact;
+        if (context != new InstrumentKnowledgeContext(Uc3500Interpreter.ProfileId, "RESULT", "error") || code == "0000") return null;
+        // Table 7-1 categories apply to result errors, never to ER response records or arbitrary text.
+        var category = code switch
+        {
+            _ when code.Length == 4 && code[1] == '0' && code[3] == '0' && code[0] is >= '1' and <= '9' && code[2] is >= '1' and <= '9' => "STRIP",
+            _ when code.Length == 4 && code[0] == '0' && code[2] == '0' && code[1] is >= '1' and <= '9' && code[3] is >= '1' and <= '9' => "LIGHT",
+            _ when code.Length == 4 && code.EndsWith("00", StringComparison.Ordinal) => "MEASUREMENT",
+            _ => null,
+        };
+        if (category is null) return null;
+        var finding = "ATSM-UC3500-ANALYSIS-" + category;
+        return new(Vocabulary["finding." + finding], finding, AtsmSeverity.Warning);
+    }
+}

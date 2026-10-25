@@ -2,12 +2,17 @@ using System.Globalization;
 
 namespace Atsm.Diagnostics;
 
-public sealed record DiagnosticRow(string[] Cells, string Details, string GroupKey);
+public sealed record DiagnosticRow(string[] Cells, string Details, string GroupKey)
+{
+    public bool Attention { get; init; }
+}
 public sealed record DiagnosticRowGroup(string Key, IReadOnlyList<DiagnosticRow> Children)
 {
     public int Count => Children.Count;
+    public DiagnosticRow? SummaryRow { get; init; }
     public DiagnosticRow Summary(Func<int, string> multiple)
     {
+        if (SummaryRow is { } summary) return summary;
         var cells = Enumerable.Range(0, Children[0].Cells.Length).Select(column =>
         {
             var values = Children.Select(row => row.Cells[column]).Distinct(StringComparer.Ordinal).ToArray();

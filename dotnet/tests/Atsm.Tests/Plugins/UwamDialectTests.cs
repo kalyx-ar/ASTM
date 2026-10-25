@@ -1,7 +1,7 @@
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis02;
 
@@ -18,7 +18,7 @@ public class UwamDialectTests
         "R|2|^^^BACT^A^1^S^000123^04|2.8x10&S&4^MAINFORMAT|/ml||A^H||||||20251105004710|UF-5000\r" +
         "L|1|N\r";
 
-    private static readonly IAstmDialect Dialect = new UwamPlugin().CreateDialect(new UwamPlugin().Profiles[0], new DialectContext(new InstrumentRef("uwam"), TimeProvider.System));
+    private static readonly IAstmDialect Dialect = new SysmexUrinalysisPlugin().CreateDialect(new SysmexUrinalysisPlugin().Profiles[0], new DialectContext(new InstrumentRef("uwam"), TimeProvider.System));
 
     [Fact]
     public void Results_follow_the_uwam_field_layout()
@@ -67,9 +67,9 @@ public class UwamDialectTests
     [Fact]
     public void Profiles_carry_the_inquiry_limits_of_the_manual()
     {
-        var profiles = new UwamPlugin().Profiles;
+        var profiles = new SysmexUrinalysisPlugin().Profiles;
 
-        Assert.True(profiles.Single(p => p.Id == UwamPlugin.WithChemistryProfile).QueryAnswerBudget < TimeSpan.FromSeconds(8));
-        Assert.True(profiles.Single(p => p.Id == UwamPlugin.WithoutChemistryProfile).QueryAnswerBudget < TimeSpan.FromSeconds(18));
+        Assert.True(profiles.Single(p => p.Id == SysmexUrinalysisPlugin.WithChemistryProfile).QueryAnswerBudget < TimeSpan.FromSeconds(8));
+        Assert.True(profiles.Single(p => p.Id == SysmexUrinalysisPlugin.WithoutChemistryProfile).QueryAnswerBudget < TimeSpan.FromSeconds(18));
     }
 }

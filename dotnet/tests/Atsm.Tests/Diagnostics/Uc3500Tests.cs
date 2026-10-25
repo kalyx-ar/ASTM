@@ -3,7 +3,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Tracing;
 using Atsm.Diagnostics;
-using Atsm.Plugin.Sysmex.Uc3500;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 using Atsm.Tracing;
 using Atsm.Tests.Runtime;
@@ -28,7 +28,7 @@ public sealed class Uc3500Tests
     private static TraceEntry Entry(long sequence, byte[] bytes, TraceDirection direction = TraceDirection.Received) => new(sequence,
         TimeSpan.FromMilliseconds(sequence), DateTimeOffset.UnixEpoch, direction, bytes);
     private static TraceInterpretation Interpret(IEnumerable<TraceEntry> entries, Uc3500CheckMode mode = Uc3500CheckMode.Auto)
-    { var plugin = new Uc3500Plugin(mode); return plugin.Interpret(plugin.Profiles[0], entries.ToArray(), new("SYN"), Guid.Empty, TimeZoneInfo.Utc); }
+    { var plugin = new SysmexUrinalysisPlugin(mode); return plugin.Interpret(plugin.TraceProfiles[0], entries.ToArray(), new("SYN"), Guid.Empty, TimeZoneInfo.Utc); }
     private static string Result(bool reflectance = true, char series = 'C', string error = "0000")
     {
         var f = new List<string> { Sample, "0001", "01", series + "00000001", error, " Strip 11A", "2026/10/25", "10:15:20" };
@@ -93,7 +93,7 @@ public sealed class Uc3500Tests
         Assert.Equal(" Strip 11A", result.Messages[2].Fields["strip.requested"]);
         if (finding is null) Assert.Empty(result.Diagnostics); else Assert.Equal(finding, Assert.Single(result.Diagnostics).Code);
         Assert.Equal(5, result.Events.Count(e => e.Level == ProtocolEventLevel.Link));
-        var profile = new DiagnosticCatalog().Resolve(Uc3500Plugin.ProfileId);
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         Assert.All(result.Messages, m => Assert.NotEmpty(DiagnosticText.Explanation(profile.TracePlugin!, m.Explanation)));
         if (response == "ER04") Assert.Contains("rack de botellas", DiagnosticText.Finding(result.Diagnostics[0], profile));
     }
@@ -146,7 +146,7 @@ public sealed class Uc3500Tests
         var log = Encoding.ASCII.GetBytes($"2026/10/25 10:00:00.000 {direction} 023{{{payload}}}\r\n2026/10/25 10:00:00.001 {direction} 001{{{(char)check}}}\r\n");
         var catalog = new DiagnosticCatalog(); var selected = catalog.Profiles.First(p => p.ContentPlugin is not null);
         var detected = DiagnosticInputDetector.Detect(log, selected, catalog);
-        Assert.Equal(Uc3500Plugin.ProfileId, detected.ProfileId); Assert.Equal(recorder, detected.Recorder); Assert.False(detected.UnsupportedProtocol);
+        Assert.Equal(SysmexUrinalysisPlugin.Uc3500Profile, detected.ProfileId); Assert.Equal(recorder, detected.Recorder); Assert.False(detected.UnsupportedProtocol);
         var input = DiagnosticReader.Read(log, DiagnosticInputFormat.Auto, selected, "opaque.any", TimeSpan.Zero);
         var profile = catalog.Resolve(input.Header.Profile!); Assert.True(profile.CanConnect); Assert.False(profile.CanSimulateHost);
         var old = input with { Header = input.Header with { Properties = new Dictionary<string, string> { ["unsupportedProtocol"] = "true" } } };
@@ -158,7 +158,7 @@ public sealed class Uc3500Tests
     [Fact]
     public async Task Direct_capture_decodes_without_sending_and_active_commands_are_rejected_before_connecting()
     {
-        var profile = new DiagnosticCatalog().Resolve(Uc3500Plugin.ProfileId);
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         var header = new TraceHeader(Guid.NewGuid(), "synthetic", "test", profile.Id, DateTimeOffset.UnixEpoch);
         var trace = new DiagnosticTraceSink(header); var channel = new SuppliedChannel(Frame(Result()), fragment: 3);
         await LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<IInstrumentChannel>(channel), false, "test", CancellationToken.None);
@@ -175,7 +175,7 @@ public sealed class Uc3500Tests
     {
         var result = Interpret([Entry(0, Frame(Query)), Entry(1, Frame(Order[..24] + new string(' ', 10)), TraceDirection.Transmitted),
             Entry(2, Frame("ER00,000000")), Entry(3, Frame(Result(error: "00CC")))]);
-        Assert.Contains("no tiene orden", DiagnosticText.Explanation(new Uc3500Plugin(), result.Messages[1].Explanation));
+        Assert.Contains("no tiene orden", DiagnosticText.Explanation(new SysmexUrinalysisPlugin(), result.Messages[1].Explanation));
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == "ATSM-UC3500-ER00");
         Assert.Contains(result.Diagnostics, d => d.Code == "ATSM-UC3500-ANALYSIS-00CC");
         Assert.All(result.Observations, o => Assert.Contains(o.Flags, f => f.Code == "00CC"));

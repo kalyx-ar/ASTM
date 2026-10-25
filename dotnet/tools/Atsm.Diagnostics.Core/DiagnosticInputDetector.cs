@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.BioRad.Cfx;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 
 namespace Atsm.Diagnostics;
@@ -41,11 +41,13 @@ public static partial class DiagnosticInputDetector
             var compatible = HasAstmHeader(extraction.Segments) || hl7 || selected.IsHl7;
             var controlOnly = extraction.Segments.Where(s => s.Direction != TraceDirection.Event).All(s => s.Data.Span.IndexOfAnyExcept((byte)4, (byte)5, (byte)6) < 0 || s.Data.Span.SequenceEqual(new byte[] { 21 }));
             var profile = hl7 ? Hl7Profile(selected)
-                : selected.CanConnect ? selected.Id : StandardAstmPlugin.ProfileId;
+                : selected.AstmProfile is not null ? selected.Id : selected.InstrumentId == SysmexUrinalysisPlugin.PluginId && compatible
+                    ? SysmexUrinalysisPlugin.WithChemistryProfile : StandardAstmPlugin.ProfileId;
             // A recorder brand alone does not identify the protocol. Only a declared message header is a model hint.
             var headers = extraction.Segments.Where(s => s.Data.Span.IndexOf("H|"u8) >= 0).Select(s => Encoding.Latin1.GetString(s.Data.Span));
             if (!hl7 && headers.Any(h => h.Contains("U-WAM", StringComparison.OrdinalIgnoreCase) || h.Contains("UF-5000", StringComparison.OrdinalIgnoreCase))
-                && selected.AstmPlugin is not UwamPlugin) profile = UwamPlugin.WithChemistryProfile; // Conservative 6 s budget; a file cannot prove the installed chemistry option.
+                && selected.AstmPlugin is not SysmexUrinalysisPlugin)
+                profile = SysmexUrinalysisPlugin.WithChemistryProfile; // Conservative budget; a file cannot prove the installed chemistry option.
             return new(formats, profile, matchingLogs[0].Id == "legacy.interface-log" ? RecordedBy.Host : InferRecorder(extraction.Segments), !compatible && !controlOnly);
         }
         var first = text.TrimStart('\uFEFF', ' ', '\r', '\n', '\t').AsSpan();

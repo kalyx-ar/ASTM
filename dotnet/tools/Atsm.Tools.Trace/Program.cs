@@ -7,7 +7,7 @@ using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugin.Abbott.CellDynRuby;
 using Atsm.Plugin.Legacy.Testing;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 using Atsm.Runtime.Tracing;
 using Atsm.Tracing;

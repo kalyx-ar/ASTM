@@ -15,7 +15,9 @@ public static class ProtocolExplainer
     {
         var vocabulary = (profile.AstmPlugin as IInstrumentDiagnosticVocabulary)?.DiagnosticVocabulary;
         return text.Replace("\r\n", "\r", StringComparison.Ordinal).Replace('\n', '\r').Split('\r', StringSplitOptions.RemoveEmptyEntries)
-            .Select(r => (Code: r[0], Meaning: vocabulary?.GetValueOrDefault("record." + r[0]))).ToArray();
+            .Select(r => (Code: r[0], Meaning: profile.AstmPlugin is IInstrumentKnowledge knowledge
+                ? knowledge.Lookup(new(profile.Id, "record", "type"), r[0].ToString())?.Text
+                : vocabulary?.GetValueOrDefault("record." + r[0]))).ToArray();
     }
     public static string RecordNames(string text, DiagnosticProfile profile) => string.Join(" · ", Records(text, profile).Select(record =>
         record.Meaning is { } meaning ? DiagnosticText.Plugin(profile.AstmPlugin!, meaning) : DiagnosticText.Format("Unknown.Command", record.Code)));

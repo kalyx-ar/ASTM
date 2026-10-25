@@ -1,6 +1,6 @@
 using System.Text;
 using Atsm.Abstractions.Tracing;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
 using Atsm.Tracing;
@@ -122,7 +122,7 @@ public class TracingTests
             "2025/11/05 00:45:29.302 R  001{[ACK]}\r\n" +
             "2025/11/05 00:45:29.312 S  020{[STX]1H|\\^&|||U-WAM[CR][ETX]00[CR][LF]}\r\n" +
             "2025/11/05 00:45:29.320 R  009{L|1|N[CR]}\r\n");
-        var adapter = new UwamPlugin().LogAdapters.Single();
+        var adapter = new SysmexUrinalysisPlugin().LogAdapters.Single();
 
         var extraction = adapter.Extract(log, new LogAdapterOptions(RecordedBy.Instrument));
 

@@ -6,7 +6,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugin.BioRad.Cfx;
-using Atsm.Plugin.Sysmex.Uwam;
+using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Plugins;
 using Atsm.Protocol.Hl7v2;
 using Atsm.Protocol.Lis02;
@@ -139,7 +139,7 @@ public class QualityDataTests
     [Fact]
     public async Task UWAM_resource_only_messages_use_the_same_custody_boundary_and_stable_reception_identity()
     {
-        var plugin = new UwamPlugin(); var host = new InMemoryLabHost(); var receipt = Guid.NewGuid();
+        var plugin = new SysmexUrinalysisPlugin(); var host = new InMemoryLabHost(); var receipt = Guid.NewGuid();
         var processor = new AstmMessageProcessor(plugin.CreateDialect(plugin.Profiles[0], new(new("U1"), TimeProvider.System)), plugin.Profiles[0], host, new("U1"), new MemoryTraceSink());
         var bytes = Encoding.ASCII.GetBytes("H|\\^&\rS|1|||||\\\\SYN-SERVER\\QC Data\\targets.csv\rL|1\r");
         await processor.ProcessAsync(bytes, receipt); await processor.ProcessAsync(bytes, receipt);

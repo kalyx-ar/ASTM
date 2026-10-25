@@ -4,6 +4,8 @@ Instantánea del 25 de octubre de 2026. Describe lo que existe y lo que se compr
 
 ## Implementado
 
+Ajuste de presentación (2026-10-25): hallazgos genéricos UC-3500 abreviados a «Error relacionado con las tiras reactivas», «Error de análisis» y «Error del sistema óptico»; código y referencia permanecen en detalle.
+
 | Pieza | Ubicación | Comprobación |
 |---|---|---|
 | Contratos neutrales (canal, modelo canónico, `ILabWorkflowHost`, traza, segmentos puros) | `dotnet/src/Atsm.Abstractions` | Compila sin advertencias (`TreatWarningsAsErrors`) |
@@ -19,22 +21,24 @@ Instantánea del 25 de octubre de 2026. Describe lo que existe y lo que se compr
 | Canales: Stream, TCP nativo (TLS 1.2/1.3 por endpoint), Replay, SerialTunnel (Link v1) | `dotnet/src/Atsm.Channels` | Vectores compartidos con C++; prueba cruzada con el agente nativo |
 | Trazas neutrales: real y teórica por el mismo método, pila de eventos, métricas, comparación, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `atsm-trace` | Pruebas sintéticas y trazas reales locales (ver abajo) |
 | Plugin Abbott ARCHITECT (ASI RS-232) | `dotnet/plugins/Atsm.Plugin.Abbott.Architect` | Mensajes sintéticos según el manual 91407-108 y trazas reales locales |
-| Plugin Sysmex U-WAM (LIS2-A2 / E1381-02) y adaptador del monitor de puertos de Sysmex | `dotnet/plugins/Atsm.Plugin.Sysmex.Uwam` | Mensajes sintéticos según R315168 rev. 22 y trazas reales locales |
+| Plugin Sysmex U-WAM (LIS2-A2 / E1381-02) y adaptador del monitor de puertos de Sysmex | `dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis` | Mensajes sintéticos según R315168 rev. 22 y trazas reales locales |
 | Plugin Abbott CELL-DYN Ruby (LIS2-A, derivado de trazas) | `dotnet/plugins/Atsm.Plugin.Abbott.CellDynRuby` | Mensajes sintéticos con la estructura de las trazas y trazas reales locales |
 | Plugin de pruebas legacy (sólo adaptador de log, fuera del motor neutral) | `dotnet/plugins/Atsm.Plugin.Legacy.Testing` | Log sintético y logs reales locales |
 | Bio-Rad CFX Maestro, CSV/RDML 1.0/1.1 | `dotnet/plugins/Atsm.Plugin.BioRad.Cfx` | Exportaciones sintéticas; referencias/exclusiones/Cq original, sin control directo ni homologación de modelos |
 | Sysmex XN-L y CS-2500 | `dotnet/plugins/Atsm.Plugin.Sysmex.XnL`, `Atsm.Plugin.Sysmex.Cs2500` | Perfiles de recepción según manual; componentes de prueba/muestra y estados crudos; consultas/órdenes sin implementar |
 | DIAGAST QWALYS 3 | `dotnet/plugins/Atsm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |
-| Diagnóstico MAUI Windows independiente | `dotnet/tools/Atsm.Diagnostics.Maui`, `Atsm.Diagnostics.Core` | 9 equipos/familias y 13 perfiles técnicos, texto seleccionable en etiquetas/celdas, interpretación/grupos predeterminados, detección de logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; ventana/handler, runtime privado y DPAPI comprobados por self-test |
-| UC-3500 serial propio | `Atsm.Plugin.Sysmex.Uc3500`, puerto `IInstrumentTracePlugin` | Reconstrucción pasiva RQ02/CM00/ER, resultados, BCC/SUM/SUM2/NONE, controles y correlación. Captura sin envío; no host activo. 501 mensajes/2.251 observaciones en captura local, sin falsa interpretación ASTM. Ver [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md) |
+| Diagnóstico MAUI Windows independiente | `dotnet/tools/Atsm.Diagnostics.Maui`, `Atsm.Diagnostics.Core` | 8 equipos/familias y 13 perfiles técnicos, texto seleccionable en etiquetas/celdas, interpretación/grupos predeterminados, detección de logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; ventana/handler, runtime privado y DPAPI comprobados por self-test |
+| UC-3500 serial propio | `Atsm.Plugin.Sysmex.Urinalysis`, puerto `IInstrumentTracePlugin` | Reconstrucción pasiva RQ02/CM00/ER, resultados, BCC/SUM/SUM2/NONE, controles y correlación. Captura sin envío; no host activo. 501 mensajes/2.251 observaciones en captura local, sin falsa interpretación ASTM. Ver [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md) |
 | Agente nativo C++17 con TLS (Mbed TLS 4.1.1) | `native/` | 542 verificaciones nativas (CBOR, Link v1, árbitro, configuración, TLS sin archivos válidos, sesión completa por TCP); pruebas cruzadas mTLS desde .NET |
 | Especificación ATSM Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
 | Datos QC/calibración y consulta | `AnalyticalQualityContext`, `IQualityDataSource`, `ObservationQualityDataSource`, `IQualityResourceContent` | Lote/material/módulo, INV/ZCL, estadísticas/curva CSV CFX y referencias S.7 U-WAM con custodia del lote completo. Sin reglas QC, descarga de archivos ni informe R24. Ver [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md) |
 | Firma Strong Name con la SNK de la distribución | `dotnet/Directory.Build.targets` | Mismo token que EDC (`066190a23251f202`); la clave no está en el repositorio |
 
-Pruebas de esta entrega: dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true → 201 correctas, 0 omitidas, dos corridas finales completas (~1 s de pruebas); ctest → 542 verificaciones, 0 fallos, repetidas (~0,26 s). Incluye 7 contra el agente compilado, 5 por TLS. Prueba opcional del Lang real: 1 correcta (77 ms), incluido seed UC-3500. GUI: self-test de ventana, runtime privado, DPAPI, selección nativa en título/cabeceras y siete vistas con/sin interpretación. CLI NativeAOT: self-test con UC-3500 y auditoría de referencias de la GUI correctos. Se mantienen visibles cinco advertencias CS8002 de MAUI oficiales sin Strong Name; ensamblados propios firmados, Authenticode pendiente. Sin homologación física.
+Pruebas de esta entrega: dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true → 211 correctas, 0 omitidas, dos corridas finales completas (~1 s de pruebas); ctest → 542 verificaciones, 0 fallos, repetidas (~0,26 s). Incluye 7 contra el agente compilado, 5 por TLS. Prueba opcional del Lang real: 1 correcta (77 ms), incluido seed de la familia Sysmex. GUI: self-test de ventana, runtime privado, DPAPI, selección nativa en título/cabeceras y siete vistas con/sin interpretación. CLI NativeAOT: self-test con UC-3500 y auditoría de referencias de la GUI correctos. Se mantienen visibles cinco advertencias CS8002 de MAUI oficiales sin Strong Name; ensamblados propios firmados, Authenticode pendiente. Sin homologación física.
 
 La intermitencia TLS de Certificate_must_identify_the_declared_controller permanece pendiente. En el incremento UC-3500 también falló una vez Fragmented_MLLP_and_coalesced_blocks_are_acknowledged_individually; pasó aislada en 122 ms y en las corridas finales completas. No se alteraron protocolos existentes ni timeouts para obtener un resultado correcto. Repertorio y límites: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
+
+Calidad: resumen por material/lote, prueba y tipo/unidad, con mínimo, mediana, máximo, DE y n; posibles atípicos/alarmas resaltados, originales en subfilas. U-WAM único con interpretación automática y opción manual; plugin de familia con conocimiento por contexto. Ver [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).
 
 ## Verificación con datos reales (sólo local)
 

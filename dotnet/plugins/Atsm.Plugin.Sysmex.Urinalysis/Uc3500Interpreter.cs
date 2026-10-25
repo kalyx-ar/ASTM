@@ -6,10 +6,10 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins;
 
-namespace Atsm.Plugin.Sysmex.Uc3500;
+namespace Atsm.Plugin.Sysmex.Urinalysis;
 
 /// <summary>UC-3500 ↔ host, not the U-WAM ↔ LIS ASTM dialect. Read-only, with no active order generation.</summary>
-public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500CheckMode.Auto) : IInstrumentTracePlugin
+internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInstrumentKnowledge knowledge) : IInstrumentTracePlugin
 {
     public const string PluginId = "sysmex.uc3500";
     public const string ProfileId = "sysmex.uc3500.serial";
@@ -74,7 +74,8 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
         foreach (var (entry, value) in decoder.Controls)
         {
             var code = value switch { 6 => "ACK", 21 => "NAK", _ => "EOT" };
-            events.Add(new(ProtocolEventLevel.Link, entry.Sequence, entry.Sequence, entry.Elapsed, entry.Direction, "uc3500." + code, Explain(code)));
+            events.Add(new(ProtocolEventLevel.Link, entry.Sequence, entry.Sequence, entry.Elapsed, entry.Direction, "uc3500." + code,
+                new(knowledge.Lookup(new(ProfileId, "control", "code"), code)!.Text, [])));
         }
         foreach (var error in decoder.Errors) Finding(error.Code, error.Sequence);
         (string Id, string Position, long Sequence)? query = null;
@@ -83,6 +84,8 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
         {
             var code = Code(packet.Text); var fields = new Dictionary<string, string>(StringComparer.Ordinal)
             { ["checksum"] = packet.Check, ["frame.valid"] = packet.Valid.ToString() };
+            var fact = knowledge.Lookup(code == "RESULT" ? new(ProfileId, "record", "type")
+                : new(ProfileId, code.StartsWith("ER", StringComparison.Ordinal) ? "ER" : "command", "code"), code);
             var explanation = Explain(code == "UNKNOWN" ? "UNKNOWN" : code.StartsWith("ER", StringComparison.Ordinal)
                 ? DiagnosticVocabulary.ContainsKey(code) ? code : "ER.UNKNOWN" : code,
                 code == "RESULT" ? packet.Text.Split(',')[0].Trim() : code);
@@ -93,7 +96,7 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
                 if (layout)
                 {
                     fields["sample.id"] = packet.Text.Substring(5, 14).Trim(); fields["tube.position"] = packet.Text.Substring(19, 2);
-                    explanation = Explain(code, fields["sample.id"], fields["tube.position"]);
+                    explanation = new(fact!.Text, [fields["sample.id"], fields["tube.position"]]);
                 }
             }
             else if (code == "CM00")
@@ -104,12 +107,13 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
                     fields["sample.id"] = packet.Text.Substring(8, 14).Trim(); fields["tube.position"] = packet.Text.Substring(22, 2);
                     fields["strip.requested"] = packet.Text.Substring(24, 10); // Leading spaces belong to the strip name.
                     explanation = string.IsNullOrWhiteSpace(fields["strip.requested"])
-                        ? Explain("CM00.EMPTY", fields["sample.id"], fields["tube.position"])
-                        : Explain(code, fields["sample.id"], fields["tube.position"], fields["strip.requested"]);
+                        ? new(knowledge.Lookup(new(ProfileId, "CM00", "strip"), "")!.Text, [fields["sample.id"], fields["tube.position"]])
+                        : new(fact!.Text, [fields["sample.id"], fields["tube.position"], fields["strip.requested"]]);
                 }
             }
             else if (code.StartsWith("ER", StringComparison.Ordinal))
             {
+                explanation = fact is null ? Explain("ER.UNKNOWN", code) : new(fact.Text, []);
                 layout = packet.Text.Length == 11 && packet.Text.AsSpan(5).SequenceEqual("000000");
                 fields["order.response"] = code;
                 if (order is { } sent)
@@ -125,7 +129,7 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
                 fields["sample.id"] = f[0].Trim(); fields["rack"] = f[1]; fields["tube.position"] = f[2];
                 fields["analysis.series"] = f[3][..1]; fields["analysis.number"] = f[3][1..]; fields["analysis.error"] = f[4];
                 fields["strip.used"] = f[5]; fields["analysis.date"] = f[6]; fields["analysis.time"] = f[7];
-                explanation = Explain(code, fields["sample.id"], fields["analysis.series"], fields["analysis.number"], f[4]);
+                explanation = new(fact!.Text, [fields["sample.id"], fields["analysis.series"], fields["analysis.number"], f[4]]);
                 if (packet.Text.Length > 441) Finding("LENGTH-DISCREPANCY", packet.Last, AtsmSeverity.Information);
             }
             if (!packet.Valid) Finding(packet.Check == "incomplete" ? "INCOMPLETE" : "CHECKSUM", packet.Last);
@@ -153,13 +157,18 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
             else if (code.StartsWith("ER", StringComparison.Ordinal))
             {
                 if (order is null) Finding("CORRELATION", packet.Last);
-                if (code != "ER00") Finding(DiagnosticVocabulary.ContainsKey(code) ? code : "UNKNOWN", packet.Last);
+                if (fact?.FindingCode is { } findingCode) Finding(findingCode["ATSM-UC3500-".Length..], packet.Last, fact.Severity);
+                else if (code != "ER00") Finding("UNKNOWN", packet.Last);
                 query = null; order = null;
             }
             else if (code == "RESULT")
             {
                 var f = packet.Text.Split(',');
-                if (f[4] != "0000") Finding(AnalysisFinding(f[4]), packet.Last);
+                if (f[4] != "0000")
+                {
+                    var error = knowledge.Lookup(new(ProfileId, "RESULT", "error"), f[4]);
+                    Finding(error?.FindingCode?["ATSM-UC3500-".Length..] ?? "ANALYSIS-ERROR", packet.Last, error?.Severity ?? AtsmSeverity.Warning);
+                }
                 var parsedTime = ParseTime(f[6], f[7], timeZone);
                 if (parsedTime is null) Finding("TIMESTAMP", packet.Last);
                 observations.AddRange(Results(f, instrument, new(traceId, packet.First, packet.Last), fields, parsedTime));
@@ -174,14 +183,6 @@ public sealed partial class Uc3500Plugin(Uc3500CheckMode checkMode = Uc3500Check
             || zone.IsInvalidTime(parsed) || zone.IsAmbiguousTime(parsed)) return null;
         return new(parsed, zone.GetUtcOffset(parsed));
     }
-    private static string AnalysisFinding(string code) => code switch
-    {
-        "00BB" or "00CC" or "00DD" => "ANALYSIS-" + code,
-        _ when code.Length == 4 && code[1] == '0' && code[3] == '0' && code[0] is >= '1' and <= '9' && code[2] is >= '1' and <= '9' => "ANALYSIS-STRIP",
-        _ when code.Length == 4 && code[0] == '0' && code[2] == '0' && code[1] is >= '1' and <= '9' && code[3] is >= '1' and <= '9' => "ANALYSIS-LIGHT",
-        _ when code.Length == 4 && code.EndsWith("00", StringComparison.Ordinal) => "ANALYSIS-MEASUREMENT",
-        _ => "ANALYSIS-ERROR",
-    };
     private static readonly string[] Parameters = ["URO", "BLD", "BIL", "KET", "GLU", "PRO", "pH", "NIT", "LEU", "SG.strip", "CRE", "ALB", "P/C", "A/C", "SG.refractometer", "COLOR"];
     private static IEnumerable<InstrumentObservation> Results(string[] f, InstrumentRef instrument, TraceRef trace,
         Dictionary<string, string> identity, DateTimeOffset? time)

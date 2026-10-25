@@ -22,7 +22,7 @@ Encabezados con fondo claro, regla inferior y agarre de redimensionado discreto 
 
 ## Una entrada U-WAM y configuraciones de comunicación
 
-La lista presenta **9 equipos/familias**, que conservan **13 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
+La lista presenta **8 equipos/familias**, que conservan **13 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
 
 | Configuración | Límite de consulta según R315168 §5.2.5 | Presupuesto del anfitrión ATSM |
 |---|---|---|
@@ -70,7 +70,7 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 ## Verificación y límites
 
-201 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+211 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 
@@ -82,3 +82,6 @@ La detección preserva también HL7/MLLP dentro de un log: infiere el lado del r
 
 
 Selección de texto: LabelHandler configura IsTextSelectionEnabled en el TextBlock nativo Windows para etiquetas/celdas. El self-test de la salida real comprueba título y cabeceras, además de alineación/handlers. El detalle de sólo lectura mantiene la selección y copia del editor nativo. Botones de expansión, casillas y arrastre de columnas conservan su función.
+
+
+U-WAM agrupa también la interpretación serial UC-3500 dentro del mismo plugin de familia. Configuración Interpretación automática predeterminada; selección específica opcional. Los hallazgos genéricos son breves. Calidad usa resúmenes calculados con subfilas reales, no el contador genérico de textos diferentes; [detalles](CALIDAD-DIAGNOSTICA.md).

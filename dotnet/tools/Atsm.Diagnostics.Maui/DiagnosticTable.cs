@@ -49,8 +49,12 @@ internal sealed class DiagnosticTable : ContentView
     public void SetRows(string view, string[] columns, IEnumerable<DiagnosticRow> source, bool group, int flexibleColumn)
     {
         var rows = source.ToArray();
+        SetGroups(view, columns, DiagnosticGrouping.Build(rows, group), flexibleColumn);
+    }
+    public void SetGroups(string view, string[] columns, IReadOnlyList<DiagnosticRowGroup> groups, int flexibleColumn)
+    {
         if (_view != view) { _view = view; _page = 0; _expanded.Clear(); }
-        _columns = columns; _flexibleColumn = flexibleColumn; _originalCount = rows.Length; _groups = DiagnosticGrouping.Build(rows, group);
+        _columns = columns; _flexibleColumn = flexibleColumn; _originalCount = groups.Sum(g => g.Count); _groups = groups;
         if (!_widths.TryGetValue(view, out var state)) _widths[view] = state = new(columns.Length);
         _state = state; if (!state.Manual) FitColumns();
         var header = new TableRow(state, columns, null, null, true);
@@ -70,7 +74,7 @@ internal sealed class DiagnosticTable : ContentView
     public void FitColumns()
     {
         if (_state is null) return;
-        var rows = _groups.SelectMany(g => g.Children).ToArray();
+        var rows = _groups.SelectMany(g => g.SummaryRow is { } summary ? g.Children.Prepend(summary) : g.Children).ToArray();
         var widths = DiagnosticColumnLayout.Fit(_columns, rows, Width > 0 ? Width : 900, _flexibleColumn);
         for (var i = 0; i < widths.Length; i++) _state.Set(i, widths[i]);
         UpdateSurfaceWidth();
@@ -88,7 +92,7 @@ internal sealed class DiagnosticTable : ContentView
         var visible = new List<VisibleRow>();
         foreach (var group in _groups)
         {
-            if (group.Count == 1) visible.Add(new(group.Children[0], group.Key, 1, false, false));
+            if (group.Count == 1 && group.SummaryRow is null) visible.Add(new(group.Children[0], group.Key, 1, false, false));
             else
             {
                 var open = _expanded.Contains(group.Key); visible.Add(new(group.Summary(n => F("Grid.Values", n)), group.Key, group.Count, true, open));
@@ -151,7 +155,7 @@ internal sealed class DiagnosticTable : ContentView
             _toggle.Text = row.IsGroup ? (row.Expanded ? "▾ " : "▸ ") + row.Count : row.Expanded ? "↳" : "1";
             _toggle.IsEnabled = row.IsGroup;
             SemanticProperties.SetDescription(_toggle, row.IsGroup ? F(row.Expanded ? "Grid.Collapse" : "Grid.Expand", row.Count) : "");
-            BackgroundColor = Color.FromArgb(row.IsGroup ? "#F1F6F8" : row.Expanded ? "#FAFBFC" : "#FFFFFF");
+            BackgroundColor = Color.FromArgb(row.Row.Attention ? "#FFF4DC" : row.IsGroup ? "#F1F6F8" : row.Expanded ? "#FAFBFC" : "#FFFFFF");
             for (var i = 0; i < _labels.Length; i++) { _labels[i].Text = ProtocolExplainer.SingleLine(row.Row.Cells[i]); _labels[i].FontAttributes = row.IsGroup ? FontAttributes.Bold : FontAttributes.None; }
         }
     }
