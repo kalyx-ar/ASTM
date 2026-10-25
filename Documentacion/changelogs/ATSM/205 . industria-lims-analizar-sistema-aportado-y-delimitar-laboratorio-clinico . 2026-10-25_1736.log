@@ -1,0 +1,25 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 17:36 America/Buenos_Aires
+Tipo: docs
+Commit: el commit docs que incorpora este archivo.
+Implementación referenciada: a9ee096d587340c9a6947730a299ce7e72784bc1
+
+Autorización
+- El usuario respondió «Publica el issue» a la solicitud de aprobar el informe
+  preparado en artifacts/issue-205-modelos.md para kalyx-ar/EDC#205.
+- Se verificaron el contenido completo y el destino antes del envío.
+- Se publicó exactamente el borrador mediante gh issue comment --body-file.
+
+Resultado
+- https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6402918370
+- Issue abierto por el alcance restante de LIMS/EDC/LAW y homologación.
+- El bloqueo anterior queda resuelto por autorización humana explícita.
+- ESTADO.md actualizado; changelogs históricos intactos.
+- Sin nuevos cambios de código, dependencias, compilaciones, ZIP, push ni PR.
+
+Verificación
+- gh devolvió salida 0 y el enlace del comentario publicado.
+- git diff --check correcto.
+- No se repiten pruebas de ejecución: sólo publicación del informe ya verificado
+  y actualización documental. Conserva la evidencia previa de 251 pruebas .NET,
+  542 verificaciones nativas y self-tests MAUI/NativeAOT de la implementación.
