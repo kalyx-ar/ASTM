@@ -12,10 +12,10 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
     {
         var vocabulary = new Dictionary<string, ProtocolText>(UwamInterpreter.CreateVocabulary(), StringComparer.Ordinal);
         foreach (var (key, value) in Uc3500Interpreter.CreateVocabulary()) vocabulary.Add(key, value);
-        foreach (var (key, value) in UfControlInterpreter.Vocabulary) vocabulary.Add(key, value);
+        foreach (var (key, value) in UfBinaryInterpreter.Vocabulary) vocabulary.Add(key, value);
         Vocabulary = vocabulary;
         foreach (var code in new[] { "DBS_LANG_01746", "DBS_LANG_02215" })
-            facts.Add((new(UfControlInterpreter.ProfileId, "NOTICE", "resource"), code), new(vocabulary["uf.need." + code]));
+            facts.Add((new(UfBinaryInterpreter.ProfileId, "NOTICE", "resource"), code), new(vocabulary["uf.need." + code]));
         foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
         foreach (var entry in UwamChemistryErrors.Definitions)
         {
@@ -54,7 +54,7 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
     }
     public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code)
     {
-        if (context.Profile == UfControlInterpreter.ProfileId)
+        if (context.Profile == UfBinaryInterpreter.ProfileId)
         {
             if (context.Model is not (null or "UF-5000")) return null;
             context = context with { Model = null };

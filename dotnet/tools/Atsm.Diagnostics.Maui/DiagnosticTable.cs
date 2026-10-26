@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Microsoft.Maui.Controls;
 using static Atsm.Diagnostics.Maui.Globals;
 
@@ -8,7 +9,8 @@ internal sealed class DiagnosticTable : ContentView
 {
     private const int PageSize = 300;
     private readonly IDiagnosticPlatformServices _platform;
-    private readonly CollectionView _list = new() { SelectionMode = SelectionMode.Single };
+    private readonly CollectionView _list = new() { SelectionMode = SelectionMode.Single, ItemsUpdatingScrollMode = ItemsUpdatingScrollMode.KeepScrollOffset };
+    private readonly ObservableCollection<VisibleRow> _visibleRows = [];
     private readonly Grid _surface = new() { RowDefinitions = [new(GridLength.Auto), new(GridLength.Star)] };
     private readonly Label _position = new() { FontSize = 12, TextColor = Color.FromArgb("#52677E"), VerticalTextAlignment = TextAlignment.Center };
     private readonly Button _previous = new() { Text = T("Grid.Previous"), FontSize = 12 }, _next = new() { Text = T("Grid.Next"), FontSize = 12 };
@@ -32,6 +34,7 @@ internal sealed class DiagnosticTable : ContentView
     public DiagnosticTable(IDiagnosticPlatformServices platform)
     {
         _platform = platform;
+        _list.ItemsSource = _visibleRows;
         _surface.HorizontalOptions = LayoutOptions.Start;
         _list.BackgroundColor = Colors.White;
         _list.EmptyView = new Label { Text = T("View.Empty"), Margin = 12, TextColor = Color.FromArgb("#52677E") };
@@ -46,10 +49,10 @@ internal sealed class DiagnosticTable : ContentView
         _previous.Clicked += (_, _) => { if (_page > 0) { _page--; Refresh(); } };
         _next.Clicked += (_, _) => { _page++; Refresh(); };
     }
-    public void SetRows(string view, string[] columns, IEnumerable<DiagnosticRow> source, bool group, int flexibleColumn)
+    public void SetRows(string view, string[] columns, IEnumerable<DiagnosticRow> source, bool group, int flexibleColumn, bool consecutive = false)
     {
         var rows = source.ToArray();
-        SetGroups(view, columns, DiagnosticGrouping.Build(rows, group), flexibleColumn);
+        SetGroups(view, columns, DiagnosticGrouping.Build(rows, group, consecutive), flexibleColumn);
     }
     public void SetGroups(string view, string[] columns, IReadOnlyList<DiagnosticRowGroup> groups, int flexibleColumn)
     {
@@ -86,7 +89,12 @@ internal sealed class DiagnosticTable : ContentView
         _state.Set(column, Math.Clamp(maximum * 6.8 + 30, 64, column == _columns.Length - 1 ? 900 : 300)); UpdateSurfaceWidth();
     }
     private void UpdateSurfaceWidth() { if (_state is { } state) _surface.WidthRequest = Math.Max(Width, DiagnosticColumnLayout.Gutter + state.Widths.Sum()); }
-    private void ToggleGroup(string key) { if (!_expanded.Add(key)) _expanded.Remove(key); Refresh(); }
+    private void ToggleGroup(string key)
+    {
+        var restore = _platform.CaptureScrollPosition(_list);
+        if (!_expanded.Add(key)) _expanded.Remove(key);
+        Refresh(); restore.Restore();
+    }
     private void Refresh()
     {
         var visible = new List<VisibleRow>();
@@ -95,14 +103,61 @@ internal sealed class DiagnosticTable : ContentView
             if (group.Count == 1 && group.SummaryRow is null) visible.Add(new(group.Children[0], group.Key, 1, false, false));
             else
             {
-                var open = _expanded.Contains(group.Key); visible.Add(new(group.Summary(n => F("Grid.Values", n)), group.Key, group.Count, true, open));
+                var open = _expanded.Contains(group.Key); visible.Add(new(group.Summary(n => F("Grid.Values", n)), group.Key, group.Repetitions ?? group.Count, true, open));
                 if (open) visible.AddRange(group.Children.Select(child => new VisibleRow(child, group.Key, 1, false, true)));
             }
         }
-        var pages = Math.Max(1, (visible.Count + PageSize - 1) / PageSize); _page = Math.Clamp(_page, 0, pages - 1);
-        _list.ItemsSource = visible.Skip(_page * PageSize).Take(PageSize).ToArray();
-        _position.Text = F("Grid.Rows", _originalCount, _groups.Count, visible.Count == 0 ? 0 : _page * PageSize + 1, Math.Min(visible.Count, (_page + 1) * PageSize), visible.Count);
+        var pages = Math.Max(1, (_groups.Count + PageSize - 1) / PageSize); _page = Math.Clamp(_page, 0, pages - 1);
+        int VisibleCount(DiagnosticRowGroup group) => group.Count == 1 && group.SummaryRow is null ? 1 : _expanded.Contains(group.Key) ? group.Count + 1 : 1;
+        var pageStart = _groups.Take(_page * PageSize).Sum(VisibleCount);
+        var pageCount = _groups.Skip(_page * PageSize).Take(PageSize).Sum(VisibleCount);
+        var page = visible.Skip(pageStart).Take(pageCount).ToArray();
+        static bool SameItem(VisibleRow a, VisibleRow b) => a.Group == b.Group && a.IsGroup == b.IsGroup
+            && (a.IsGroup || ReferenceEquals(a.Row, b.Row) || a.Row.GroupKey == b.Row.GroupKey && a.Row.Details == b.Row.Details);
+        static bool SameContent(VisibleRow a, VisibleRow b) => a.Count == b.Count && a.Expanded == b.Expanded
+            && a.Row.Attention == b.Row.Attention && a.Row.Details == b.Row.Details && a.Row.Cells.SequenceEqual(b.Row.Cells, StringComparer.Ordinal);
+        for (var i = 0; i < page.Length; i++)
+        {
+            if (i < _visibleRows.Count && SameItem(_visibleRows[i], page[i]))
+            { if (!SameContent(_visibleRows[i], page[i])) _visibleRows[i] = page[i]; continue; }
+            var existing = -1;
+            for (var j = i + 1; j < _visibleRows.Count; j++) if (SameItem(_visibleRows[j], page[i])) { existing = j; break; }
+            if (existing >= 0)
+            {
+                for (var j = existing - 1; j >= i; j--) _visibleRows.RemoveAt(j);
+                _visibleRows[i] = page[i];
+            }
+            else _visibleRows.Insert(i, page[i]);
+        }
+        while (_visibleRows.Count > page.Length) _visibleRows.RemoveAt(_visibleRows.Count - 1);
+        _position.Text = F("Grid.Rows", _originalCount, _groups.Count, visible.Count == 0 ? 0 : pageStart + 1, pageStart + pageCount, visible.Count);
         _previous.IsEnabled = _page > 0; _next.IsEnabled = _page + 1 < pages;
+    }
+    internal async Task VerifyExpansionKeepsScrollAsync()
+    {
+        var rows = Enumerable.Range(0, 1200).Select(i => new DiagnosticRow(["SYN " + i], "SYN-" + i, "SYN-GROUP-" + i / 2)).ToArray();
+        SetRows("scroll-self-test", ["SYN"], rows, true, 0);
+        await Task.Delay(150);
+        _list.ScrollTo(180, position: ScrollToPosition.Start, animate: false);
+        await Task.Delay(250);
+        var position = _platform.CaptureScrollPosition(_list); var last = position.CurrentOffset(); var settled = 0;
+        for (var attempt = 0; attempt < 20 && settled < 4; attempt++)
+        {
+            await Task.Delay(50); var current = position.CurrentOffset();
+            settled = current > 0 && Math.Abs(current - last) < 0.01 ? settled + 1 : 0; last = current;
+        }
+        if (settled < 4) throw new InvalidOperationException("ATSM-SCROLL-SELFTEST-NOT-SETTLED");
+        var before = position.CurrentOffset();
+        var page = _page; var source = _list.ItemsSource; var key = _visibleRows[185].Group;
+        if (before <= 0) throw new InvalidOperationException("ATSM-SCROLL-SELFTEST-NOT-SCROLLED");
+        ToggleGroup(key); await Task.Delay(200);
+        if (!ReferenceEquals(source, _list.ItemsSource) || _page != page || Math.Abs(position.CurrentOffset() - before) > 1)
+            throw new InvalidOperationException($"ATSM-EXPANSION-SCROLL-RESET before={before} after={position.CurrentOffset()} page={page}/{_page}");
+        ToggleGroup(key); await Task.Delay(200);
+        if (_page != page || Math.Abs(position.CurrentOffset() - before) > 1) throw new InvalidOperationException("ATSM-COLLAPSE-SCROLL-RESET");
+        var finalGroup = _visibleRows[^1].Group; ToggleGroup(finalGroup);
+        if (_visibleRows.Count != PageSize + 2 || _visibleRows.TakeLast(2).Any(r => r.Group != finalGroup || r.IsGroup))
+            throw new InvalidOperationException("ATSM-EXPANDED-GROUP-SPLIT-BY-PAGE");
     }
     private sealed record VisibleRow(DiagnosticRow Row, string Group, int Count, bool IsGroup, bool Expanded);
     private sealed class WidthState(int count)
@@ -128,7 +183,7 @@ internal sealed class DiagnosticTable : ContentView
             _group = group; Padding = new Thickness(4, 3); HeightRequest = header ? 40 : 36; ColumnSpacing = 0;
             BackgroundColor = Color.FromArgb(header ? "#F6F8FA" : "#FFFFFF"); ColumnDefinitions.Add(new(64));
             _toggle = new Button { Text = "", IsVisible = !header, FontSize = 11, Padding = 0, BackgroundColor = Colors.Transparent, TextColor = Color.FromArgb("#0F766E"), CornerRadius = 3 };
-            _toggle.Clicked += (_, _) => { if (BindingContext is VisibleRow { IsGroup: true } row) _group?.Invoke(row.Group); };
+            _toggle.Clicked += (_, _) => { if (BindingContext is VisibleRow { IsGroup: true } row) { detail?.Invoke(row.Row.Details); _group?.Invoke(row.Group); } };
             Add(_toggle); _labels = new Label[columns.Length];
             if (header) Add(new Label { Text = T("Grid.Count"), Margin = new Thickness(6, 0), FontSize = 11, TextColor = Color.FromArgb("#64748B"), VerticalTextAlignment = TextAlignment.Center });
             for (var i = 0; i < columns.Length; i++)

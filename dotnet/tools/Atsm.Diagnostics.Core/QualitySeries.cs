@@ -30,6 +30,7 @@ public static class QualitySeriesBuilder
                 var unique = records.DistinctBy(o => o.ObservationId).ToArray();
                 var measured = unique.Where(o => o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed).ToArray();
                 bool Arithmetic(InstrumentObservation o) => IsNumeric(o)
+                    && !InstrumentContent.IsImageReference(o)
                     && knowledge?.DescribeValue(o) is not { IsOrdinal: true } and not { IsStructuredContent: true };
                 var numeric = measured.Where(Arithmetic).ToArray();
                 var sorted = numeric.Select(o => o.Value.Numeric!.Value).Order().ToArray();
@@ -62,7 +63,7 @@ public static class QualitySeriesBuilder
                     Range = QualityReportedRange.Build(measured, knowledge),
                     // Frequencies describe every communicated record, including retransmissions and
                     // non-performed results. Only the numeric statistics deduplicate observations.
-                    ValueFrequencies = records.GroupBy(o => (Value: string.IsNullOrWhiteSpace(o.Value.RawText)
+                    ValueFrequencies = records.GroupBy(o => (Value: InstrumentContent.IsImageReference(o) ? DiagnosticText.Common("value.Image") : string.IsNullOrWhiteSpace(o.Value.RawText)
                             ? o.Value.Coded?.Display ?? o.Value.Coded?.Code ?? "" : o.Value.RawText.Trim(),
                         Numeric: Arithmetic(o) && o.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed,
                         NotPerformed: o.InstrumentStatusMeaning == InstrumentStatusMeaning.NotPerformed))

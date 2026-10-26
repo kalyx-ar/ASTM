@@ -25,11 +25,10 @@ internal static class InspectInput
             Console.WriteLine($"ATSM_QUALITY groups={quality.Count} records={quality.Sum(s => s.MeasurementCount)} flagged={quality.Sum(s => s.Flagged)} missingMaterial={quality.Count(s => string.IsNullOrWhiteSpace(s.Material))} observationAlerts={analysis.Observations.Count(o => ProtocolExplainer.RequiresAttention(o, knowledge as IInstrumentFlagKnowledge))}");
             foreach (var group in analysis.Diagnostics.GroupBy(d => d.Code).OrderBy(g => g.Key, StringComparer.Ordinal))
                 Console.WriteLine($"ATSM_FINDING code={group.Key} count={group.Count()}");
-            static string Ms(TimeSpan? duration) => duration?.TotalMilliseconds.ToString("G9", System.Globalization.CultureInfo.InvariantCulture) ?? "none";
             foreach (var statistic in CommunicationStatistics.Build(analysis, CommunicationStatistics.HasCaptureClock(input)))
             {
                 var distribution = statistic.Distribution;
-                Console.WriteLine($"ATSM_TIMING code={statistic.Code} direction={statistic.Direction} count={distribution.Count} minMs={Ms(distribution.Minimum)} medianMs={Ms(distribution.Median)} p95Ms={Ms(distribution.P95)} maxMs={Ms(distribution.Maximum)} pending={statistic.Pending} invalidIntervals={statistic.InvalidIntervals} clockAvailable={statistic.ClockAvailable} reads={statistic.Reads} bytes={statistic.Bytes}");
+                Console.WriteLine($"ATSM_TIMING code={statistic.Code} direction={statistic.Direction} count={distribution.Count} min={DiagnosticDuration.Format(distribution.Minimum)} median={DiagnosticDuration.Format(distribution.Median)} p95={DiagnosticDuration.Format(distribution.P95)} max={DiagnosticDuration.Format(distribution.Maximum)} pending={statistic.Pending} invalidIntervals={statistic.InvalidIntervals} clockAvailable={statistic.ClockAvailable} reads={statistic.Reads} bytes={statistic.Bytes}");
             }
             if (profile.TracePlugin is not null)
             {

@@ -1,79 +1,78 @@
-# Control UF y tiempos de comunicación
+# UF binario y tiempos de comunicación
 
-Incremento del 26 de octubre de 2026, kalyx-ar/EDC#205. Lectura pasiva y parcial dentro de `Atsm.Plugin.Sysmex.Urinalysis`, perfil `sysmex.uf.control.partial`. La selección principal conserva una sola familia U-WAM/UF/UC. La detección consulta el contenido, nunca el nombre del archivo; reconocer este formato compatible no acredita la identidad física de un equipo.
+Incremento del 26 de octubre de 2026, kalyx-ar/EDC#205. `Atsm.Plugin.Sysmex.Urinalysis` interpreta resultados ASTM, UC-3500 y el formato binario UF dentro de la misma familia. El perfil binario es `sysmex.uf.binary`. Los dos archivos UF aportados corresponden al mismo equipo; su nombre no participa en la detección ni se usa como modelo.
 
-## Evidencia y registros reconocidos
+## Reconstrucción del stream
 
-La captura local UF-5000Control contiene etiquetas legibles y bloques repetidos. La ausencia de cabeceras ASTM/HL7 no impide extraer esos hechos. La implementación anterior importaba los bytes pero no examinaba estos registros; se sustituye ese límite por una interpretación parcial explícita. No se transmite ninguna orden UF.
+La normalización reside en el SDK neutral: `BinaryWireParser` convierte hexadecimal/prefijos/notación de controles a los mismos bytes y `BinaryFrameLayout` describe encuadres por longitud, orden de bytes y patrones. El plugin UF declara su layout y la interpretación del payload; no contiene otro parser genérico de encuadres. El formato HexBytes de Diagnostics utiliza ese puerto antes del codec ASTM o del perfil binario correspondiente. No se transforma un protocolo propietario en ASTM por cambiar su representación: se normalizan los datos al mismo modelo canónico.
 
-Una clase de aviso observada ocupa 266 bytes:
+Los nombres ASTM comunes y sus traducciones pertenecen a `StandardDiagnosticVocabulary.Shared`, source `Atsm.Plugins`. Se retiraron reformulaciones redundantes por marca para H/P/O/R/Q/C/M/L; Imagen, Normal y otros conceptos generales se reutilizan. La disposición de registros/campos y los códigos con significado específico siguen en el plugin.
 
-| Offset, desde cero | Longitud | Comprobación / contenido |
+La primera aproximación encontraba dos avisos y bloques de 13 bytes dentro de las lecturas. Era insuficiente: confundía cortes del monitor con límites de mensaje. La revisión reconstruye las envolturas por longitud, por dirección y conservando las entradas de origen. Una división arbitraria en lecturas no cambia el resultado; un evento de captura separa los buffers.
+
+| Offset, desde cero | Longitud | Disposición observada |
 |---|---|---|
-| 0 | 3 | Prefijo observado `01 00 00` |
-| 3 | 34 | Campo opaco; no se convierte en muestra ni fecha |
-| 37 | 50 | Etiqueta ASCII terminada en NUL y relleno NUL |
-| 87 | 64 | Recurso `DBS_LANG_#####` y texto localizado, terminación/relleno NUL |
-| 151 | 114 | Recurso de contexto, terminación/relleno NUL |
-| 265 | 1 | Marcador observado `03`; no es comprobación de integridad |
+| 0 | 1 | 02 |
+| 1 | 20 | Primer identificador, texto con terminación/relleno NUL |
+| 21 | 12 | Segundo identificador, texto con terminación/relleno NUL |
+| 33 | 3 | Tipo de mensaje, lectura little endian |
+| 36 | 1 | 02 |
+| 37 | 4 | Campo u32le observado igual a 1; no se le asigna otra semántica |
+| 41 | 4 | Longitud del payload, u32le |
+| 45 | N | Payload, que puede incluir 02/03 y NUL como datos |
+| 45 + N | 1 | 03 final |
 
-En la captura se verifican estas asociaciones:
+El tamaño total es N + 46. El encuadre se verificó sobre los 500.444 bytes de la captura: **2.193 mensajes completos, sin restos ni doble conteo**. No se presume checksum, integridad criptográfica ni identidad física autenticada. La disposición es evidencia de traza, todavía no una especificación del fabricante homologada. Los identificadores recibidos se presentan como identificadores, sin inventar si cada uno es serie, módulo u otro dato.
 
-| Recurso | Etiqueta y texto recibidos | Presentación |
-|---|---|---|
-| DBS_LANG_01746 | Chequeo fondo / Necesidad | Chequeo de fondo requerido |
-| DBS_LANG_02215 | Limpieza / Necesidad | Limpieza requerida |
+| Tipo observado | Payload | Mensajes | Lectura implementada |
+|---|---:|---:|---|
+| 2 | 102 bytes | 1.981 | Envoltura y datos binarios; significado de campos numéricos pendiente |
+| 6 | 1.500 bytes | 105 | Diez posiciones de 150 bytes; campos de aviso en cada posición ocupada |
+| 11 | 376 bytes | 105 | Texto del equipo y recurso DBS_LANG |
+| 12 | 262 bytes | 2 | Etiqueta, recurso/calificador y contexto |
 
-Ambas usan el contexto `DBS_LANG_01745`. Es conocimiento derivado de la traza, no una tabla de comandos homologada. La interpretación exige esa combinación de campos. Un recurso desconocido o un calificador/contexto diferente se conserva sin afirmar una necesidad conocida.
+En tipo 6, cada posición tiene código u32le en offset 0 y texto con relleno NUL en offset 10, ancho 100. Se conservan todos los campos originales; no se fabrica el significado de los demás bytes. En tipo 11, el texto ocupa payload[62..262), y el recurso payload[262..376). En tipo 12, etiqueta [34..84), recurso/calificador [84..148) y contexto [148..262). El intérprete captura etiquetas nuevas: **no exige una lista cerrada de textos ni de códigos**. UTF-8 válido se decodifica como tal; en otro caso se conserva la lectura Latin-1 y siempre los bytes.
 
-Estos avisos producen mensajes, eventos, observaciones técnicas y hallazgos informativos. Las observaciones tienen muestra vacía/rol desconocido, valor codificado, sin magnitud, unidad ni contexto QC. No se fabrican pacientes ni mediciones analíticas. Estado «Requiere atención», sin tratarlos como errores de análisis. El significado usa el seed/Lang; los campos y bytes recibidos permanecen disponibles.
+Las lecturas de 386 bytes corresponden al subencuadre tipo 11, no a un mensaje ASTM. El fragmento de 266 bytes observado comenzaba dentro del campo de longitud del tipo 12. Ambos pueden examinarse en capturas parciales sin exigir el encabezado externo completo. Los bloques de 13 bytes aportados por el usuario están dentro del payload de los mensajes tipo 2 completos: no se cuentan como otros mensajes cuando la envoltura está disponible. Sus lecturas numéricas candidatas siguen sin significado operativo confirmado.
 
-«Necesidad» no acredita que se haya enviado una orden de mantenimiento, que la operación esté ejecutándose o que haya terminado. Por ello no genera una duración de operación.
+## Contenido extraído
 
-También se reconocen bloques recurrentes de 13 bytes:
+Se obtienen **349 observaciones técnicas** y sus hallazgos/eventos, sin muestra, rol clínico, medición numérica, unidad ni contexto QC fabricados:
 
-| Offset | Contenido observado |
-|---|---|
-| 0 | `02` |
-| 1–5 | NUL |
-| 6–7 | Campo variable; se expone una lectura candidata u16 little endian |
-| 8–11 | Lectura u32 little endian 90 o 100 |
-| 12 | `03` |
+| Texto recibido | Registros |
+|---|---:|
+| Ejecute cierre | 205 |
+| UF-CELLPACK SF caducado | 105 |
+| Err mater. de control caducado | 31 |
+| RBC alto inusual | 6 |
+| Necesidad: chequeo de fondo / limpieza | 2 |
 
-La secuencia que aportó el usuario tiene lectura u16le 2551 en offset 6 y u32le 100 en offset 8. No se les atribuye unidad, estado, contador, comando ni significado operativo confirmado. Tampoco se declara checksum o integridad verificados. «STX» y «ETX» son aquí nombres de bytes observados, no prueba de framing ASTM.
+Los conteos incluyen avisos repetidos en instantáneas del equipo, no 349 incidentes distintos. Tipo 11 incluye 100 instrucciones de cierre, 4 avisos de material caducado y 1 de RBC alto; las listas tipo 6 aportan otros 242 registros. El texto viene del equipo. El knowledge sólo añade la forma breve «Chequeo de fondo requerido» / «Limpieza requerida» a los recursos 01746/02215 con calificador Necesidad y contexto 01745; un código o texto nuevo se captura igualmente. Las traducciones afectan la presentación de interpretaciones propias, no los textos recibidos.
 
-La reconstrucción trabaja sobre el stream por dirección, conserva referencias a las entradas de origen y soporta cortes arbitrarios entre lecturas. Los eventos del registrador separan los buffers. La detección automática requiere el registro con recursos; un bloque corto aislado no basta para adivinar fabricante/modelo. Una configuración manual permite examinarlo dentro del perfil parcial.
+Una instrucción de cierre o una necesidad de mantenimiento no acreditan ejecución, aceptación, inicio ni final de una operación. No generan una duración inventada. «RBC alto inusual» es un aviso comunicado, no un nuevo resultado clínico de RBC.
 
-Resultado local: 34.373 entradas y 500.444 bytes conservados; 1.981 bloques recurrentes y 2 avisos, 1.983 mensajes/bloques y 2 observaciones técnicas. Se mantiene un hallazgo de interpretación parcial. Los demás campos, recursos como DBS_LANG_01682/01633/01712, integridad, encuadre completo, dirección física y propósito de las variantes 90/100 siguen pendientes. No se extraen resultados clínicos de esos campos desconocidos.
+## Presentación y cronología
 
-## Estadísticas generales
+El identificador recibido se muestra una sola vez en el encabezado del caso. Trama identifica las cabeceras sin repetir el mismo ID en todas las filas y marca un cambio si aparece otro identificador. Cuando se agrupa, presenta el bloque completo con las lecturas originales como subfilas. Las repeticiones sólo se unen si son consecutivas e idénticas; cualquier comunicación diferente corta el grupo. Mensajes y Eventos también preservan el orden. Hallazgos puede agrupar por diagnóstico, y Calidad conserva sus agrupaciones estadísticas.
 
-La vista **Comunicación** funciona independientemente de la interpretación de operaciones. Presenta mínimo, mediana, P95 (rango más próximo), máximo y cantidad de intervalos, con subfilas que remiten a las entradas originales. La mediana par es el punto medio temporal. Contadores de lecturas/bytes y límites se conservan en el detalle.
+Al seleccionar o desplegar un bloque, el panel inferior muestra su interpretación y los bytes del mensaje completo reconstruido, sin encadenar detalles de fragmentos. Las subfilas siguen disponibles para inspección técnica. Una lectura formada por cinco NUL muestra «Fragmento 5 bytes - NUL»; los fragmentos breves muestran nombres ASCII conocidos, como ACK (06), ENQ (05) y EOT (04). Ese nombre de byte no acredita una confirmación del enlace dentro de un payload binario. No se agrupan todas las cabeceras o todos los NUL dispersos en una vista cronológica. El modo sin agrupación conserva cada entrada.
 
-- Intervalos entre lecturas: globales y por dirección. Incluyen pausas, interrupciones y lecturas con el mismo timestamp.
-- Cambios de sentido: tiempo desde una entrada hasta la siguiente de dirección contraria; no prueba que sea una respuesta.
-- Recepción de mensajes/bloques: desde la primera hasta la última entrada que los contiene.
-- ENQ→ACK, trama→ACK y sus respuestas NAK: sólo cuando el observador LIS01 establece la relación. Bytes 05/06/15 dentro de un contenido binario no generan estas métricas.
-- Respuestas de comandos: límites explícitos aportados por el intérprete, por ejemplo CM00→ER en UC-3500. Una respuesta de rechazo también tiene tiempo de comunicación.
+La expansión/contracción actualiza una colección observable persistente en lugar de sustituir ItemsSource, y conserva las filas cuyo contenido no cambió. Windows configura el modo del panel nativo y restaura la posición tras el layout. El self-test de ventana real desplaza una lista de 1.200 registros, espera la finalización del scroll inicial, expande/contrae y comprueba offset, página y colección. También expande el último grupo de página para verificar que todos sus hijos siguen visibles: se paginan 300 grupos completos. [MAUI](https://learn.microsoft.com/en-us/dotnet/maui/user-interface/controls/collectionview/scrolling?view=net-maui-10.0), [panel nativo de Windows](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.itemsstackpanel.itemsupdatingscrollmode).
 
-Un frame con checksum alterado por el registrador puede tener un tiempo de ACK medible si el observador comprueba que el receptor lo confirmó. Un acuse implícito no se convierte en un ACK observado. Los pendientes indican ausencia de cierre observado en el tramo considerado, no un timeout supuesto. Límites ausentes, secuencias invertidas o reloj regresivo no se convierten en cero: se excluyen del cálculo y se cuentan como intervalos no calculables.
+Las notas de desarrollo, enlaces a copias de manuales y advertencias genéricas de cobertura se retiraron del panel, del catálogo y de las cadenas que se incorporan a los ensamblados. La documentación técnica permanece fuera de los ejecutables. Los perfiles muestran configuraciones útiles.
 
-Las fuentes sin reloj de captura, como un archivo de bytes o un mensaje completo importado, muestran duraciones no disponibles. Un cero ms registrado puede deberse a la resolución/coalescencia del monitor. Los casos y trazas conservan la procedencia temporal; una traza sintética describe su propio reloj, no una medición física nueva.
+Adaptador, registrador, zona horaria y cero líneas omitidas son metadatos de importación, no hallazgos. Se guardan en propiedades del caso. Las omisiones reales por fecha inválida o discrepancias de longitud generan advertencias específicas con su cantidad; una limitación desconocida muestra su texto concreto en lugar de encubrirla con una etiqueta genérica.
 
-UF-5000Control contiene únicamente lecturas R desde el punto de vista del registrador. La aplicación muestra «Lectura del registrador» cuando no conoce los roles físicos, sin invertirlo visualmente en equipo/anfitrión. Sus 34.370 intervalos tienen mediana 0 ms, P95 521 ms y máximo 13.865.543 ms; el máximo es una pausa en la captura, no un RTT ni una duración de mantenimiento. La recepción de sus bloques aparece con 0 ms porque cada bloque está íntegramente contenido en una lectura fechada. No hay base suficiente para medir sus respuestas bidireccionales como RTT.
+Las referencias a formatos de imagen se reconocen de forma general, además del tipo IF del plugin. Tipo y resultado muestran «Imagen», Unidad «—»; no entran en estadísticas aritméticas y no se abren archivos, URI ni referencias. El original permanece intacto.
 
-## Operaciones largas
+## Tiempos y operaciones
 
-`InstrumentTraceTiming` distingue `Response`, `OperationTotal` y `OperationProcessing`. El intérprete/anfitrión que conoce los límites aporta las secuencias de inicio y fin; un fin nulo queda pendiente. Una operación puede aportar:
+Comunicación presenta mínimo, mediana, P95 (rango más próximo), máximo y cantidad, con subfilas de origen. Trama y Comunicación usan **HH:mm:ss.fff**, con horas acumuladas sin volver a cero a las 24 horas. No se usa notación científica. Sin reloj se muestra —; un cero fechado puede reflejar resolución/coalescencia del monitor.
 
-1. Solicitud→aceptación/respuesta inicial: comunicación.
-2. Solicitud→respuesta final: duración total.
-3. Aceptación→final: tiempo de proceso.
+Los intervalos entre lecturas, cambios de sentido y recepción de mensajes son independientes de operaciones. No se llaman RTT a pausas o cambios de sentido. ENQ/ACK, trama/ACK y NAK sólo se miden cuando el observador establece la relación; una coincidencia de bytes de control en un payload no basta. CM00→ER de UC-3500 aporta una respuesta explícita. Ausencia de cierre no equivale a un timeout supuesto; límites inválidos y regresiones de reloj no se convierten en cero.
 
-Se muestran como distribuciones separadas por clase/código; una explicación del plugin identifica la operación cuando existe. No se completan límites por proximidad, cambio de etiqueta ni inicio de otra operación. Los avisos UF de necesidad sólo justifican los hechos informados; aún no delimitan una ejecución real de limpieza o chequeo.
+En esta captura UF hay 34.370 intervalos: mediana 00:00:00.000, P95 00:00:00.521 y máximo 03:51:05.543. Es una pausa de captura, no mantenimiento. La recepción reconstruida de mensajes tiene mediana 0 ms, P95 1 ms y máximo 6 ms. Sólo se observan lecturas R; la UI dice «Lectura del registrador» mientras no se conozcan los roles físicos.
 
-## Contratos y comprobación
+`InstrumentTraceTiming` separa Response, OperationTotal y OperationProcessing. El intérprete/anfitrión que conoce la solicitud, aceptación y respuesta final aporta sus secuencias; un fin nulo queda pendiente. Solicitud→respuesta inicial mide comunicación; solicitud→final, duración total; aceptación→final, proceso. La captura UF no delimita todavía estas operaciones largas.
 
-SDK `PluginApi.Version = 2`: los métodos `Recognizes` e `InferRecorder` reciben `InstrumentTraceProfile`, permitiendo discriminar varios protocolos dentro del mismo plugin. Catálogo y consumidores compilados se actualizaron juntos, sin firmas anteriores ni aliases de ejecución. Link v1 y el formato de traza no cambian. `TraceInterpretation`/`DiagnosticAnalysis` exponen los intervalos tipados; las estadísticas siguen fuera del conocimiento del fabricante.
-
-Pruebas: avisos conocidos/desconocidos/contexto distinto, ausencia de muestra/QC, reconstrucción en todos los cortes, separación RX/TX, conservación del bloque aportado y de campos desconocidos, detección por contenido, reanálisis, reloj ausente/regresivo, percentiles/medianas, ACK/NAK reales, checksum alterado, CM00→ER y separación respuesta/operación/proceso. MAUI comprueba ocho vistas, selección automática, etiquetas/observaciones UF, intervalos desplegables y limpieza del aviso al cambiar de protocolo. CLI emite sólo agregados `ATSM_TIMING`; no publica identificadores ni payloads privados.
+SDK API 2: reconocimiento/inferencia por perfil, Timings tipados y consumidores compilados actualizados sin aliases anteriores. Link v1 y el formato de traza no cambian. Queda por documentar la semántica de los campos binarios tipo 2 y restantes, sus unidades, roles físicos y límites de operaciones; P-15 sigue abierto. La especificación local U-WAM R315168 describe la interfaz ASTM externa; no sustituye la especificación de esta envoltura binaria.

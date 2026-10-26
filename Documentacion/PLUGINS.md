@@ -4,7 +4,11 @@ Estado: contratos de motor implementados; kits formales de conformidad pendiente
 
 ## Qué hace y qué no hace
 
-SDK vigente: `PluginApi.Version = 2`. `IInstrumentTracePlugin.Recognizes(profile, segments)` e `InferRecorder(profile, segments)` reciben el perfil concreto. La discriminación de UC-3500 y control UF parcial convive en el mismo plugin de familia. Los consumidores se recompilan con este contrato; no se mantienen las firmas anteriores. `TraceInterpretation.Timings` aporta límites explícitos separados en respuesta, duración total de operación y proceso. Véase [Control UF y tiempos](UF-CONTROL-Y-TIEMPOS.md).
+SDK vigente: `PluginApi.Version = 2`. `IInstrumentTracePlugin.Recognizes(profile, segments)` e `InferRecorder(profile, segments)` reciben el perfil concreto. UC-3500, ASTM y UF binario conviven en el mismo plugin de familia; el nombre de un log no es un modelo. Los consumidores se recompilan sin firmas anteriores. `TraceInterpretation.Timings` separa respuesta, duración total y proceso; `InstrumentContent.IsImageReference` ofrece clasificación común de referencias, sin abrirlas. Véase [UF binario y tiempos](UF-CONTROL-Y-TIEMPOS.md).
+
+Normalización neutral: `Atsm.Plugins.Tracing.BinaryWireParser` acepta hexadecimal separado/compacto, prefijos 0x/\\x y notación de controles; conserva NUL y rechaza entradas inválidas. `BinaryFrameLayout` declara encuadre por longitud, orden de bytes, patrones y terminador, sin fabricantes dentro del parser. UF declara su disposición y aporta la semántica del payload; su entrada binaria/hex produce el mismo modelo. El detector/lector también entrega ASTM normalizado al codec existente, sin un intérprete ASTM por marca.
+
+`StandardDiagnosticVocabulary.Shared` contiene los nombres ASTM H/P/O/R/Q/C/M/L, controles de enlace y conceptos comunes como Imagen/Normal. Los plugins reutilizan esos objetos y no los vuelven a traducir en cada ensamblado. `ProtocolText.SourceAssembly` fija el propietario del seed común (`Atsm.Plugins`); los textos específicos mantienen el ensamblado del plugin. S de U-WAM y códigos cuya semántica depende de su contexto siguen siendo extensiones específicas. No se fuerza el significado de una bandera de un fabricante sobre otro.
 
 | El plugin hace | El plugin no hace |
 |---|---|

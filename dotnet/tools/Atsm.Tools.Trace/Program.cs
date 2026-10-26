@@ -86,7 +86,7 @@ int ListPlugins()
             Console.WriteLine($"  profile {profile.Id}: host answer budget {profile.QueryAnswerBudget.TotalSeconds} s, establishment {profile.Link.EstablishmentTimeout.TotalSeconds} s");
     }
     foreach (var profile in Catalog.Shared.Profiles.Where(p => p.ContentPlugin is not null || p.IsHl7))
-        Console.WriteLine($"profile {profile.Id} ({profile.DisplayName}): {profile.Evidence}; analysis in atsm-diagnostics");
+        Console.WriteLine($"profile {profile.Id} ({profile.DisplayName})");
     foreach (var adapter in adapters)
         Console.WriteLine($"adapter {adapter.Id}: {adapter.Description}");
     return 0;

@@ -84,13 +84,19 @@ internal static class NativeSelfTest
         var notice = new byte[266]; notice[0] = 1; notice[265] = 3;
         Encoding.ASCII.GetBytes("SYNTHETIC").CopyTo(notice.AsSpan(3)); Encoding.ASCII.GetBytes("Limpieza").CopyTo(notice.AsSpan(37));
         Encoding.ASCII.GetBytes("DBS_LANG_02215Necesidad").CopyTo(notice.AsSpan(87)); Encoding.ASCII.GetBytes("DBS_LANG_01745").CopyTo(notice.AsSpan(151));
+        var envelope = new byte[308]; envelope[0] = 2; envelope[33] = 12; envelope[36] = 2; envelope[37] = 1; envelope[^1] = 3;
+        Encoding.ASCII.GetBytes("SYNTHETIC-ID").CopyTo(envelope.AsSpan(1)); Encoding.ASCII.GetBytes("SYN-02").CopyTo(envelope.AsSpan(21));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(envelope.AsSpan(41), 262); notice.AsSpan(3, 262).CopyTo(envelope.AsSpan(45)); notice = envelope;
         var controlInput = DiagnosticReader.Read(notice, DiagnosticInputFormat.Auto, uwam, "synthetic", TimeSpan.Zero);
         var controlProfile = catalog.Resolve(controlInput.Header.Profile!); var control = DiagnosticReader.Analyze(controlInput, controlProfile, timing);
-        if (controlProfile.Id != SysmexUrinalysisPlugin.UfControlProfile || control.Observations.Count != 1
+        if (controlProfile.Id != SysmexUrinalysisPlugin.UfBinaryProfile || control.Observations.Count != 1
             || ProtocolExplainer.ResultValue(control.Observations[0], controlProfile) != "Limpieza requerida"
             || CommunicationStatistics.Build(control).Any(s => s.Code.StartsWith("Operation", StringComparison.Ordinal)))
             throw new InvalidDataException("Native UF control/communication mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=14 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok uf-control-partial=ok communication-stats=ok");
+        var image = csResult with { ResultKind = null, Value = new("PNG&SYN&plot.png") };
+        if (ProtocolExplainer.ResultValue(image, cs) != "Imagen" || DiagnosticDuration.Format(TimeSpan.FromMilliseconds(30976077)) != "08:36:16.077")
+            throw new InvalidDataException("Native image/duration mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=14 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok uf-binary-framing=ok communication-stats=ok duration-format=ok general-images=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

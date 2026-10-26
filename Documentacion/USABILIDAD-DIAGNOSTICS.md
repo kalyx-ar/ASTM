@@ -12,9 +12,9 @@ Los originales, códigos, posiciones y datos del fabricante permanecen en el cas
 
 ## Grupos, contenido y columnas
 
-Se agrupan comandos, mensajes, eventos y hallazgos por significado/código, y mediciones por muestra/prueba/tipo. **Cantidad** indica el número de filas; la flecha despliega subfilas con cada valor y detalle original. Si una columna tiene valores diferentes, el resumen indica cuántos; no muestra como común el valor de la primera fila. Desactivar la agrupación devuelve cada fila.
+Trama, Mensajes y Eventos preservan la cronología y sólo agrupan repeticiones consecutivas con el mismo contenido; cualquier comunicación diferente corta el grupo. Trama permite agrupar mensajes reconstruidos como bloques con sus lecturas originales en subfilas; el contador del bloque indica repeticiones, no el número de cortes del monitor. Hallazgos puede agrupar diagnósticos separados, y Calidad conserva agrupaciones estadísticas por material/prueba/tipo. Desactivar la agrupación devuelve cada fila original.
 
-Se eliminó el recorte de las últimas 2.000 filas. La vista pagina 300 filas visibles para mantener la navegación; los grupos y sus hijos siguen completos. Se prueba un grupo con 10.001 registros sin pérdida.
+Se eliminó el recorte de las últimas 2.000 filas. La vista pagina 300 grupos, conservando todos los hijos de cada grupo expandido en su página para mantener la navegación; los grupos y sus hijos siguen completos. Se prueba un grupo con 10.001 registros sin pérdida.
 
 Los mensajes de la lista se presentan en una línea, con separadores visibles entre registros. El detalle conserva el texto original multilínea. El ajuste de columnas es automático al contenido y ancho de la ventana, con muestreo de hasta 1.500 filas y un ancho mínimo legible para encabezados; si éstos no caben, hay desplazamiento horizontal. La tabla ocupa el ancho disponible desde la izquierda. El usuario puede arrastrar el borde de un encabezado para personalizar un ancho; doble clic reajusta esa columna. Los anchos manuales se conservan durante actualizaciones de esa vista. No hay botón «Ajustar columnas».
 
@@ -31,7 +31,7 @@ La lista presenta **8 equipos/familias**, que conservan **14 perfiles técnicos*
 
 Ambas utilizan el mismo plugin, dialecto, encuadre y comunicación. No se abren conexiones adicionales. La diferencia implementada es el presupuesto de consulta; el operador confirma la configuración real antes de conectar. Un archivo no demuestra por sí solo qué configuración de hardware está instalada.
 
-La misma familia contiene los intérpretes pasivos UC-3500 y UF de control binario parcial. El segundo reconoce avisos de necesidad de limpieza/chequeo de fondo y bloques recurrentes, sin atribuir significado a campos desconocidos. La detección es por contenido; no requiere otra entrada en el selector principal. [Evidencia y límites](UF-CONTROL-Y-TIEMPOS.md).
+La misma familia contiene los intérpretes pasivos UC-3500 y UF binario. El segundo reconstruye envolturas completas por longitud, identifica los campos recibidos y captura avisos/listas por estructura, incluso códigos/textos nuevos. La detección es por contenido; no requiere otra entrada en el selector principal ni consulta el nombre del archivo. Las notas de implementación y los enlaces a copias de manuales se eliminaron del panel, catálogo y código compilado. [Evidencia y límites](UF-CONTROL-Y-TIEMPOS.md).
 
 Si la cabecera permite sugerir U-WAM y todavía estaba seleccionado otro equipo, la importación propone la variante de presupuesto más corto (6 s, compatible con el límite más exigente). Es una selección conservadora del intérprete, no una detección de hardware instalado. Si el operador ya había seleccionado una variante U-WAM, se conserva.
 
@@ -74,7 +74,7 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 Incremento del 26 de octubre: **Comunicación** es la octava vista. Agrupa intervalos entre lecturas, cambios de sentido, recepción de mensajes y respuestas identificadas, con mínimo, mediana, P95, máximo y subfilas de origen. Duración total y proceso de operaciones se mantienen separados y requieren límites explícitos. Un archivo sin reloj muestra duración no disponible; un aviso de mantenimiento requerido no se convierte en ejecución. [Métricas y puertos](UF-CONTROL-Y-TIEMPOS.md).
 
-346 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye los casos de usabilidad, UC-3500, control UF y tiempos. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las ocho vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+384 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye usabilidad, UC-3500, UF binario, cronología, imágenes y duraciones HH:mm:ss.fff. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las ocho vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 

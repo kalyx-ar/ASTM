@@ -3,6 +3,7 @@ using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins;
+using Atsm.Plugins.Tracing;
 using Atsm.Protocol.Hl7v2;
 using Atsm.Protocol.Lis02;
 using Atsm.Protocol.Mllp;
@@ -11,7 +12,7 @@ using Atsm.Tracing;
 
 namespace Atsm.Diagnostics;
 
-public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace, ProtectedCase, Auto = -1 }
+public enum DiagnosticInputFormat { Export, AstmMessage, Hl7Message, SysmexLog, LegacyLog, WireBytes, AtsmTrace, ProtectedCase, HexBytes, Auto = -1 }
 public sealed record DecodedMessage(long Sequence, string Direction, string Type, string Text)
 {
     public long FirstSequence { get; init; } = Sequence;
@@ -41,6 +42,18 @@ public static class DiagnosticReader
             recordedBy ??= detected.Recorder;
         }
         if (format == DiagnosticInputFormat.ProtectedCase) throw new InvalidDataException("ATSM-DIAG-PROTECTED-READER-REQUIRED");
+        if (format == DiagnosticInputFormat.HexBytes)
+        {
+            var decoded = BinaryWireParser.ParseHex(bytes); var catalog = new DiagnosticCatalog();
+            var detected = DiagnosticInputDetector.Detect(decoded, profile, catalog);
+            if (detected.ProfileId is { } id) profile = catalog.Resolve(id);
+            else if (profile.ContentPlugin is not null) profile = catalog.Resolve(StandardAstmPlugin.ProfileId);
+            var inner = detected.Recognized && detected.Format != DiagnosticInputFormat.HexBytes ? detected.Format : DiagnosticInputFormat.WireBytes;
+            var normalized = Read(decoded, inner, profile, sourceName, utcOffset, recordedBy);
+            var metadata = new Dictionary<string, string>(normalized.Header.Properties ?? new Dictionary<string, string>())
+                { ["inputFormat"] = nameof(DiagnosticInputFormat.HexBytes), ["decodedFormat"] = inner.ToString(), ["wireEncoding"] = "hex" };
+            return normalized with { Header = normalized.Header with { Properties = metadata } };
+        }
         if (!profile.IsHl7 && (format == DiagnosticInputFormat.Hl7Message || format == DiagnosticInputFormat.WireBytes && DiagnosticInputDetector.HasHl7Header(bytes)))
             throw new InvalidDataException("ATSM-DIAG-HL7-PROFILE-REQUIRED");
         if (format == DiagnosticInputFormat.AtsmTrace)
@@ -50,7 +63,7 @@ public static class DiagnosticReader
         }
         IReadOnlyList<TraceSegment> segments;
         var properties = new Dictionary<string, string> { ["inputFormat"] = format.ToString(), ["protocol"] = profile.Protocol };
-        var limitations = new List<string> { "Diagnostic import; no external effects." };
+        var limitations = new List<string>();
         if (format is DiagnosticInputFormat.SysmexLog or DiagnosticInputFormat.LegacyLog)
         {
             var adapterId = format == DiagnosticInputFormat.SysmexLog ? "sysmex.port-monitor" : "legacy.interface-log";
@@ -69,8 +82,10 @@ public static class DiagnosticReader
                 properties["unsupportedProtocol"] = "true";
                 if (segments.Any(s => s.Data.Span.Contains((byte)0))) properties["unsupportedPayload"] = "binary";
             }
-            limitations.AddRange(adapter.Limitations);
-            limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
+            properties["logAdapter"] = adapterId;
+            properties["logUtcOffset"] = utcOffset.ToString("c", System.Globalization.CultureInfo.InvariantCulture);
+            properties["skippedLines"] = extracted.Skipped.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (extracted.Skipped > 0) limitations.Add("ATSM-DIAG-SOURCE-SKIPPED: " + extracted.Skipped);
             limitations.AddRange(extracted.Findings);
         }
         else
@@ -90,7 +105,14 @@ public static class DiagnosticReader
         input = RevalidateProtocol(input, profile);
         var values = new List<InstrumentObservation>(); var findings = new List<AtsmDiagnostic>(); var messages = new List<DecodedMessage>();
         if (!input.IsComplete) findings.Add(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "The case was interrupted or its final closure is missing; data may be incomplete."));
-        findings.AddRange((input.Header.Limitations ?? []).Select(l => new AtsmDiagnostic("ATSM-DIAG-SOURCE-LIMITATION", AtsmSeverity.Information, l)));
+        foreach (var limitation in input.Header.Limitations ?? [])
+        {
+            var colon = limitation.LastIndexOf(':');
+            var count = colon >= 0 ? limitation[(colon + 1)..].Trim() : "";
+            var code = limitation.StartsWith("ATSM-DIAG-SOURCE-SKIPPED: ", StringComparison.Ordinal) ? "ATSM-DIAG-SOURCE-SKIPPED"
+                : limitation.StartsWith("declared length differs from decoded payload: ", StringComparison.Ordinal) ? "ATSM-DIAG-SOURCE-LENGTH-MISMATCH" : null;
+            findings.Add(code is not null ? new(code, AtsmSeverity.Warning, count) : new("ATSM-DIAG-SOURCE-LIMITATION", AtsmSeverity.Information, limitation));
+        }
         if (profile.TracePlugin is { } tracePlugin)
         {
             var interpreted = tracePlugin.Interpret(profile.TraceProfile!, input.Entries, new("diagnostic"), input.Header.TraceId, timing.InstrumentTimeZone);

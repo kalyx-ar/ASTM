@@ -8,11 +8,7 @@ public sealed partial class QwalysPlugin : IInstrumentDiagnosticVocabulary
     private static IReadOnlyDictionary<string, ProtocolText> CreateVocabulary()
     {
         var values = new Dictionary<string, ProtocolText>(StandardDiagnosticVocabulary.Create(
-        "QWALYS 3 ASTM Connection Manual §O/R/C",
-        ("record.O", "Muestra y prueba de inmunohematología"),
-        ("record.R", "Reacción de inmunohematología y soporte"),
-        ("record.C", "Comentario de la reacción"),
-        ("record.Q", "Consulta del instrumento; este perfil sólo recibe resultados")), StringComparer.Ordinal);
+        "QWALYS 3 ASTM Connection Manual §O/R/C"), StringComparer.Ordinal);
         foreach (var (key, text) in new (string, string)[]
         {
             ("valueKind.W", "Reacción en pocillo o columna"), ("valueKind.A", "Autocontrol de compatibilidad"),

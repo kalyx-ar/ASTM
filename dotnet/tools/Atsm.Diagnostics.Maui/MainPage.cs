@@ -31,7 +31,7 @@ public sealed class MainPage : ContentPage
     private readonly Entry _query = Input(""), _response = Input(""), _offset = Input("-03:00"), _password = Input("");
     private readonly CheckBox _tls = new() { WidthRequest = 24, HeightRequest = 28 }, _hex = new() { WidthRequest = 24, HeightRequest = 28 },
         _interpret = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 }, _group = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 };
-    private readonly Label _evidence = Text("", 12), _certificate = Text(T("Live.NoCertificate"), 12), _title = Text(T("View.NoCase"), 21), _summary = Text(T("View.Prompt"), 12), _status = Text(T("View.Ready"), 12);
+    private readonly Label _certificate = Text(T("Live.NoCertificate"), 12), _title = Text(T("View.NoCase"), 21), _summary = Text(T("View.Prompt"), 12), _status = Text(T("View.Ready"), 12);
     private readonly Button _open, _save, _connect, _stop;
     private readonly VerticalStackLayout _interface = new() { Spacing = 8 }, _source = new() { Spacing = 8 };
     private readonly DiagnosticTable _table;
@@ -41,7 +41,7 @@ public sealed class MainPage : ContentPage
     private readonly List<Button> _tabButtons = [];
     private readonly IDispatcherTimer _refresh;
     private readonly string[] _tabs = [T("View.Wire"), T("View.Messages"), T("View.Observations"), T("View.Findings"), T("View.Quality"), T("View.Events"), T("View.Catalog"), T("View.Communication")];
-    private readonly DiagnosticInputFormat[] _inputFormats = [DiagnosticInputFormat.Auto, DiagnosticInputFormat.Export, DiagnosticInputFormat.AstmMessage, DiagnosticInputFormat.Hl7Message, DiagnosticInputFormat.SysmexLog, DiagnosticInputFormat.LegacyLog, DiagnosticInputFormat.WireBytes, DiagnosticInputFormat.AtsmTrace];
+    private readonly DiagnosticInputFormat[] _inputFormats = [DiagnosticInputFormat.Auto, DiagnosticInputFormat.Export, DiagnosticInputFormat.AstmMessage, DiagnosticInputFormat.Hl7Message, DiagnosticInputFormat.SysmexLog, DiagnosticInputFormat.LegacyLog, DiagnosticInputFormat.WireBytes, DiagnosticInputFormat.HexBytes, DiagnosticInputFormat.AtsmTrace];
     private DiagnosticCase? _case;
     private DiagnosticAnalysis? _analysis;
     private DiagnosticTraceSink? _capture;
@@ -75,7 +75,7 @@ public sealed class MainPage : ContentPage
         foreach (var value in new[] { T("Live.Capture"), T("Live.Simulate") }) _mode.Items.Add(value);
         _transport.SelectedIndex = _mode.SelectedIndex = 0;
         _profiles.SelectedIndexChanged += (_, _) => ConfigureInstrument(); _configurations.SelectedIndexChanged += (_, _) => SetProfile(); _profiles.SelectedIndex = 0;
-        _source.Add(Text(T("Source.Title"), 12)); _source.Add(Field(T("Source.Plugin"), _profiles)); _source.Add(Field(T("Source.Configuration"), _configurations)); _source.Add(_evidence);
+        _source.Add(Text(T("Source.Title"), 12)); _source.Add(Field(T("Source.Plugin"), _profiles)); _source.Add(Field(T("Source.Configuration"), _configurations));
         _source.Add(Field(T("Source.Format"), _formats)); _source.Add(Field(T("Source.Recorder"), _recorder));
         _source.Add(new HorizontalStackLayout { Spacing = 8, Children = { _open, _save } });
         _source.Add(Text(T("Source.Custody"), 12));
@@ -125,8 +125,8 @@ public sealed class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=14, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-control-partial, communication-statistics, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
-                catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=14, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-binary-framing, chronological-blocks, duration-format, communication-statistics, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name + (error.Message.StartsWith("ATSM-", StringComparison.Ordinal) ? " " + error.Message : "")); Environment.Exit(1); }
             });
         }
     }
@@ -150,7 +150,7 @@ public sealed class MainPage : ContentPage
     private void SetProfile()
     {
         if (!_ready || _selecting || _profiles.SelectedIndex < 0 || _configurations.SelectedIndex < 0) return;
-        _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect;
+        _interface.IsVisible = Profile.CanConnect;
         _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
         _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
         if (_case is not null && !IsCapturing) Analyze();
@@ -163,7 +163,7 @@ public sealed class MainPage : ContentPage
         foreach (var profile in model.Profiles) _configurations.Items.Add(profile.Configuration);
         _detectedProfile = id;
         _configurations.SelectedIndex = HasAutomaticInterpretation ? 0 : model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
-        _evidence.Text = Profile.Evidence; _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
+        _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
         _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
     }
     private RecordedBy? Recorder => _recorder.SelectedIndex switch { 1 => RecordedBy.Host, 2 => RecordedBy.Instrument, _ => null };
@@ -326,16 +326,18 @@ public sealed class MainPage : ContentPage
             {
                 var detected = _catalog.ResolveInterpretation(_case, Profile); _detectedProfile = detected.Id;
                 _case = _case with { Header = _case.Header with { Profile = detected.Id } };
-                _evidence.Text = detected.Evidence;
             }
             _case = DiagnosticReader.RevalidateProtocol(_case, Profile);
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
-            if (_analysis.Diagnostics.FirstOrDefault(d => d.Code is "ATSM-DIAG-UNSUPPORTED-PROTOCOL" or "ATSM-UF-CONTROL-PARTIAL") is { } protocolNotice)
+            if (_analysis.Diagnostics.FirstOrDefault(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") is { } protocolNotice)
                 _status.Text = _protocolNotice = DiagnosticText.Finding(protocolNotice, Profile);
             else if (_status.Text == DiagnosticText.Text("Detection.Unsupported") || _status.Text == DiagnosticText.Text("Finding.UnsupportedBinary")
                 || _status.Text == DiagnosticText.Text("Finding.ATSM-DIAG-UNSUPPORTED-PROTOCOL") || _status.Text == _protocolNotice)
             { _status.Text = T("View.FileRead"); _protocolNotice = null; }
-            _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
+            _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count);
+            if (_analysis.Messages.OrderBy(m => m.FirstSequence).Select(m => m.Fields.GetValueOrDefault("device.identifier")).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) is { } deviceIdentifier)
+                _summary.Text += " · " + F("Source.DeviceIdentifier", deviceIdentifier);
+            ShowTable();
         }
         catch (Exception error) { ShowError(error); }
     }
@@ -353,21 +355,26 @@ public sealed class MainPage : ContentPage
         switch (_tab)
         {
             case 0:
-                headers = [T("Column.Sequence"), T("Column.Milliseconds"), T("Column.Direction"), T("Column.Bytes"), T("Column.Command")];
+                headers = [T("Column.Sequence"), T("Column.Time"), T("Column.Direction"), T("Column.Bytes"), T("Column.Command")];
                 var protocolMessages = (_analysis?.Messages ?? []).Where(m => m.Explanation is not null).ToLookup(m => m.FirstSequence);
                 var protocolEvents = (_analysis?.Events ?? []).Where(e => e.Explanation is not null && e.Level == Atsm.Tracing.StackLevel.Link).ToLookup(e => e.Sequence);
+                var captureClock = _case is not null && CommunicationStatistics.HasCaptureClock(_case);
                 rows = (_case?.Entries ?? []).Select(entry =>
                 {
-                    var meaning = unsupported ? DiagnosticText.Format("Message.Wire", entry.Data.Length) : ProtocolExplainer.Entry(entry, Profile);
+                    var meaning = unsupported && entry.Direction != TraceDirection.Event && (entry.Data.Length == 0 || entry.Data.Span.IndexOfAnyExcept((byte)0) >= 0)
+                        ? DiagnosticText.Format("Message.Wire", entry.Data.Length) : ProtocolExplainer.Entry(entry, Profile);
                     if (Profile.TracePlugin is { } plugin)
                     {
                         var explanations = protocolMessages[entry.Sequence].Select(m => m.Explanation!).Concat(protocolEvents[entry.Sequence].Select(e => e.Explanation!)).ToArray();
                         if (explanations.Length > 0) meaning = string.Join(" · ", explanations.Select(e => DiagnosticText.Explanation(plugin, e)));
                     }
                     var raw = DiagnosticReader.DescribeBytes(entry.Data, _hex.IsChecked);
-                    return Row([entry.Sequence.ToString(), entry.Elapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture), D(entry.Direction.ToString()), entry.Data.Length.ToString(), interpreted ? meaning : entry.Code ?? raw],
-                        Detail(meaning, "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), meaning);
-                }); break;
+                    return Row([entry.Sequence.ToString(), DiagnosticDuration.Format(captureClock ? entry.Elapsed : null), D(entry.Direction.ToString()), entry.Data.Length.ToString(), interpreted ? meaning : entry.Code ?? raw],
+                        Detail(meaning, "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), entry.Code, Convert.ToHexString(entry.Data.Span));
+                }).ToArray();
+                if (_group.IsChecked && Profile.TracePlugin is not null)
+                { _table.SetGroups("wire:" + interpreted + ":blocks", headers, WireGroups(rows.ToArray()), 4); return; }
+                break;
             case 1:
                 headers = [T("Column.Sequence"), T("Column.Direction"), T("Column.Type"), T("Column.Content")];
                 var observations = (_analysis?.Observations ?? []).ToLookup(o => o.Trace.LastSequence);
@@ -377,10 +384,9 @@ public sealed class MainPage : ContentPage
                     var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
                     return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
                         Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + (message.Explanation?.Text.Evidence ?? ProtocolExplainer.RecordEvidence(message.Text, Profile))
-                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, kind,
-                        ProtocolExplainer.MessageHasError(message, Profile, observations[message.Sequence].ToArray()).ToString());
+                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, message.Type, message.Text);
                 }).ToArray();
-                var messageGroups = DiagnosticGrouping.Build(rows, _group.IsChecked).Select(group =>
+                var messageGroups = DiagnosticGrouping.Build(rows, _group.IsChecked, consecutive: true).Select(group =>
                 {
                     if (!interpreted || group.Count == 1 || group.Children.Select(r => r.Cells[3]).Distinct(StringComparer.Ordinal).Count() == 1) return group;
                     var first = (_analysis?.Messages ?? []).First(m => m.Sequence.ToString() == group.Children[0].Cells[0]);
@@ -405,7 +411,7 @@ public sealed class MainPage : ContentPage
                 {
                     var meaning = DiagnosticText.Finding(finding, Profile);
                     return Row(interpreted ? [DiagnosticText.Text("Severity." + finding.Severity), meaning, finding.Location ?? ""] : [DiagnosticText.Text("Severity." + finding.Severity), finding.Code, finding.Message, finding.Location ?? ""],
-                        Detail(meaning + "\n" + DiagnosticText.FindingEvidence(finding, Profile), finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code);
+                        Detail(meaning + "\n" + DiagnosticText.FindingEvidence(finding, Profile), finding.Code + "\n" + finding.Location + "\n" + finding.Message), finding.Severity.ToString(), finding.Code, finding.Message);
                 }); break;
             case 4:
                 headers = [T("Quality.MaterialLot"), T("Column.Test"), T("Quality.DataType"), T("Quality.Unit"), T("Quality.Minimum"), T("Quality.MedianValue"), T("Quality.Maximum"), T("Quality.SD"), T("Quality.N"), T("Quality.Unperformed"), T("Quality.State")];
@@ -422,18 +428,18 @@ public sealed class MainPage : ContentPage
                         ? ProtocolExplainer.RecordNames(string.Join("\r", records.Select(code => code + "|")), Profile)
                         : DiagnosticText.Event(item.Code, item.Detail);
                     return Row(interpreted ? [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), meaning] : [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), item.Code, item.Detail ?? ""],
-                        Detail(meaning, item.Level + "\n" + item.Code + "\n" + item.Detail), item.Level.ToString(), item.Code);
+                        Detail(meaning, item.Level + "\n" + item.Code + "\n" + item.Detail), item.Level.ToString(), item.Direction.ToString(), item.Code, item.Detail, meaning);
                 }); break;
             case 7:
                 headers = [T("Timing.Metric"), T("Column.Direction"), T("Timing.N"), T("Timing.Minimum"), T("Timing.Median"), T("Timing.P95"), T("Timing.Maximum"), T("Timing.Pending")];
                 _table.SetGroups("communication", headers, CommunicationGroups(), 0); return;
             default:
-                headers = [T("Column.Profile"), T("Column.Configuration"), T("Column.Evidence")];
-                rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration)), string.Join(" · ", instrument.Profiles.Select(p => p.Evidence).Distinct(StringComparer.Ordinal))],
-                    string.Join("\n\n", instrument.Profiles.Select(p => p.Id + "\n" + p.DisplayName + "\n" + p.Evidence + "\n" + string.Join("\n", p.AstmProfile?.Evidence ?? p.ContentProfile?.Evidence ?? p.TraceProfile?.Evidence ?? []))), instrument.Id)); break;
+                headers = [T("Column.Profile"), T("Column.Configuration")];
+                rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration))],
+                    string.Join("\n", instrument.Profiles.Select(p => p.DisplayName)), instrument.Id)); break;
         }
-        var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 2 };
-        _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible);
+        var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 1 };
+        _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible, consecutive: _tab is 0 or 5);
     }
     private string CaptureDirection(string direction)
     {
@@ -444,9 +450,39 @@ public sealed class MainPage : ContentPage
         var read = (direction == nameof(TraceDirection.Received)) != reversed;
         return T(read ? "Timing.CaptureRead" : "Timing.CaptureWrite");
     }
+    private IReadOnlyList<DiagnosticRowGroup> WireGroups(DiagnosticRow[] rows)
+    {
+        var entries = _case!.Entries; var messages = _analysis!.Messages;
+        var positions = entries.Select((e, i) => (e.Sequence, i)).ToDictionary(p => p.Sequence, p => p.i);
+        var ranges = messages.Select(m => (Message: m, First: positions[m.FirstSequence], Last: positions[m.Sequence])).ToArray();
+        if (ranges.Zip(ranges.Skip(1)).Any(p => p.First.Last >= p.Second.First)) return DiagnosticGrouping.Build(rows, true, consecutive: true);
+        var groups = new List<DiagnosticRowGroup>(); var cursor = 0; var index = 0;
+        while (index < ranges.Length)
+        {
+            var first = ranges[index];
+            while (cursor < first.First)
+            { groups.Add(new("wire-entry:" + entries[cursor].Sequence, [rows[cursor]])); cursor++; }
+            var end = index;
+            while (end + 1 < ranges.Length && ranges[end + 1].First == ranges[end].Last + 1
+                && ranges[end + 1].Message.Direction == first.Message.Direction && ranges[end + 1].Message.Text == first.Message.Text) end++;
+            var last = ranges[end]; var key = "wire-block:" + entries[first.First].Sequence;
+            var children = rows[first.First..(last.Last + 1)]; var cells = rows[first.First].Cells.ToArray();
+            cells[0] = entries[first.First].Sequence + " → " + entries[last.Last].Sequence;
+            cells[3] = entries.Skip(first.First).Take(last.Last - first.First + 1).Sum(e => (long)e.Data.Length).ToString(CultureInfo.CurrentCulture);
+            var meaning = ProtocolExplainer.MessageContent(first.Message, Profile, _analysis.Observations);
+            cells[4] = _interpret.IsChecked ? meaning : first.Message.Text;
+            var complete = entries.Skip(first.First).Take(first.Last - first.First + 1).SelectMany(e => e.Data.ToArray()).ToArray();
+            var details = meaning + "\n" + F("Wire.CompleteBlock", entries[first.First].Sequence, entries[last.Last].Sequence, end - index + 1)
+                + "\n\n" + DiagnosticText.Text("Original") + "\n" + DiagnosticReader.DescribeBytes(complete, _hex.IsChecked);
+            groups.Add(new(key, children) { Repetitions = end - index + 1, SummaryRow = new(cells, details, key) });
+            cursor = last.Last + 1; index = end + 1;
+        }
+        while (cursor < rows.Length) { groups.Add(new("wire-entry:" + entries[cursor].Sequence, [rows[cursor]])); cursor++; }
+        return groups;
+    }
     private IReadOnlyList<DiagnosticRowGroup> CommunicationGroups()
     {
-        static string Ms(TimeSpan? value) => value?.TotalMilliseconds.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
+        static string Time(TimeSpan? value) => DiagnosticDuration.Format(value);
         var groups = new List<DiagnosticRowGroup>();
         if (_analysis is null) return groups;
         foreach (var item in CommunicationStatistics.Build(_analysis, _case is not null && CommunicationStatistics.HasCaptureClock(_case)))
@@ -459,10 +495,10 @@ public sealed class MainPage : ContentPage
             var detail = T("Timing.Detail") + "\n" + F("Timing.Flow", item.Reads, item.Bytes, item.InvalidIntervals)
                 + (item.ExchangeCode is { } code ? "\n" + code : "") + (item.Pending > 0 ? "\n" + T("Timing.NoEnd") : "")
                 + (item.ClockAvailable ? "" : "\n" + T("Timing.NoClock"));
-            var children = item.Intervals.Select(i => new DiagnosticRow([i.FirstSequence + " → " + i.LastSequence, direction, "1", "", Ms(i.Duration), "", "", ""],
-                F("Timing.Boundaries", i.FirstSequence, i.LastSequence, Ms(i.Duration)) + "\n" + T("Timing.Detail"), key)).ToArray();
+            var children = item.Intervals.Select(i => new DiagnosticRow([i.FirstSequence + " → " + i.LastSequence, direction, "1", "", Time(i.Duration), "", "", ""],
+                F("Timing.Boundaries", i.FirstSequence, i.LastSequence, Time(i.Duration)) + "\n" + T("Timing.Detail"), key)).ToArray();
             var pending = item.Code is "ReadInterval" or "DirectionTurn" or "MessageReception" ? "—" : item.Pending.ToString(CultureInfo.CurrentCulture);
-            groups.Add(new(key, children) { SummaryRow = new([metric, direction, stats.Count.ToString(CultureInfo.CurrentCulture), Ms(stats.Minimum), Ms(stats.Median), Ms(stats.P95), Ms(stats.Maximum), pending], detail, key)
+            groups.Add(new(key, children) { SummaryRow = new([metric, direction, stats.Count.ToString(CultureInfo.CurrentCulture), Time(stats.Minimum), Time(stats.Median), Time(stats.P95), Time(stats.Maximum), pending], detail, key)
                 { Attention = item.InvalidIntervals > 0 } });
         }
         return groups;
@@ -607,6 +643,7 @@ public sealed class MainPage : ContentPage
         VerifyQualityPresentation();
         VerifyKnowledgePresentation();
         VerifyControlCommunication();
+        await _table.VerifyExpansionKeepsScrollAsync(); ShowTable();
     }
     private void VerifyControlCommunication()
     {
@@ -614,6 +651,9 @@ public sealed class MainPage : ContentPage
         var notice = new byte[266]; notice[0] = 1; notice[265] = 3;
         Encoding.ASCII.GetBytes("SYNTHETIC").CopyTo(notice.AsSpan(3)); Encoding.ASCII.GetBytes("Limpieza").CopyTo(notice.AsSpan(37));
         Encoding.ASCII.GetBytes("DBS_LANG_02215Necesidad").CopyTo(notice.AsSpan(87)); Encoding.ASCII.GetBytes("DBS_LANG_01745").CopyTo(notice.AsSpan(151));
+        var envelope = new byte[308]; envelope[0] = 2; envelope[33] = 12; envelope[36] = 2; envelope[37] = 1; envelope[^1] = 3;
+        Encoding.ASCII.GetBytes("SYNTHETIC-ID").CopyTo(envelope.AsSpan(1)); Encoding.ASCII.GetBytes("SYN-02").CopyTo(envelope.AsSpan(21));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(envelope.AsSpan(41), 262); notice.AsSpan(3, 262).CopyTo(envelope.AsSpan(45)); notice = envelope;
         var block = new byte[] { 2, 0, 0, 0, 0, 0, 247, 9, 100, 0, 0, 0, 3 };
         _case = DiagnosticReader.Read(notice, DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero);
         _case = _case with { Header = _case.Header with { Properties = new Dictionary<string, string>(_case.Header.Properties!) { ["timingSource"] = "synthetic" } } };
@@ -622,15 +662,22 @@ public sealed class MainPage : ContentPage
             new(2, TimeSpan.FromMilliseconds(100), DateTimeOffset.UnixEpoch, TraceDirection.Received, block),
             new(3, TimeSpan.FromMilliseconds(110), DateTimeOffset.UnixEpoch, TraceDirection.Received, block)] };
         Analyze();
-        if (Profile.Id != SysmexUrinalysisPlugin.UfControlProfile || _analysis!.Messages.Count != 3 || _analysis.Observations.Count != 1
+        if (Profile.Id != SysmexUrinalysisPlugin.UfBinaryProfile || _analysis!.Messages.Count != 3 || _analysis.Observations.Count != 1
             || ProtocolExplainer.ResultValue(_analysis.Observations[0], Profile) != "Limpieza requerida"
             || CaptureDirection("Received") != T("Timing.CaptureRead")) throw new InvalidDataException("ATSM-MAUI-UF-CONTROL-SELFTEST");
         var flow = CommunicationGroups().First();
-        if (flow.SummaryRow!.Cells[2] != "3" || flow.SummaryRow.Cells[4] != "10" || flow.SummaryRow.Cells[6] != "90" || flow.Children.Count != 3)
+        if (flow.SummaryRow!.Cells[2] != "3" || flow.SummaryRow.Cells[4] != "00:00:00.010" || flow.SummaryRow.Cells[6] != "00:00:00.090" || flow.Children.Count != 3)
             throw new InvalidDataException("ATSM-MAUI-COMMUNICATION-SELFTEST");
+        _tab = 0; ShowTable(); _table.VerifyAutomaticLayout();
+        var syntheticRows = _case.Entries.Select(e => new DiagnosticRow([e.Sequence.ToString(), DiagnosticDuration.Format(e.Elapsed), "R", e.Data.Length.ToString(), "SYN"], "SYN", "SYN")).ToArray();
+        var blocks = WireGroups(syntheticRows);
+        if (blocks.Count != 2 || blocks[0].Children.Count != 2 || blocks[1].Repetitions != 2 || blocks.SelectMany(b => b.Children).Count() != 4)
+            throw new InvalidDataException("ATSM-MAUI-CHRONOLOGICAL-BLOCKS-SELFTEST");
+        if (blocks[0].SummaryRow is not { } blockSummary || !blockSummary.Details.Contains(DiagnosticReader.DescribeBytes(notice, _hex.IsChecked), StringComparison.Ordinal)
+            || !_summary.Text.Contains("SYNTHETIC-ID", StringComparison.Ordinal)) throw new InvalidDataException("ATSM-MAUI-COMPLETE-BLOCK-DETAIL-SELFTEST");
         _tab = 7; ShowTable(); _table.VerifyAutomaticLayout();
         _case = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero); Analyze();
-        if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile || _status.Text.Contains("Interpretación parcial", StringComparison.Ordinal))
+        if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile)
             throw new InvalidDataException("ATSM-MAUI-UF-STALE-STATUS-SELFTEST");
         _tab = 7; ShowTable(); _table.VerifyAutomaticLayout();
     }

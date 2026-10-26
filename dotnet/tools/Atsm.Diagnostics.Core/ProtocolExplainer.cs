@@ -3,6 +3,7 @@ using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins;
+using Atsm.Plugins.Tracing;
 using Atsm.Protocol.Lis01;
 using Atsm.Runtime.Tracing;
 using Atsm.Tracing;
@@ -73,7 +74,22 @@ public static class ProtocolExplainer
         observation.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning || observation.Flags.Any(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false);
     public static string Entry(TraceEntry entry, DiagnosticProfile profile)
     {
-        if (profile.TracePlugin is not null) return DiagnosticText.Format("Message.Wire", entry.Data.Length);
+        if (entry.Direction == TraceDirection.Event && entry.Detail is { Length: > 0 } eventText)
+        {
+            var kind = eventText.Split(':', 2)[0].Trim().ToUpperInvariant();
+            return kind is "OPEN" or "CLOSE" ? DiagnosticText.Text("Event." + kind) : eventText;
+        }
+        if (entry.Data.Length > 0 && entry.Data.Span.IndexOfAnyExcept((byte)0) < 0) return DiagnosticText.Format("Message.Nul", entry.Data.Length);
+        if (profile.TracePlugin is not null)
+        {
+            static string Name(byte value)
+            {
+                var token = AsciiControlTokens.Bracketed.FirstOrDefault(p => p.Value == value).Key;
+                return token is not null ? token.Trim('[', ']') + " (" + value.ToString("X2") + ")" : value.ToString("X2");
+            }
+            var preview = string.Join(" ", entry.Data.ToArray().Take(16).Select(Name)) + (entry.Data.Length > 16 ? " …" : "");
+            return entry.Data.Length == 1 ? preview : DiagnosticText.Format("Message.BinaryFragment", entry.Data.Length, preview);
+        }
         if (entry.Code == TraceReconstruction.MessageCode)
             return profile.IsHl7 ? DiagnosticText.Text("Event.lis02.message") : RecordNames((profile.AstmProfile?.Encoding ?? Encoding.UTF8).GetString(entry.Data.Span), profile);
         if (entry.Data.Length == 1)
@@ -91,8 +107,8 @@ public static class ProtocolExplainer
     public static string ResultKind(InstrumentObservation observation, DiagnosticProfile profile)
     {
         var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
-        if (plugin is IInstrumentValueKnowledge knowledge && knowledge.DescribeValue(observation) is { } valueMeaning)
-            return DiagnosticText.Plugin(plugin, valueMeaning.Kind);
+        if (InstrumentContent.Describe(observation, plugin as IInstrumentValueKnowledge) is { } valueMeaning)
+            return DiagnosticText.Plugin(plugin ?? typeof(InstrumentContent), valueMeaning.Kind);
         var raw = observation.ResultKind ?? "";
         if (raw.Length == 0) return DataKind(observation);
         if (profile.TracePlugin is { } trace && trace.DiagnosticVocabulary.TryGetValue("resultKind." + raw, out var traceKind)) return DiagnosticText.Plugin(trace, traceKind);
@@ -109,16 +125,17 @@ public static class ProtocolExplainer
             ? observation.Quality?.Statistics.Count > 0 ? "Value.Statistics" : "Value.Empty" : "Value.Text");
     public static string Unit(InstrumentObservation observation, DiagnosticProfile profile)
     {
-        if (InstrumentUnits.Symbol(observation.Value) is { } symbol) return symbol;
         var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
+        if (InstrumentContent.IsImageReference(observation) || (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation)?.Scale == "image") return DiagnosticText.Text("Unit.None");
+        if (InstrumentUnits.Symbol(observation.Value) is { } symbol) return symbol;
         if (plugin is IInstrumentValueKnowledge knowledge && knowledge.DescribeUnit(observation) is { } unit) return DiagnosticText.Plugin(plugin, unit);
         return DiagnosticText.Text(observation.Value.Numeric is null || observation.Value.Coded is not null ? "Unit.None" : "Unit.NotReported");
     }
     public static string ResultValue(InstrumentObservation observation, DiagnosticProfile profile)
     {
         var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
-        var meaning = (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation);
-        if (meaning?.DisplayText is { } text) return DiagnosticText.Plugin(plugin!, text);
+        var meaning = InstrumentContent.Describe(observation, plugin as IInstrumentValueKnowledge);
+        if (meaning?.DisplayText is { } text) return DiagnosticText.Plugin(plugin ?? typeof(InstrumentContent), text);
         return meaning?.DisplayValue is { } display ? display == meaning.Kind.Fallback ? DiagnosticText.Plugin(plugin!, meaning.Kind) : display : observation.Value.RawText;
     }
     public static string Status(InstrumentObservation observation, DiagnosticProfile? profile = null)

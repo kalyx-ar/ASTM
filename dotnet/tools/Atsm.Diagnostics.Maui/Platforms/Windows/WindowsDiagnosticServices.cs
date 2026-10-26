@@ -5,6 +5,25 @@ namespace Atsm.Diagnostics.Maui;
 
 public sealed class WindowsDiagnosticServices : IDiagnosticPlatformServices
 {
+    public DiagnosticScrollPosition CaptureScrollPosition(Microsoft.Maui.Controls.View view)
+    {
+        static T? Find<T>(Microsoft.UI.Xaml.DependencyObject root) where T : Microsoft.UI.Xaml.DependencyObject
+        {
+            if (root is T foundRoot) return foundRoot;
+            for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+                if (Find<T>(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i)) is { } found) return found;
+            return null;
+        }
+        if (view.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement element || Find<Microsoft.UI.Xaml.Controls.ScrollViewer>(element) is not { } viewer) return new(0, () => { }, () => 0);
+        if (Find<Microsoft.UI.Xaml.Controls.ItemsStackPanel>(element) is { } panel)
+            panel.ItemsUpdatingScrollMode = Microsoft.UI.Xaml.Controls.ItemsUpdatingScrollMode.KeepScrollOffset;
+        element.UpdateLayout();
+        var horizontal = viewer.HorizontalOffset; var vertical = viewer.VerticalOffset;
+        return new(vertical, () => element.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            element.UpdateLayout(); viewer.ChangeView(horizontal, vertical, null, true);
+        }), () => viewer.VerticalOffset);
+    }
     public void AttachColumnResize(Microsoft.Maui.Controls.View grip, Action<double> resizeBy, Action autoFit)
     {
         Microsoft.UI.Xaml.UIElement? attached = null; bool resizing = false; double previousX = 0;

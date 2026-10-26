@@ -14,12 +14,9 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
     public const string PluginId = "sysmex.uc3500";
     public const string ProfileId = "sysmex.uc3500.serial";
     public const string Manual = "Sysmex UC-3500 Host Communication Specifications (Except North America), v0.0.5 (2017-04-14)";
-    public const string ManualUrl = "https://pdfcoffee.com/uc-3500-host-manual-v005-pdf-free.html";
-    public PluginDescriptor Describe() => new(PluginId, "0.1.0", 1, "Sysmex", ["UC-3500"], [Manual, ManualUrl]);
+    public PluginDescriptor Describe() => new(PluginId, "0.1.0", PluginApi.Version, "Sysmex", ["UC-3500"], [Manual]);
     public IReadOnlyList<InstrumentTraceProfile> Profiles { get; } = [new(ProfileId, "UC-3500 · Serial (lectura pasiva)",
-        [Manual + " §6.1.1: TRANSPARENT 1/2 y HANDSHAKE, comprobación BCC/SUM/SUM2/NONE; §6.1.2 tablas 6-14 a 6-18.",
-         "El texto indica 441 bytes; la suma de anchos de tabla 6-17 y la captura local son 446. Se admite la estructura de campos de la tabla y se informa la discrepancia.",
-         "Autodetección pasiva de comprobación por trama; NONE no acredita integridad. Sin timers, escrituras ni homologación en hardware.", ManualUrl])];
+        [Manual + " §6.1.1–6.1.2"] )];
 
     private static Uc3500WireDecoder Decode(IEnumerable<TraceEntry> entries, Uc3500CheckMode mode)
     {

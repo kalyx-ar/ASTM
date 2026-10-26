@@ -8,10 +8,7 @@ public sealed partial class ArchitectPlugin : IInstrumentDiagnosticVocabulary
     private static IReadOnlyDictionary<string, ProtocolText> CreateVocabulary()
     {
         var values = new Dictionary<string, ProtocolText>(StandardDiagnosticVocabulary.Create(
-        "Abbott ARCHITECT ASI 91407-108 tablas de registros",
-        ("record.O", "Muestra y solicitud de ensayos ARCHITECT"),
-        ("record.R", "Resultado de ensayo ARCHITECT"),
-        ("record.Q", "Consulta o cancelación de solicitudes ARCHITECT")), StringComparer.Ordinal);
+        "Abbott ARCHITECT ASI 91407-108 tablas de registros"), StringComparer.Ordinal);
         foreach (var (key, text) in new (string, string)[]
         {
             ("valueKind.F", "Concentración"), ("valueKind.P", "Respuesta instrumental"), ("valueKind.I", "Interpretación"),

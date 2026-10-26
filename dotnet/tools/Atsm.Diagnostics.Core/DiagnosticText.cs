@@ -21,13 +21,10 @@ public static class DiagnosticText
         ["Message.QueryAnswer"] = "Respuesta a consulta de solicitudes", ["Message.Acknowledgement"] = "Confirmación de recepción del mensaje",
         ["Message.Result"] = "Muestra {0} · {1}: {2} {3}",
         ["Message.Incomplete"] = "Mensaje incompleto", ["Message.Hl7Unknown"] = "Mensaje HL7 sin interpretación documentada ({0})",
-        ["Message.Export"] = "Exportación de resultados", ["Message.Wire"] = "Fragmento de comunicación ({0} bytes)",
+        ["Message.Export"] = "Exportación de resultados", ["Message.Wire"] = "Fragmento {0} bytes", ["Message.Nul"] = "Fragmento {0} bytes - NUL",
+        ["Message.BinaryFragment"] = "Fragmento {0} bytes - {1}",
         ["Message.WithError"] = "{0} - Con error", ["Flag.Unknown"] = "Código sin interpretar: {0}",
         ["Finding.UnsupportedBinary"] = "Protocolo binario sin intérprete documentado; bytes disponibles en Trama.",
-        ["Command.ENQ"] = "Solicitud de inicio de transmisión (ENQ)", ["Command.ACK"] = "Aceptación de la comunicación o trama (ACK)",
-        ["Command.NAK"] = "Rechazo; el emisor debe reintentar (NAK)", ["Command.EOT"] = "Fin de transmisión (EOT)",
-        ["Command.STX"] = "Inicio de trama (STX)", ["Command.ETX"] = "Fin de mensaje (ETX)",
-        ["Command.ETB"] = "La trama continúa en otro bloque (ETB)",
         ["Direction.Received"] = "Equipo → anfitrión", ["Direction.Transmitted"] = "Anfitrión → equipo", ["Direction.Event"] = "Evento",
         ["Direction.RX"] = "Equipo → anfitrión", ["Severity.Information"] = "Información", ["Severity.Warning"] = "Advertencia", ["Severity.Error"] = "Error",
         ["Level.Technical"] = "Captura", ["Level.Link"] = "Enlace", ["Level.Message"] = "Mensaje", ["Level.Operation"] = "Interpretación",
@@ -44,7 +41,8 @@ public static class DiagnosticText
         ["Finding.ATSM-DIAG-INCOMPLETE-CASE"] = "El caso fue interrumpido o no tiene cierre; los datos pueden estar incompletos.",
         ["Finding.ATSM-DIAG-UNSUPPORTED-PROTOCOL"] = "El log utiliza un protocolo sin intérprete compatible. Se conservan los bytes; no se infieren resultados.",
         ["Finding.ATSM-DIAG-DIRECTION-UNCERTAIN"] = "No se pudo inferir la dirección del log. Confirme si lo registró el anfitrión o el instrumento.",
-        ["Finding.ATSM-DIAG-SOURCE-LIMITATION"] = "Limitación de la fuente de captura; consulte el detalle original.",
+        ["Source.Skipped"] = "Registros omitidos por fecha inválida: {0}",
+        ["Source.LengthMismatch"] = "Registros con longitud informada distinta de los bytes capturados: {0}",
         ["Finding.ATSM-DIAG-INCOMPLETE-MESSAGE"] = "Mensaje incompleto; se excluyó de las observaciones interpretadas.",
         ["Finding.ATSM-DIAG-LIS01-INVALID-FRAME"] = "Trama inválida; consulte la causa y los bytes originales en el detalle.",
         ["Finding.STXInside"] = "Se recibió un inicio de trama (STX) dentro de otra trama abierta.",
@@ -73,6 +71,7 @@ public static class DiagnosticText
         ["Finding.HL7"] = "El mensaje HL7 no cumple el perfil seleccionado; consulte el código y el detalle original.",
         ["Finding.MLLP"] = "Se detectó ruido o un bloque MLLP incompleto o inválido.",
         ["Event.bytes"] = "Bytes capturados", ["Event.record-bytes"] = "Registros capturados sin encuadre de enlace",
+        ["Event.OPEN"] = "Inicio de captura", ["Event.CLOSE"] = "Fin de captura",
         ["Event.lis01.enquiry"] = "Solicitud de inicio de transmisión", ["Event.lis01.established"] = "Enlace establecido",
         ["Event.lis01.busy"] = "Receptor ocupado", ["Event.lis01.contention"] = "Ambos extremos intentaron transmitir",
         ["Event.lis01.frame"] = "Trama recibida", ["Event.lis01.invalid-frame"] = "Trama inválida",
@@ -90,15 +89,18 @@ public static class DiagnosticText
         ["Format.Auto"] = "Detectar automáticamente", ["Format.Export"] = "Exportación CSV / RDML",
         ["Format.AstmMessage"] = "Mensaje ASTM completo", ["Format.Hl7Message"] = "Mensaje HL7 completo",
         ["Format.SysmexLog"] = "Log Sysmex · monitor de puertos", ["Format.LegacyLog"] = "Log legacy · interfaz",
-        ["Format.WireBytes"] = "Bytes de cable", ["Format.AtsmTrace"] = "Traza ATSM", ["Format.ProtectedCase"] = "Caso protegido",
+        ["Format.WireBytes"] = "Bytes de cable", ["Format.HexBytes"] = "Bytes en hexadecimal / controles", ["Format.AtsmTrace"] = "Traza ATSM", ["Format.ProtectedCase"] = "Caso protegido",
     };
     private static readonly Dictionary<string, Dictionary<string, string>> pluginSeeds = new(StringComparer.Ordinal);
-    public static string Text(string key) => lang.GetValueOrDefault(key, key);
+    public static string Text(string key) => lang.GetValueOrDefault(key) ?? (StandardDiagnosticVocabulary.Shared.ContainsKey(key) ? Common(key) : key);
     public static string Localize(string key, string fallback) => lang.GetValueOrDefault(key, fallback);
     public static bool IsLocalized(string text) => lang.Values.Contains(text, StringComparer.Ordinal);
     public static string Format(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, Text(key), args);
     public static string Finding(AtsmDiagnostic finding, DiagnosticProfile? profile = null)
     {
+        if (finding.Code == "ATSM-DIAG-SOURCE-LIMITATION") return finding.Message;
+        if (finding.Code == "ATSM-DIAG-SOURCE-SKIPPED") return Format("Source.Skipped", finding.Message);
+        if (finding.Code == "ATSM-DIAG-SOURCE-LENGTH-MISMATCH") return Format("Source.LengthMismatch", finding.Message);
         var plugin = (object?)profile?.TracePlugin ?? profile?.AstmPlugin;
         if (plugin is IInstrumentDiagnosticVocabulary vocabulary && vocabulary.ExplainFinding(finding) is { } explanation) return Explanation(plugin, explanation);
         if (finding.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL" && finding.Message == DiagnosticReader.UnsupportedBinaryMessage) return Text("Finding.UnsupportedBinary");
@@ -123,20 +125,24 @@ public static class DiagnosticText
         ?? Finding(new(code, AtsmSeverity.Information, original ?? ""));
     public static string Plugin(object plugin, ProtocolText value)
     {
-        var source = plugin.GetType().Assembly.GetName().Name!;
+        var source = value.SourceAssembly ?? plugin.GetType().Assembly.GetName().Name!;
         return pluginSeeds.TryGetValue(source, out var seed) ? seed.GetValueOrDefault(value.Key, value.Fallback) : value.Fallback;
     }
     public static string Explanation(object plugin, ProtocolExplanation value) => string.Format(CultureInfo.CurrentCulture, Plugin(plugin, value.Text), value.Arguments.Cast<object>().ToArray());
+    public static string Common(string key) => Plugin(typeof(StandardDiagnosticVocabulary), StandardDiagnosticVocabulary.Shared[key]);
     public static async Task InitializeAsync(DbConnection database, DiagnosticCatalog catalog, string target = "es-AR", CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(database);
 #if KALYX_LANG
-        foreach (var profile in catalog.Profiles) lang.TryAdd("Profile." + profile.Id + ".Evidence", profile.Evidence);
         await InitializeSeedAsync(lang, typeof(DiagnosticText).Assembly.GetName().Name!, database, target, cancellationToken);
+        var common = StandardDiagnosticVocabulary.Shared.Values.ToDictionary(v => v.Key, v => v.Fallback, StringComparer.Ordinal);
+        var commonSource = typeof(StandardDiagnosticVocabulary).Assembly.GetName().Name!;
+        await InitializeSeedAsync(common, commonSource, database, target, cancellationToken); pluginSeeds[commonSource] = common;
         foreach (var assembly in catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().Concat(catalog.TracePlugins).GroupBy(p => p.GetType().Assembly.GetName().Name!, StringComparer.Ordinal))
         {
-            var seed = assembly.SelectMany(p => p.DiagnosticVocabulary.Values).GroupBy(v => v.Key, StringComparer.Ordinal)
+            var seed = assembly.SelectMany(p => p.DiagnosticVocabulary.Values).Where(v => v.SourceAssembly is null).GroupBy(v => v.Key, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Fallback, StringComparer.Ordinal);
+            if (seed.Count == 0) continue;
             await InitializeSeedAsync(seed, assembly.Key, database, target, cancellationToken);
             pluginSeeds[assembly.Key] = seed;
         }

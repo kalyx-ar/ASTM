@@ -20,12 +20,8 @@ internal sealed partial class UwamInterpreter(IInstrumentKnowledge knowledge) : 
 
     private static readonly string[] Evidence =
     [
-        "Sysmex R315168 U-WAM ASTM Host Online Specifications rev. 22, 5.2.4: one record per message, at most 240 characters per frame text",
-        "R315168 5.2.5: 15 s establishment, 30 s receiver; order inquiry answered within 8 s (with chemistry analyzer) or 18 s (without)",
-        "R315168 5.2.5: in E1381-95 mode U-WAM performs no timeout processing (not covered by these profiles)",
-        "R315168 pp.39-40,47: QC identifier and serial in R.14; §5.3.3.7/Appendix J: S.7 points to external target/limit CSV; host resolves, ATSM never opens it.",
-        "R315168 rev.22 appendices B/K: UF-3000/3000x/4000/5000, UC-1000/3500 and UD-10 on the U-WAM host link; not qualification of each analyzer's direct protocol.",
-        "Local UF-5000 trace: O.4.3 identifies QC when O.3 is empty; composite QC R.4/R.5 retained in source fields. Only documented R.4.2 format codes are classified as formats; other components are not invented statistics.",
+        "Sysmex R315168 U-WAM ASTM Host Online Specifications rev.22 §5.2.4–5.2.5",
+        "R315168 §5.3.3.7; appendices B, J, K",
     ];
 
     // The host answer budget leaves margin below the instrument limit for framing and transfer.

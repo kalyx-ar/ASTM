@@ -8,11 +8,9 @@ public sealed partial class Cs2500Plugin : IInstrumentDiagnosticVocabulary
     private static IReadOnlyDictionary<string, ProtocolText> CreateVocabulary()
     {
         var values = new Dictionary<string, ProtocolText>(StandardDiagnosticVocabulary.Create(
-        "Sysmex CS-2500 rev.2.04 §5.3.3",
-        ("record.O", "Muestra o material de control y posición"),
-        ("record.R", "Resultado de coagulación, dilución y alarmas"),
-        ("record.Q", "Consulta del instrumento; este perfil sólo recibe resultados")), StringComparer.Ordinal);
-        void Add(string key, string text, string evidence) => values.Add(key, new(key, text, evidence));
+        "Sysmex CS-2500 rev.2.04 §5.3.3"), StringComparer.Ordinal);
+        void Add(string key, string text, string evidence) => values.Add(key, key == "flag.N" ? StandardDiagnosticVocabulary.Shared["state.Normal"]
+            : key == "flag.A" ? StandardDiagnosticVocabulary.Shared["state.AnalysisError"] : new(key, text, evidence));
         foreach (var (code, text) in new (string, string)[]
         {
             ("N", "Normal"), ("A", "Error de análisis"), ("L", "Por debajo del límite del paciente"),

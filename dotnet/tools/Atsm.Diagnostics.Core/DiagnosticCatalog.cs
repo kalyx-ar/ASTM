@@ -14,13 +14,12 @@ namespace Atsm.Diagnostics;
 
 public sealed record DiagnosticTiming(TimeSpan QueryBudget, TimeSpan ResponseTimeout, TimeZoneInfo InstrumentTimeZone);
 
-public sealed class DiagnosticProfile(string id, string manufacturer, string name, string protocol, string evidence)
+public sealed class DiagnosticProfile(string id, string manufacturer, string name, string protocol)
 {
     public string Id { get; } = id;
     public string Manufacturer { get; } = manufacturer;
     public string Name { get; } = name;
     public string Protocol { get; } = protocol;
-    public string Evidence => DiagnosticText.Localize("Profile." + Id + ".Evidence", evidence);
     public string InstrumentId => AstmPlugin?.Describe().Id ?? ContentPlugin?.Describe().Id ?? TracePlugin?.Describe().Id ?? (IsHl7 ? "abbott.architect" : Id);
     public string Configuration => Id switch
     {
@@ -67,28 +66,19 @@ public sealed class DiagnosticCatalog
         var profiles = new List<DiagnosticProfile>();
         foreach (var plugin in TracePlugins)
         foreach (var profile in plugin.Profiles)
-            profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, string.Join(", ", plugin.Describe().Models), profile.Protocol,
-                string.Join("; ", profile.Evidence))
+            profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, string.Join(", ", plugin.Describe().Models), profile.Protocol)
             { TracePlugin = plugin, TraceProfile = profile });
         foreach (var plugin in ContentPlugins)
         foreach (var profile in plugin.Profiles)
-            profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, "CFX Maestro", profile.Format, "Manual + pruebas sintéticas; exportación, sin control directo")
+            profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, "CFX Maestro", profile.Format)
             { ContentPlugin = plugin, ContentProfile = profile });
         foreach (var plugin in AstmPlugins)
         foreach (var profile in plugin.Profiles)
         {
             var descriptor = plugin.Describe();
-            var evidence = descriptor.Id switch
-            {
-                "abbott.celldyn-ruby" => "Trazas locales; hipótesis pendientes de manual",
-                "abbott.architect" => "Manual y trazas locales; sin homologación en hardware",
-                SysmexUrinalysisPlugin.PluginId => "Conocimiento de U-WAM y sus analizadores; interpretación por contexto del enlace. Sin homologación en hardware.",
-                "clsi.lis02" => "Estándar genérico; no valida un equipo particular",
-                _ => "Manual + pruebas sintéticas; sólo recepción de resultados",
-            };
-            profiles.Add(new(profile.Id, descriptor.Manufacturer, string.Join(", ", descriptor.Models), "ASTM", evidence) { AstmPlugin = plugin, AstmProfile = profile });
+            profiles.Add(new(profile.Id, descriptor.Manufacturer, string.Join(", ", descriptor.Models), "ASTM") { AstmPlugin = plugin, AstmProfile = profile });
         }
-        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP", "Manual + pruebas sintéticas; ZOS, no actor LAW completo") { IsHl7 = true });
+        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP") { IsHl7 = true });
         if (profiles.Select(p => p.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != profiles.Count) throw new InvalidOperationException("Duplicate profile ID.");
         Profiles = profiles;
         Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,

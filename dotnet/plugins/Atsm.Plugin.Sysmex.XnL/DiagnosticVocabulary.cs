@@ -8,11 +8,9 @@ public sealed partial class XnLPlugin : IInstrumentDiagnosticVocabulary
     private static IReadOnlyDictionary<string, ProtocolText> CreateVocabulary()
     {
         var values = new Dictionary<string, ProtocolText>(StandardDiagnosticVocabulary.Create(
-        "Sysmex XN-L 1273-MKT rev.3 §7/8",
-        ("record.O", "Muestra o material de control; posición en gradilla"),
-        ("record.R", "Resultado hematológico y juicio del instrumento"),
-        ("record.Q", "Consulta del instrumento; este perfil sólo recibe resultados")), StringComparer.Ordinal);
-        void Add(string key, string text, string evidence) => values.Add(key, new(key, text, evidence));
+        "Sysmex XN-L 1273-MKT rev.3 §7/8"), StringComparer.Ordinal);
+        void Add(string key, string text, string evidence) => values.Add(key, key == "flag.N" ? StandardDiagnosticVocabulary.Shared["state.Normal"]
+            : key == "flag.W" ? StandardDiagnosticVocabulary.Shared["state.LowReliability"] : new(key, text, evidence));
         foreach (var (code, label) in new (string, string)[]
         {
             ("N", "Normal"), ("L", "Por debajo del intervalo de referencia"), ("H", "Por encima del intervalo de referencia"),

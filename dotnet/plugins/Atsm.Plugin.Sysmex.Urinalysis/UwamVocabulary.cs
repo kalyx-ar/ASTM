@@ -10,14 +10,11 @@ internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
         var result = new Dictionary<string, ProtocolText>(StandardDiagnosticVocabulary.Create(
         "Sysmex R315168 rev.22 §5.3.3",
         ("record.S", "Datos del control de calidad y referencia de objetivos/límites"),
-        ("record.O", "Muestra, tipo de análisis y estado de la solicitud"),
-        ("record.R", "Resultado urinario, método, dilución y formato del valor"),
-        ("record.Q", "Consulta de solicitudes por número de muestra"),
         ("resultFormat.RAW", "Original"),
         ("resultFormat.MAINFORMAT", "Formateado")), StringComparer.Ordinal);
         void Add(string key, string text, string evidence) => result[key] = new(key, text, evidence);
         Add("message.QuerySamples", "Consulta {0} por número de muestra", "R315168 rev.22 §5.3.3.5, Q.3");
-        Add("value.Image", "Imagen", "R315168 rev.22 §5.3.3.4, R.3 result type IF / appendix E");
+        result["value.Image"] = StandardDiagnosticVocabulary.Shared["value.Image"];
         Add("unit.NonMeasurement", "—", "R315168 rev.22 §5.3.3.4, IF/RC: imagen o comentario, sin magnitud física");
         Add("value.ResearchIndicator", "Indicador de investigación", "R315168 rev.22 appendices C/F.2 pp.74/80; códigos sin unidad, no concentraciones");
         foreach (var (parameter, code, text) in UwamIndicators.Research)
@@ -48,7 +45,12 @@ internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
             ("LH.L", "Por debajo del intervalo normal"), ("LH.H", "Por encima del intervalo normal"),
             ("LH.LL", "Por debajo del límite de anormalidad"), ("LH.HH", "Por encima del límite de anormalidad"),
             ("QC.L", "Por debajo del límite de control"), ("QC.H", "Por encima del límite de control"),
-        }) Add("flag." + key, label, "R315168 rev.22 §5.3.3.4, 9.7 pp.46-47; analyzer flag y LH flag son contextos distintos");
+        })
+        {
+            var shared = key switch { "N" => "state.Normal", "A" => "state.AnalysisError", "W" => "state.LowReliability", _ => null };
+            if (shared is not null) result["flag." + key] = StandardDiagnosticVocabulary.Shared[shared];
+            else Add("flag." + key, label, "R315168 rev.22 §5.3.3.4, 9.7 pp.46-47; analyzer flag y LH flag son contextos distintos");
+        }
         return result;
     }
 }

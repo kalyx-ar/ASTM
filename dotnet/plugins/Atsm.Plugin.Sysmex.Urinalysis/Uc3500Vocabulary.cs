@@ -42,9 +42,7 @@ internal sealed partial class Uc3500Interpreter
         Add("RESULT", "Resultados de muestra {0}, serie {1}, análisis {2}; código del equipo: {3}", "§6.1.2.7, tabla 6-17");
         Add("UNKNOWN", "Registro UC-3500 sin interpretación documentada; se conserva el original", "§6.1.2");
         Add("INVALID", "Registro UC-3500 incompleto o inválido; se conserva el original", "§6.1.1.3-.4 / §6.1.2");
-        Add("ACK", "Trama recibida correctamente (ACK)", "§6.1.1.5");
-        Add("NAK", "Trama rechazada; se solicita retransmisión (NAK)", "§6.1.1.5");
-        Add("EOT", "Fin o interrupción del intercambio (EOT)", "§6.1.1.5");
+        foreach (var control in new[] { "ACK", "NAK", "EOT" }) result[control] = StandardDiagnosticVocabulary.Shared["Command." + control];
         Add("finding.ATSM-UC3500-ANALYSIS-00BB", "Error de lectura del código de barras (00BB). Puede persistir aunque se corrija manualmente la identificación antes del reenvío.", "§7, tablas 7-1 y 7-2");
         Add("finding.ATSM-UC3500-ANALYSIS-00CC", "Error de orden (00CC). El equipo puede medir con su tira configurada si ORDER ERROR está en MEASURE; el código no acredita la aceptación de la orden del anfitrión.", "§6.1.2.6 / §7, tablas 7-1 y 7-2");
         Add("finding.ATSM-UC3500-ANALYSIS-00DD", "Advertencia de vencimiento de las tiras (00DD).", "§7, tablas 7-1 y 7-2");

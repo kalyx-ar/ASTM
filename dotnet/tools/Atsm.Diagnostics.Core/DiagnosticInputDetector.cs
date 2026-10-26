@@ -6,6 +6,7 @@ using System.Xml;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Plugins;
+using Atsm.Plugins.Tracing;
 using Atsm.Protocol.Lis02;
 
 namespace Atsm.Diagnostics;
@@ -62,6 +63,11 @@ public static partial class DiagnosticInputDetector
             return new([DiagnosticInputFormat.Export], CfxPlugin.CurveProfileId);
         if (first.StartsWith("MSH", StringComparison.Ordinal)) return new([DiagnosticInputFormat.Hl7Message], Hl7Profile(selected));
         if (bytes.AsSpan().IndexOf("\vMSH"u8) >= 0) return new([DiagnosticInputFormat.WireBytes], Hl7Profile(selected));
+        if (BinaryWireParser.TryParseHex(bytes, out var normalized))
+        {
+            var inner = Detect(normalized, selected, catalog);
+            return new([DiagnosticInputFormat.HexBytes], inner.ProfileId, inner.Recorder, inner.UnsupportedProtocol);
+        }
         if (first.StartsWith("H|", StringComparison.Ordinal) && IsAstmHeader(first.ToString()))
             return new([DiagnosticInputFormat.AstmMessage], catalog.ResolveAstmInterpretation([new(null, TraceDirection.Received, SegmentContent.Message, bytes)], selected).Id);
         if (bytes.Contains((byte)2) && IsAstmHeader(text))

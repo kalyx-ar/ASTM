@@ -19,8 +19,8 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "record.S")] = "CONTROL TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UC3500-ER04")] = "TIRA TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Crosses")] = "CRUCES TRADUCIDAS";
-        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.N")] = "ESTADO TRADUCIDO";
-        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "value.Image")] = "IMAGEN TRADUCIDA";
+        database.Translations[("Atsm.Plugins", "state.Normal")] = "ESTADO TRADUCIDO";
+        database.Translations[("Atsm.Plugins", "value.Image")] = "IMAGEN TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UWAM-CHEMISTRY-UC3500-9902")] = "ERROR TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.UC3500.00CC")] = "ESTADO DE ERROR TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "unit.NotTransmitted")] = "UNIDAD NO INFORMADA TRADUCIDA";
@@ -47,7 +47,7 @@ public sealed class LangIntegrationTests
         Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultValue(observation, profile));
         Assert.Equal("ERROR TRADUCIDO", DiagnosticText.Finding(new("ATSM-UWAM-CHEMISTRY-UC3500-9902", AtsmSeverity.Warning, "Original"), profile));
         var direct = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("BLD", null, "urn:atsm:vendor:sysmex.uc3500")),
-            ResultKind = "CONCENTRATION", Flags = [new("00CC", null, "urn:atsm:vendor:sysmex.uc3500")], InstrumentStatusMeaning = Atsm.Abstractions.Model.InstrumentStatusMeaning.Warning };
+            ResultKind = "CONCENTRATION", Value = new("10", Numeric: 10), Flags = [new("00CC", null, "urn:atsm:vendor:sysmex.uc3500")], InstrumentStatusMeaning = Atsm.Abstractions.Model.InstrumentStatusMeaning.Warning };
         var directProfile = catalog.Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         Assert.Equal("ESTADO DE ERROR TRADUCIDO", ProtocolExplainer.Status(direct, directProfile));
         Assert.Equal("UNIDAD NO INFORMADA TRADUCIDA", ProtocolExplainer.Unit(direct, directProfile));
@@ -65,8 +65,9 @@ public sealed class LangIntegrationTests
             Instrument = observation.Instrument with { Model = "U-WAM" }, VendorIdentity = new(new Dictionary<string, string> { ["instrument.id"] = "UF-5000" }),
             ResultKind = "S/RAW", Value = new("3", Coded: new("3", null, "urn:synthetic")) };
         Assert.Equal("INDICADOR TRADUCIDO", ProtocolExplainer.ResultValue(research, profile));
-        var ufNeed = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("DBS_LANG_02215", null, "urn:atsm:vendor:sysmex.uf.control")), Value = new("Necesidad") };
-        Assert.Equal("LIMPIEZA TRADUCIDA", ProtocolExplainer.ResultValue(ufNeed, catalog.Resolve(SysmexUrinalysisPlugin.UfControlProfile)));
+        var ufNeed = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("DBS_LANG_02215", null, "urn:atsm:vendor:sysmex.uf.binary")),
+            Value = new("Necesidad", Coded: new("DBS_LANG_02215", null, "urn:atsm:vendor:sysmex.uf.binary:need")) };
+        Assert.Equal("LIMPIEZA TRADUCIDA", ProtocolExplainer.ResultValue(ufNeed, catalog.Resolve(SysmexUrinalysisPlugin.UfBinaryProfile)));
         Assert.Equal("Necesidad", ufNeed.Value.RawText);
         Assert.Equal(ConnectionState.Open, database.State);
     }

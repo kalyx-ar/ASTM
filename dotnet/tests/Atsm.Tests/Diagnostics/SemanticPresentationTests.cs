@@ -73,7 +73,7 @@ public sealed class SemanticPresentationTests
     {
         var result = Analyze("H|\\^&\rQ|1|SYN-123\rL|1|N\r"); var message = Assert.Single(result.Messages);
         Assert.Equal("Consulta SYN-123 por número de muestra", ProtocolExplainer.MessageContent(message, Profile, []));
-        Assert.Equal("Consulta de solicitudes por número de muestra", ProtocolExplainer.MessageSummary(message, Profile));
+        Assert.Equal("Consulta de solicitudes", ProtocolExplainer.MessageSummary(message, Profile));
     }
 
     [Fact]
