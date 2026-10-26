@@ -1,0 +1,130 @@
+Issue: kalyx-ar/EDC#205
+Fecha: 2026-10-25 21:56 America/Buenos_Aires
+Tipo: feat / fix / docs
+Commit de implementación: daef5fbaa0fe1da325f87b2397fd87abe1d34720
+Commit del registro: el commit docs que incorpora este archivo.
+Alcance previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405454437
+Ampliación de captura: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405720230
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405834890
+
+Alcance humano
+- Incorporar al knowledge los listados de códigos documentados de los equipos.
+- Revisar el aviso binario persistente en UF-5000Control. El usuario no conoce
+  el puerto ni el origen preciso de la captura; no se inventa ese contexto.
+
+Conocimiento implementado
+- U-WAM: 11 valores de RBC-Info., UTI-Info. y BACT-Info.; 19 comentarios de
+  revisión, con restricciones por tipo S/RC, parámetro reservado y modelo.
+  Research queda codificado y fuera de las estadísticas numéricas; los textos
+  conservan el carácter de sospecha/evaluación del equipo. No son diagnósticos.
+  RC deriva un flag :review-comment de revisión, sin reescribir los flags
+  originales ni convertirlo en error de análisis.
+- XN-L: 49 indicadores IP (tablas 7-10), 8 flags base y contextos de máscara.
+  A en una sospecha IP difiere de A con ---- o ++++. Un Q-Flag no es una
+  concentración ni recibe un umbral universal; sin A no se vuelve positivo.
+- CS-2500: 68 códigos numéricos de la tabla 19, incluido cálculo/calibración,
+  interferencias, errores de curva y códigos internos. R.7.1, evaluación
+  R.7.2 e instrumento R.7.3 separados; ejemplo documentado 34422 incluido.
+  N no oculta un error de cálculo ni la ausencia de curva validada. Estados
+  S/F describen finalización, no validación clínica. Tipos de emisión 1-9/A.
+  HIL/volumen tienen contextos propios; 1100.4000.0000 no confirma por sí solo
+  volumen inadecuado. Unknown9999 no es un comodín para códigos desconocidos.
+- QWALYS: 9 tipos, 4 soportes, estados R/M, CMP/INCMP/E según tipo de reacción.
+  El soporte de reacción no se interpreta como una unidad física.
+- ARCHITECT: F/P/I, ensayo primario/correlación y 7 flags con significado
+  explícito, incluido EXP. No se adivina la definición de los códigos que
+  el manual sólo enumera ni se trasladan tablas a CELL-DYN u otros modelos.
+- IInstrumentKnowledge por perfil/registro/campo/modelo; validación adicional
+  del sistema de códigos en presentación. Los resúmenes H/P/O/R/etc se
+  mantienen al agregar el nuevo puerto a los plugins.
+- InstrumentValueMeaning.DisplayText contiene significado traducible,
+  separado de DisplayValue literal. Core y MAUI lo presentan con el seed
+  del ensamblado/Lang; RawText, códigos y metadatos originales se conservan.
+- Calidad muestra valores codificados interpretados también en el grupo,
+  con modo crudo reversible, subfilas y tipos/unidades independientes.
+
+Fuentes
+- Sysmex R315168 rev.22, appendices C/D/F pp.74-76/80.
+- XN-L 1273-MKT rev.3, tablas 5/7-10 pp.24-25/29-33.
+- CS-2500 R316009 rev.2.04 pp.32-35, appendix C tabla 19 pp.53-55.
+  Copia primaria pública: https://doclib.siemens-healthineers.com/rest/v1/view?document-id=372255
+- QWALYS 3 ASTM Connection Manual, sección 4.6 p.10.
+- Abbott ARCHITECT ASI 91407-108, tablas 1.13/2.4.
+- Extracción de texto y revisión visual de tablas PDF locales; manuales
+  ignorados y no publicados. No se usan recomendaciones de integradores
+  comerciales sin una especificación primaria que respalde el protocolo.
+
+UF-5000Control: importación corregida, semántica pendiente
+- Se descartaban 315 lecturas porque el regex exigía llaves de apertura/cierre
+  en cada línea. El monitor reparte bloques largos con contadores propios
+  de tres dígitos y llaves que abarcan varias lecturas.
+- Normalización sólo de decoración en memoria, con contador decodificado y
+  estado por dirección. Conserva llaves literales, espacios, NUL, dirección y
+  timestamp. No mezcla RX/TX ni elimina ceros. Registros braced ya válidos
+  conservan su interpretación y admiten otros anchos de contador.
+- Una ambigüedad inicial sin estado conserva el parse anterior de la línea
+  y mantiene el aviso de diferencia de longitud; no acepta una extracción
+  ambigua como si fuese íntegra. RegexLogAdapter expone Decode al adaptador.
+- Captura completa: 34.373 entradas = 34.371 lecturas + 2 eventos;
+  500.444 bytes, 399.939 NUL; cero diferencias con contadores declarados.
+  El conteo previo de 34.058 era parcial; no se reescribe ese histórico.
+- La captura completa no contiene H|, R|, Q|, MSH|, UF-5000 ni RQ02.
+  UTF-16/UTF-32 en ambas endianidades y retirada de NUL no recuperan esos
+  marcadores. Son comprobaciones locales, no transformaciones de producción.
+- Revisión de manuales disponibles, búsqueda de documentación del fabricante
+  y referencias legacy locales sin identificar ese encuadre/codificación.
+  No se ha establecido el canal preciso ni un título de manual faltante.
+- El aviso binario permanece: no hay intérprete semántico confirmado.
+  P-15 sigue pendiente dentro de la misma familia UF-5000; no se deduce
+  que el contenido sea sólo de control ni que carezca de datos sensibles.
+
+Verificación
+- 326/326 pruebas .NET, 0 omitidas; suites finales repetidas (~1 s de pruebas).
+  36 casos nuevos: contextos/tabla completa/desconocidos, errores enmascarados
+  por N, HIL/volumen, indicadores IP, valores codificados, originales,
+  bloques repartidos, RX/TX, llaves literales, espacios y contadores ambiguos.
+- La prueba histórica de observaciones de otro sistema detectó un lookup de
+  tipos sin contexto. Se resolvió mediante DescribeValue validado por plugin,
+  sin relajar la prueba ni reinterpretar un código ajeno como tipo propio.
+- 542 comprobaciones nativas correctas, repetidas (~0,25 s de la última corrida).
+- Lang real, artifacts/lang-knowledge: 1/1 correcta en 164 ms; traducciones
+  de evaluación CS, IP XN-L, reacción QWALYS e indicador de investigación U-WAM.
+- Compilación MAUI correcta. Self-test de la salida final: PASS, salida 0,
+  6,95 s; incluye valor de investigación en grupo/subfila, ausencia de extremo
+  numérico y restauración del código crudo, además de controles anteriores.
+- CLI NativeAOT: ATSM_NATIVE_SELFTEST_OK, manufacturer-tables=ok.
+  Auditoría GUI: ATSM_PUBLICATION_DEPENDENCIES_OK.
+- Corpus privado desde el ejecutable final, sólo agregados:
+  UF-5000Control: 34.373 entradas / 0 mensajes / 0 observaciones;
+    aviso de protocolo no interpretado conservado.
+  UF-5000 resultados: 7.089 / 425 / 5.006;
+    Calidad 33 grupos / 33 registros / 0 material vacío / 0 alertas QC.
+  AMS: 20.929 / 118 / 9.572;
+    Calidad 81 grupos / 129 registros / 0 material vacío;
+    220 códigos 9902 con correspondencia UC-3500/00CC conservados.
+- GUI y CLI ProductVersion 0.1.0+daef5fbaa0fe1da325f87b2397fd87abe1d34720.
+- 19 DLL propias con token 066190A23251F202. Cinco advertencias CS8002
+  oficiales MAUI sin Strong Name conocidas y visibles; ejecutables propios
+  Authenticode NotSigned, pendiente del release. Sin cambios de confianza.
+
+Archivos principales
+- Plugins: Sysmex.Urinalysis UwamIndicators/UrinalysisKnowledge/
+  UrinalysisValueKnowledge/UrinalysisFlags/UwamVocabulary/UwamInterpreter;
+  Sysmex.XnL XnLMessages/InstrumentKnowledge/DiagnosticVocabulary;
+  Sysmex.Cs2500 Cs2500Errors/InstrumentKnowledge/DiagnosticVocabulary/dialecto;
+  Abbott.Architect y Diagast.Qwalys InstrumentKnowledge/DiagnosticVocabulary.
+- SDK: InstrumentValueKnowledge, Tracing/RegexLogAdapter; Diagnostics.Core
+  ProtocolExplainer; MAUI MainPage; CLI NativeSelfTest.
+- Pruebas: InstrumentKnowledgeExpansionTests, SysmexMonitorBlockTests,
+  LangIntegrationTests y pruebas previas de Calidad conservadas.
+- Documentacion/{ESTADO,CONTINUACION,DIAGNOSTICO-MANTENIMIENTO,
+  CALIDAD-DIAGNOSTICA}.md.
+
+Entrega
+- dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+- dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+- #205 abierto/In Progress por el alcance restante; informe publicado según
+  autorización previa del usuario y reglas de trazabilidad.
+- Sin nuevas dependencias, ZIP, wrappers, fuentes legacy copiadas, cambios de
+  Identidades, push ni PR. Manuales/trazas privadas no publicados. Sin homologación
+  en equipos físicos ni cambios a fuentes/documentos del checkout padre EDC.
