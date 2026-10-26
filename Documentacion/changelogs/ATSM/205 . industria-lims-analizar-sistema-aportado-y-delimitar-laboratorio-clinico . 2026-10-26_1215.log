@@ -1,0 +1,35 @@
+Issue: https://github.com/kalyx-ar/EDC/issues/205
+Alcance previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6418923242
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6419638927
+Commit funcional: 62aa329e5f755ad5b1c1fc084811c13b3e44aecc
+Tipo: feat / diagnostico binario UF y puertos neutrales de campos.
+
+Cambios:
+- Atsm.Plugins: InstrumentTraceField, BinaryFields, FirstByteOffset y TryReadUnsigned neutral de 1–4 bytes, ambos ordenes.
+- Plugin Sysmex.Urinalysis: layout tipo 2 de 102 bytes, siete registros contador/nivel y campos iniciales; deteccion por estructura, sin nombres de archivo ni valores de ejemplo. Retirado reconocimiento especulativo del fragmento de 13 bytes como mensaje aislado.
+- Diagnostics.Core/Maui: campos y rangos sobre lecturas originales; un 06 numerico no se presenta como ACK. Resumen del bloque con valores, detalle completo y originales intactos; cronologia y grupos consecutivos preservados. Explicaciones traducibles por Lang.
+- Pruebas de todos los cortes, lecturas de un byte/NUL, varios mensajes por lectura, layout desconocido, endianness/limites y traduccion real.
+- Documentacion: UF-CONTROL-Y-TIEMPOS, ESTADO y CONTINUACION.
+
+Evidencia y limites:
+- 1.981 mensajes tipo 2: cuatro contadores poblados y tres en cero, sin inferir que cero sea ausencia o agotamiento. Los cuatro decrecen 196 unidades con pasos 0/-1.
+- Hipotesis de disponibilidad de reactivos respaldada por el fabricante y transicion 1.662/1.661 compatible con capacidad de colorantes 2.077. No confirma asignacion de registros, unidades ni porcentajes. UI Contador/Nivel/Codigo de estado, sin nombres fisicos inventados.
+- P-15 sigue abierto: asignacion fisica/unidades, estados/indicadores, campos restantes, integridad, roles y limites operativos. No se inventan resultados clinicos, QC, RTT ni operaciones.
+- Ninguna dependencia nueva, carga en caliente, cambio de confianza, ZIP ni publicacion de datos privados.
+
+Validacion:
+- .NET: 391 pruebas correctas en dos pasadas completas finales, 1 s cada una. Primera pasada con 390 pruebas: fallo intermitente de identidad TLS del agente; el mismo caso paso aislado en 303 ms y las suites finales pasaron. Causa no reproducida; no se modifico TLS ni timeouts.
+- Nativo: CTest repetido correcto, 0,36 / 0,26 s; 542 comprobaciones existentes.
+- Lang real: 1 prueba correcta, 258 ms, con traduccion de campo binario.
+- GUI MAUI autonoma/ReadyToRun: self-test ventana/runtime privado/DPAPI/campos/grupos/scroll correcto, salida 0, 7,77 s.
+- CLI NativeAOT: self-test y verify-publication correctos.
+- Ambas salidas: 0.1.0+62aa329e5f755ad5b1c1fc084811c13b3e44aecc.
+- Corpus UF binario: 34.373 entradas, 2.193 mensajes, 349 observaciones tecnicas, 350 hallazgos; 1.981 UF_COUNTERS, 105 UF_ALERTS, 105 UF_NOTICE, 2 UF_ACTIVITY. 500.444 bytes conservados. 34.371 lecturas cubiertas por campos, cero tokens ACK/EOT falsos; dos eventos de captura adicionales.
+- Regresion NativeAOT: UF ASTM 425 mensajes/5.006 observaciones, UC 501/2.251, AMS 118/9.572.
+- 19 DLL propias con token 066190A23251F202. Cinco CS8002 conocidas de DLL oficiales MAUI sin Strong Name y Authenticode NotSigned pendientes. Cero coincidencias de notas/enlaces retirados en DLL propias y CLI.
+
+Salidas directas, sin comprimidos:
+dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+
+Estado final: incremento compilado y verificado; #205 abierto/En progreso por el alcance pendiente. Documentacion registrada en commit trazable posterior al funcional; sin push ni PR.
