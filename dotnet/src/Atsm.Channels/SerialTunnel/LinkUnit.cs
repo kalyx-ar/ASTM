@@ -13,15 +13,35 @@ public enum LinkType : byte
     Renew = 0x14,
     Release = 0x15,
     Revoked = 0x16,
+    RequestHandover = 0x17,
     ConfirmTransfer = 0x18,
+    HandoverAsked = 0x19,
+    HandoverAnswer = 0x1A,
+    HandoverResult = 0x1B,
+    KillSwitch = 0x1C,
+    Contest = 0x1D,
+    SecurityResult = 0x1E,
     SerialData = 0x20,
     WriteStatus = 0x21,
     PortEvent = 0x22,
+    SecurityEvent = 0x23,
+    GetStatus = 0x40,
+    GetConfig = 0x41,
+    SetConfig = 0x42,
+    SetTls = 0x43,
+    ListDevices = 0x44,
+    RevokePort = 0x45,
+    ReopenPort = 0x46,
+    ReadEvents = 0x47,
+    Restart = 0x48,
+    UnblockController = 0x49,
+    AdminEvent = 0x4E,
+    AdminResult = 0x4F,
     Heartbeat = 0x7E,
     Error = 0x7F,
 }
 
-/// <summary>One ATSM Link v1 unit (spec/link-v1.md): 12-byte big-endian header and payload.</summary>
+/// <summary>One RemoteUSB Link v1 unit (spec/link-v1.md, spec/admin-v1.md): 12-byte big-endian header and payload.</summary>
 public sealed record LinkUnit(LinkType Type, ushort Flags, ushort Channel, byte[] Payload)
 {
     public const int HeaderSize = 12;

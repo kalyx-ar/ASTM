@@ -527,6 +527,7 @@ void Agent::kill_switch(const std::shared_ptr<Connection>& connection, Port& por
     log(LogLevel::Warning, "port " + port.config.port_id + ": kill switch by " + connection->controller_id + " (" + connection->peer + ") on " + logged.target);
     dispatch(port, events);
     broadcast(port, logged);
+    send(connection, link::control(link::Type::SecurityResult, port.index, Value::map({{0, Value::uint(request_id)}, {1, Value::uint(logged.id)}})));
 }
 
 void Agent::contest(const std::shared_ptr<Connection>& connection, Port& port, const Value& map, std::uint64_t now,
@@ -559,7 +560,9 @@ void Agent::contest(const std::shared_ptr<Connection>& connection, Port& port, c
     event.until_ms = platform::utc_ms() + config_.security.contest_block_ms;
     event.detail = "kill-switch event " + std::to_string(record->first);
     log(LogLevel::Warning, "port " + port.config.port_id + ": kill switch of " + killer + " contested by " + connection->controller_id);
-    broadcast(port, emit(event));
+    const Event contested = emit(event);
+    broadcast(port, contested);
+    send(connection, link::control(link::Type::SecurityResult, port.index, Value::map({{0, Value::uint(request_id)}, {1, Value::uint(contested.id)}})));
     if (bool_or(map, 3)) {
         std::vector<ArbiterEvent> events;
         port.arbiter->close("REMOTEUSB-SECURE-CLOSED", events);

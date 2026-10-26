@@ -75,6 +75,7 @@ Unknown keys and out-of-range values are rejected with the path of the field.
 | 0x1B HandoverResult | agent → requester | 0 requestId, 1 yielded bool, 2 code |
 | 0x1C KillSwitch | controller → agent | 0 requestId, 1 reason |
 | 0x1D Contest | controller → agent | 0 requestId, 1 killEventId, 2 reason, 3 secureClose bool |
+| 0x1E SecurityResult | agent → requester | 0 requestId, 1 eventId (kill switch or contest accepted; refusals are `Error` with the requestId) |
 | 0x23 SecurityEvent | agent → every controller of the port | 0 eventId, 1 kind, 2 portId, 3 actor, 4 target, 5 generation, 6 reason, 7 untilUtcMs, 8 uncertain, 9 timeUtcMs |
 
 Cooperative handover request:

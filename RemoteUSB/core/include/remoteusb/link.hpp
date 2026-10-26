@@ -39,6 +39,7 @@ enum class Type : std::uint8_t {
     HandoverResult = 0x1B,
     KillSwitch = 0x1C,
     Contest = 0x1D,
+    SecurityResult = 0x1E,
     SerialData = 0x20,
     WriteStatus = 0x21,
     PortEvent = 0x22,

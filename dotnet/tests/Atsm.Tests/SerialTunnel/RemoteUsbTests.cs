@@ -100,6 +100,47 @@ public class RemoteUsbTests
         Assert.Equal(Atsm.Abstractions.Channels.WriteProgress.Rejected, stale.Progress);
     }
 
+    [RemoteUsbFact]
+    public async Task Owner_yields_the_port_to_a_cooperative_handover_request()
+    {
+        using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
+        instrumentListener.Start();
+        await using var agent = await RemoteUsbProcess.StartAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port);
+        using var instrumentSocket = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
+
+        RemoteUsbHandoverRequest? asked = null;
+        await using var owner = await SerialTunnelChannel.ConnectAsync("owner", new TcpEndpointOptions("127.0.0.1", agent.Port),
+            new SerialTunnelOptions("edc-test", "architect-port") { HandoverDecision = request => { asked = request; return true; } }, CancellationToken.None);
+        await using var requester = await SerialTunnelChannel.ConnectAsync("requester", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None);
+        var lease = await owner.AcquireAsync(new("edc-test"), CancellationToken.None);
+
+        // Only a queued controller may ask.
+        Assert.Equal(new RemoteUsbHandoverResult(false, "REMOTEUSB-HANDOVER-NOT-QUEUED"), await requester.RequestHandoverAsync("quality run", CancellationToken.None).WaitAsync(Timeout));
+        var waiting = requester.AcquireAsync(new("edc-backup"), CancellationToken.None).AsTask();
+        await Task.Delay(300);
+        var result = await requester.RequestHandoverAsync("quality run", CancellationToken.None).WaitAsync(Timeout);
+
+        Assert.True(result.Yielded);
+        Assert.Equal(("edc-backup", "quality run"), (asked?.Requester, asked?.Reason));
+        Assert.Equal(lease.Generation + 1, (await waiting.WaitAsync(Timeout)).Generation);
+    }
+
+    [RemoteUsbFact]
+    public async Task Administration_never_accepts_private_keys_over_plain_text_and_reports_the_devices()
+    {
+        await using var agent = await RemoteUsbProcess.LaunchAsync();
+        await using var admin = await agent.AdminAsync();
+        var refused = await Assert.ThrowsAsync<RemoteUsbAdminException>(() => admin.SetTlsAsync(false, null, null, pskIdentity: "edc", psk: new byte[32]));
+        Assert.Equal("REMOTEUSB-INSECURE-CHANNEL", refused.Code);
+        var status = await admin.GetStatusAsync();
+        Assert.Equal((false, false), (status[5UL], status[6UL]));
+        Assert.NotNull(await admin.ListDevicesAsync());
+
+        await using var secure = await agent.AdminAsync(tls: true);
+        Assert.Equal("REMOTEUSB-WEAK-PSK", (await Assert.ThrowsAsync<RemoteUsbAdminException>(() => secure.SetTlsAsync(false, null, null, pskIdentity: "edc", psk: new byte[8]))).Code);
+        await secure.SetTlsAsync(false, null, null, pskIdentity: "edc", psk: System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + Timeout;
@@ -112,19 +153,26 @@ public class RemoteUsbTests
     }
 }
 
+/// <summary>RemoteUSB started as the service runs it (<c>remoteusb run</c>) on a throw-away state directory and provisioned through its administration endpoint.</summary>
 internal sealed class RemoteUsbProcess : IAsyncDisposable
 {
     private readonly Process _process;
-    private readonly string _config;
+    private readonly string _state;
 
-    private RemoteUsbProcess(Process process, string config, int port)
+    private RemoteUsbProcess(Process process, string state, int adminPort, string certificateSha256)
     {
         _process = process;
-        _config = config;
-        Port = port;
+        _state = state;
+        AdminPort = adminPort;
+        AgentCertificateSha256 = certificateSha256;
     }
 
-    public int Port { get; }
+    public int AdminPort { get; }
+
+    public string AgentCertificateSha256 { get; }
+
+    /// <summary>Link port of the configuration in force.</summary>
+    public int Port { get; private set; }
 
     public static string? Executable()
     {
@@ -142,27 +190,24 @@ internal sealed class RemoteUsbProcess : IAsyncDisposable
         return null;
     }
 
-    public static async Task<RemoteUsbProcess> StartAsync(int instrumentPort, string tls = "\"Plain\"", string? backupCertificateSha256 = null)
+    public static RemoteUsbConfiguration Configuration(int instrumentPort, bool tls = false, string? backupCertificateSha256 = null,
+        IReadOnlyList<RemoteUsbController>? extraControllers = null, RemoteUsbSecurity? security = null) =>
+        new("test-agent", [new RemoteUsbPort("architect-port", "architect-01", RemoteUsbDevice.Tcp("127.0.0.1", instrumentPort),
+            [new RemoteUsbController("edc-test", 10), new RemoteUsbController("edc-backup", 20, backupCertificateSha256), .. extraControllers ?? []])
+            { Lease = TimeSpan.FromSeconds(6) }])
+        {
+            PlatformProfile = "test",
+            ListenHost = "127.0.0.1",
+            Heartbeat = TimeSpan.FromSeconds(2),
+            Tls = tls,
+            Security = security ?? new RemoteUsbSecurity(),
+        };
+
+    /// <summary>Starts an unconfigured agent.</summary>
+    public static async Task<RemoteUsbProcess> LaunchAsync(params string[] arguments)
     {
-        var config = Path.Combine(Path.GetTempPath(), $"remoteusb-{Guid.NewGuid():N}.json");
-        await File.WriteAllTextAsync(config, $$"""
-            {
-              "schemaVersion": "remoteusb/1",
-              "agentId": "test-agent",
-              "platformProfile": "test",
-              "listen": { "host": "127.0.0.1", "port": 0, "tls": {{tls}} },
-              "heartbeatMs": 2000,
-              "ports": [
-                {
-                  "portId": "architect-port",
-                  "instrumentId": "architect-01",
-                  "device": { "kind": "tcp", "host": "127.0.0.1", "port": {{instrumentPort}} },
-                  "ownership": { "leaseMs": 6000, "controllers": [ { "id": "edc-test", "priority": 10 }, { "id": "edc-backup", "priority": 20{{(backupCertificateSha256 is null ? "" : $", \"certificateSha256\": \"{backupCertificateSha256}\"")}} } ] }
-                }
-              ]
-            }
-            """);
-        var process = Process.Start(new ProcessStartInfo(Executable()!, ["--config", config, "--quiet"])
+        var state = Path.Combine(Path.GetTempPath(), $"remoteusb-{Guid.NewGuid():N}");
+        var process = Process.Start(new ProcessStartInfo(Executable()!, ["run", "--state", state, "--admin", "127.0.0.1:0", "--name", "test-agent", "--quiet", .. arguments])
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -171,12 +216,34 @@ internal sealed class RemoteUsbProcess : IAsyncDisposable
         process.ErrorDataReceived += (_, _) => { };
         process.BeginErrorReadLine();
         var line = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        if (line is null || !line.StartsWith("REMOTEUSB-LISTENING ", StringComparison.Ordinal))
+        var parts = line?.Split(' ');
+        if (parts is not ["REMOTEUSB-ADMIN", _, _])
         {
             process.Kill();
             throw new InvalidOperationException($"Agent did not start: {line}");
         }
-        return new RemoteUsbProcess(process, config, int.Parse(line["REMOTEUSB-LISTENING ".Length..], System.Globalization.CultureInfo.InvariantCulture));
+        return new RemoteUsbProcess(process, state, int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture), parts[2]);
+    }
+
+    /// <summary>Plain agent with the standard test configuration.</summary>
+    public static async Task<RemoteUsbProcess> StartAsync(int instrumentPort)
+    {
+        var agent = await LaunchAsync();
+        await agent.ConfigureAsync(Configuration(instrumentPort));
+        return agent;
+    }
+
+    public Task<RemoteUsbAdminClient> AdminAsync(bool tls = false, System.Security.Cryptography.X509Certificates.X509Certificate2? certificate = null, string serverId = "edc-admin") =>
+        RemoteUsbAdminClient.ConnectAsync("127.0.0.1", AdminPort, serverId, tls ? AgentCertificateSha256 : null, certificate);
+
+    public async Task<int> ConfigureAsync(RemoteUsbConfiguration configuration, Func<RemoteUsbAdminClient, Task>? before = null, bool tls = false,
+        System.Security.Cryptography.X509Certificates.X509Certificate2? certificate = null)
+    {
+        await using var admin = await AdminAsync(tls, certificate);
+        if (before is not null)
+            await before(admin);
+        Port = await admin.SetConfigAsync(1, configuration);
+        return Port;
     }
 
     public async ValueTask DisposeAsync()
@@ -187,6 +254,12 @@ internal sealed class RemoteUsbProcess : IAsyncDisposable
             await _process.WaitForExitAsync();
         }
         _process.Dispose();
-        File.Delete(_config);
+        try
+        {
+            Directory.Delete(_state, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
     }
 }

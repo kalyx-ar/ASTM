@@ -15,7 +15,14 @@ public sealed record SerialTunnelOptions(string ControllerId, string PortId)
     public TimeSpan HandshakeTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     public int MaxUnitBytes { get; init; } = 64 * 1024;
+
+    /// <summary>Answer of this owner to a cooperative handover request; null keeps the port (spec/admin-v1.md).</summary>
+    public Func<RemoteUsbHandoverRequest, bool>? HandoverDecision { get; init; }
 }
+
+public sealed record RemoteUsbHandoverRequest(ulong HandoverId, string Requester, string? Reason, TimeSpan Timeout);
+
+public sealed record RemoteUsbHandoverResult(bool Yielded, string? Code);
 
 public sealed class SerialTunnelException(string code, string message) : Exception($"{code}: {message}")
 {
@@ -35,6 +42,7 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Channel<ReadOnlyMemory<byte>> _received = Channel.CreateUnbounded<ReadOnlyMemory<byte>>(new UnboundedChannelOptions { SingleReader = true });
     private readonly Channel<ChannelEvent> _events = Channel.CreateUnbounded<ChannelEvent>();
+    private readonly Channel<RemoteUsbEvent> _securityEvents = Channel.CreateUnbounded<RemoteUsbEvent>();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _controlReplies = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _writeReplies = new();
     private readonly CancellationTokenSource _stop = new();
@@ -205,6 +213,43 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
         }
     }
 
+    /// <summary>Asks the current owner to yield the port. The requester must already be queued (AcquireAsync pending).</summary>
+    public async Task<RemoteUsbHandoverResult> RequestHandoverAsync(string? reason, CancellationToken cancellationToken)
+    {
+        var map = await ControlRequestAsync(LinkType.RequestHandover, reason is null ? [] : LinkCbor.Map((1, reason)), cancellationToken).ConfigureAwait(false);
+        return new RemoteUsbHandoverResult(map.GetValueOrDefault(1UL) is true, map.GetValueOrDefault(2UL) as string);
+    }
+
+    /// <summary>Forced interruption of the current owner (needs TLS with an authenticated peer and the right). Returns the event id to contest.</summary>
+    public async Task<ulong> KillSwitchAsync(string reason, CancellationToken cancellationToken)
+    {
+        var map = await ControlRequestAsync(LinkType.KillSwitch, LinkCbor.Map((1, reason)), cancellationToken).ConfigureAwait(false);
+        return map.GetValueOrDefault(1UL) as ulong? ?? 0;
+    }
+
+    /// <summary>Contests a kill switch: the agent drops and blocks its author; <paramref name="secureClose"/> also closes the port.</summary>
+    public async Task<ulong> ContestAsync(ulong killEventId, string reason, bool secureClose, CancellationToken cancellationToken)
+    {
+        var map = await ControlRequestAsync(LinkType.Contest, LinkCbor.Map((1, killEventId), (2, reason), (3, secureClose)), cancellationToken).ConfigureAwait(false);
+        return map.GetValueOrDefault(1UL) as ulong? ?? 0;
+    }
+
+    /// <summary>Semaphore and security events of this port (handover, kill switch, contest, secure close).</summary>
+    public async IAsyncEnumerable<RemoteUsbEvent> SecurityEventsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var item in _securityEvents.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            yield return item;
+    }
+
+    private async Task<SortedDictionary<ulong, object?>> ControlRequestAsync(LinkType type, SortedDictionary<ulong, object?> fields, CancellationToken cancellationToken)
+    {
+        var requestId = (ulong)Interlocked.Increment(ref _requestId);
+        var reply = Register(_controlReplies, requestId);
+        fields[0] = requestId;
+        await SendAsync(LinkUnit.Control(type, _port, fields), cancellationToken).ConfigureAwait(false);
+        return await reply.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async IAsyncEnumerable<ChannelEvent> EventsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var channelEvent in _events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -256,6 +301,7 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
         {
             _closed = true;
             _received.Writer.TryComplete();
+            _securityEvents.Writer.TryComplete();
             Publish(ChannelEventKind.Closed, null, "agent connection closed");
             foreach (var reply in _controlReplies.Values.Concat(_writeReplies.Values))
                 reply.TrySetException(new IOException(_closeReason ?? "Agent connection closed."));
@@ -296,6 +342,26 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
                 break;
             case LinkType.PortEvent:
                 Publish(ChannelEventKind.Faulted, map.GetValueOrDefault(1UL) as string, map.GetValueOrDefault(2UL) as string);
+                break;
+            case LinkType.HandoverResult or LinkType.SecurityResult when _controlReplies.TryRemove(requestId, out var result):
+                result.TrySetResult(map);
+                break;
+            case LinkType.HandoverAsked when unit.Channel == _port:
+                var asked = new RemoteUsbHandoverRequest(requestId, map.GetValueOrDefault(1UL) as string ?? "", map.GetValueOrDefault(2UL) as string,
+                    TimeSpan.FromMilliseconds(map.GetValueOrDefault(3UL) as ulong? ?? 0));
+                var yield = _options.HandoverDecision?.Invoke(asked) ?? false;
+                _ = SendAsync(LinkUnit.Control(LinkType.HandoverAnswer, _port, LinkCbor.Map((0, asked.HandoverId), (1, yield))), _stop.Token)
+                    .ContinueWith(_ => { }, TaskScheduler.Default);
+                break;
+            case LinkType.SecurityEvent when unit.Channel == _port:
+                _securityEvents.Writer.TryWrite(new RemoteUsbEvent(requestId,
+                    DateTimeOffset.FromUnixTimeMilliseconds((long)(map.GetValueOrDefault(9UL) as ulong? ?? 0)), map.GetValueOrDefault(1UL) as string ?? "",
+                    map.GetValueOrDefault(2UL) as string, map.GetValueOrDefault(3UL) as string, map.GetValueOrDefault(4UL) as string,
+                    (uint)(map.GetValueOrDefault(5UL) as ulong? ?? 0), map.GetValueOrDefault(6UL) as string,
+                    map.GetValueOrDefault(7UL) is ulong until ? DateTimeOffset.FromUnixTimeMilliseconds((long)until) : null, map.GetValueOrDefault(8UL) is true, null));
+                break;
+            case LinkType.Error when map.GetValueOrDefault(1UL) is ulong failed && failed != 0 && _controlReplies.TryRemove(failed, out var refused):
+                refused.TrySetException(new SerialTunnelException(map.GetValueOrDefault(0UL) as string ?? "ATSM-CH-AGENT-ERROR", map.GetValueOrDefault(2UL) as string ?? ""));
                 break;
             case LinkType.Error:
                 _closeReason = $"Agent error {map.GetValueOrDefault(0UL)}: {map.GetValueOrDefault(2UL)}";
