@@ -1,36 +1,36 @@
-# RemoteUSB: servicio y administración remota (P-16)
+# PortGate: servicio y administración remota (P-16)
 
 **Decisiones humanas del 2026-10-26:**
 
-1. El agente se llama **RemoteUSB** (antes `atsm-agent`, directorio `native/`). Es un puente serie ↔ TCP agnóstico del protocolo del instrumento: lo administra ATSM neutral y la parte específica la aporta el plugin.
+1. El agente se llama **PortGate** (decisión humana 2026-10-26; antes `atsm-agent` en `native/` y, brevemente, RemoteUSB). Es una puerta de puertos serie y Ethernet hacia TCP, agnóstica del protocolo del instrumento, con semáforo, kill switch y administración remota: lo usa ATSM neutral y la parte específica la aporta el plugin.
 2. Se administra de forma remota y centralizada; el archivo JSON deja de ser la vía de aprovisionamiento.
 3. En Windows es un **servicio**, no un driver.
 4. TLS es opcional. El material X.509 puede venir completo desde el servidor.
 5. No hay código de vinculación. El servidor que se conecta establece el modo de operación.
-6. Versiones, historial y vuelta atrás de la **configuración** los administra el **servidor**; RemoteUSB no guarda versiones de configuración porque son innecesarias. Sí puede guardar historia de eventos (semáforo, seguridad, puertos) para auditoría (aclaración humana del 2026-10-26).
-7. RemoteUSB es **ignorante** de la identidad de los instrumentos: informa lo que ve y el servidor recuerda qué dispositivo corresponde a cada instrumento.
+6. Versiones, historial y vuelta atrás de la **configuración** los administra el **servidor**; PortGate no guarda versiones de configuración porque son innecesarias. Sí puede guardar historia de eventos (semáforo, seguridad, puertos) para auditoría (aclaración humana del 2026-10-26).
+7. PortGate es **ignorante** de la identidad de los instrumentos: informa lo que ve y el servidor recuerda qué dispositivo corresponde a cada instrumento.
 8. No hay `--import`. La configuración sin red se hace con una UI que consume el puerto de administración en `127.0.0.1`.
 9. **Siempre arranca con la última configuración instalada**, esté o no disponible el servidor. Para cambiarla hay que conectarse y reemplazarla con la autorización vigente. Nunca vuelve al estado "sin configurar" por sí solo: eso permitiría que un servidor desconocido lo reconfigure.
 
 ## Servicio, no driver
 
-RemoteUSB no necesita modo kernel: el puerto lo expone el driver del adaptador (usbser, FTDI, Prolific o el puerto nativo) y RemoteUSB lo abre como cualquier proceso. Un servicio de usuario arranca antes del inicio de sesión, se reinicia solo ante fallos y se instala con `CreateService`. Un driver exigiría firma de kernel certificada por Microsoft, una falla tiraría el equipo (pantalla azul) y no aporta nada aquí.
+PortGate no necesita modo kernel: el puerto lo expone el driver del adaptador (usbser, FTDI, Prolific o el puerto nativo) y PortGate lo abre como cualquier proceso. Un servicio de usuario arranca antes del inicio de sesión, se reinicia solo ante fallos y se instala con `CreateService`. Un driver exigiría firma de kernel certificada por Microsoft, una falla tiraría el equipo (pantalla azul) y no aporta nada aquí.
 
-`remoteusb service install|uninstall|start|stop` registra el servicio con inicio automático y recuperación. En Linux/Raspberry, unidad `systemd` con usuario dedicado del grupo `dialout`. Se retira `--config`/`--check` como vía de operación (regla 12).
+`portgate service install|uninstall|start|stop` registra el servicio con inicio automático y recuperación. En Linux/Raspberry, unidad `systemd` con usuario dedicado del grupo `dialout`. Se retira `--config`/`--check` como vía de operación (regla 12).
 
 ## Modos que fija el servidor
 
 | Aspecto | Opciones |
 |---|---|
-| Quién inicia | **Servidor** (RemoteUSB escucha) o **agente** (RemoteUSB conecta a la dirección del servidor; rol cliente de P-09) |
+| Quién inicia | **Servidor** (PortGate escucha) o **agente** (PortGate conecta a la dirección del servidor; rol cliente de P-09) |
 | Acceso | **Restringido** (sólo el servidor que lo configuró administra y usa los puertos) o **compartido** (varios controladores según la lista que entrega el servidor) |
 | Transporte | **Plano** o **TLS**, por endpoint (administración y Link) |
 
-Recién instalado, RemoteUSB escucha administración en el puerto 28240. El primer servidor que lo configura en modo restringido queda como único administrador. Esa configuración persiste y se usa en cada arranque.
+Recién instalado, PortGate escucha administración en el puerto 28240. El primer servidor que lo configura en modo restringido queda como único administrador. Esa configuración persiste y se usa en cada arranque.
 
 ## Protocolo de administración
 
-Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en un endpoint propio:
+Extensión de PortGate Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en un endpoint propio:
 
 | Tipo | Dirección | Contenido |
 |---|---|---|
@@ -51,10 +51,10 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 ## Identidad de los instrumentos
 
 - La configuración de puertos usa el nombre del sistema (`COM5`) que el servidor eligió a partir de `ListDevices`.
-- RemoteUSB no persiste correspondencias ni selectores; informa la identidad física de cada puerto.
+- PortGate no persiste correspondencias ni selectores; informa la identidad física de cada puerto.
 - El servidor recuerda instrumento ↔ identidad física y puede reconocer el equipo por su tráfico (número de serie del analizador en el encabezado ASTM/HL7). Si el adaptador aparece en otro COM, envía un `SetConfig` corregido.
 
-## Qué guarda RemoteUSB
+## Qué guarda PortGate
 
 - **Configuración vigente:** modo, administrador autorizado, material TLS y puertos, protegida (DPAPI de máquina en Windows, `0600` en POSIX). Sin versiones anteriores; se sobrescribe en cada cambio y se usa en cada arranque.
 - **Registro de eventos:** tomas, liberaciones, pedidos de cesión, kill switch, impugnaciones, cierres por seguridad, aparición/desaparición de dispositivos y cambios de configuración (quién, cuándo, revisión; no su contenido). Persistente, con tamaño acotado y rotación, protegido igual que la configuración. Consultable por el servidor y los observadores autorizados para auditar aunque no estuvieran conectados en el momento del evento.
@@ -65,9 +65,9 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 |---|---|---|---|
 | R1 | **Toma del agente recién instalado.** Entre la instalación y la primera configuración, quien alcance el puerto 28240 puede configurarlo en modo restringido y quedarse con él. | El laboratorio pierde el control del equipo; recuperarlo exige reinstalar con permisos de administrador del sistema. | **Decidido:** opción de fijar el servidor al instalar (`service install --server host:puerto [--server-cert sha256 | --psk …]`): arranca ya restringido e iniciado por el agente. Sin ese parámetro ni firewall, el riesgo lo asume quien opera la instalación. |
 | R2 | **Administración en plano.** Sin TLS, el administrador se reconoce por su dirección IP. En la misma red se puede suplantar (ARP spoofing) o interceptar. | Un tercero reconfigura el agente, lee o inyecta datos del instrumento. | **Decidido:** el plano es una opción legítima (puede haber motivos para no usar TLS). TLS es la recomendación documentada; no usarla es un riesgo que asume el operador. |
-| R3 | **Clave privada enviada en plano.** `SetTls` lleva la clave privada al agente. | Si el canal es plano, la clave queda expuesta y el TLS posterior no protege nada. | **Decidido:** cuando se requiere TLS, su aprovisionamiento viaja por un canal seguro. RemoteUSB rechaza `SetTls` con clave privada por un canal plano. El canal inicial puede ser TLS con el certificado autogenerado del agente (huella fijada por el servidor) o TLS-PSK; ver [Aprovisionamiento seguro](#aprovisionamiento-seguro). |
+| R3 | **Clave privada enviada en plano.** `SetTls` lleva la clave privada al agente. | Si el canal es plano, la clave queda expuesta y el TLS posterior no protege nada. | **Decidido:** cuando se requiere TLS, su aprovisionamiento viaja por un canal seguro. PortGate rechaza `SetTls` con clave privada por un canal plano. El canal inicial puede ser TLS con el certificado autogenerado del agente (huella fijada por el servidor) o TLS-PSK; ver [Aprovisionamiento seguro](#aprovisionamiento-seguro). |
 | R4 | **Acceso local por 127.0.0.1.** Cualquier proceso del equipo llega al puerto local. | Un usuario sin privilegios usa o reconfigura el agente. | **Decidido:** el acceso local se restringe sólo si el servidor lo restringe. El uso local es legítimo: una instancia local (p. ej. EDC local) puede tomar el puerto por `127.0.0.1` cuando el servidor cae, o como failover por latencia, compitiendo por el mismo semáforo. |
-| R5 | **Servidor suplantado en modo "inicia el agente".** RemoteUSB conecta a una dirección; DNS o IP pueden apuntar a otro equipo. | Un servidor falso le entrega configuración o recibe los datos. | Con TLS, fijar el certificado del servidor. En plano no hay mitigación técnica: sólo red confiable. |
+| R5 | **Servidor suplantado en modo "inicia el agente".** PortGate conecta a una dirección; DNS o IP pueden apuntar a otro equipo. | Un servidor falso le entrega configuración o recibe los datos. | Con TLS, fijar el certificado del servidor. En plano no hay mitigación técnica: sólo red confiable. |
 | R6 | **Servidor perdido.** Si el servidor administrador desaparece (reinstalado, certificado perdido), nadie puede cambiar la configuración. | El equipo sigue funcionando con la última configuración, pero no se puede administrar. | Es el comportamiento buscado (decisión 9). Recuperación: reinstalar el servicio con permisos de administrador del sistema, lo que borra el estado. El servidor debe respaldar su identidad (certificado y clave). |
 | R7 | **Clave privada en reposo.** DPAPI de máquina protege contra otros equipos, no contra un administrador local. | Un administrador del equipo puede extraer la clave TLS. | Aceptado: quien administra el sistema operativo ya controla el puerto serie. Documentarlo. |
 | R8 | **Escritura al instrumento.** Un controlador con el puerto concedido envía bytes crudos al analizador. | Comandos no deseados (borrado, reprocesos) desde un controlador autorizado o comprometido. | Lista de controladores entregada por el servidor; modo restringido por defecto; el compartido se habilita explícitamente. |
@@ -79,12 +79,12 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 
 Cuando el servidor requiere TLS, el material se entrega por un canal ya cifrado. Dos formas, ambas soportadas por Mbed TLS 4.1 sin dependencias nuevas:
 
-- **TLS con el certificado autogenerado del agente.** RemoteUSB genera su par de claves al instalarse; el servidor fija la huella en el primer contacto y por ese canal entrega certificado, clave y CA. Protege contra quien escucha; no contra un intermediario activo en ese primer contacto, salvo que la huella se verifique o se pase con `--server-cert`.
+- **TLS con el certificado autogenerado del agente.** PortGate genera su par de claves al instalarse; el servidor fija la huella en el primer contacto y por ese canal entrega certificado, clave y CA. Protege contra quien escucha; no contra un intermediario activo en ese primer contacto, salvo que la huella se verifique o se pase con `--server-cert`.
 - **TLS-PSK.** Sí, sirve: una clave compartida pasada al instalar (`--psk`) autentica a ambos extremos desde el primer contacto, sin certificados. Condiciones: usar el modo PSK con (EC)DHE (TLS 1.3 `psk_dhe_ke` o TLS 1.2 `ECDHE-PSK`) para tener secreto hacia adelante; la PSK debe ser aleatoria de al menos 128 bits, no una contraseña, porque una PSK débil admite ataque de diccionario sobre un handshake capturado; una identidad PSK por agente, y rotación desde el servidor. La PSK puede quedar como autenticación permanente o usarse sólo para entregar los certificados.
 
 ## Semáforo de uso: varios servidores y varios puertos
 
-RemoteUSB sirve muchos puertos a un servidor, o varios puertos a varios servidores. Ejemplo: cuatro servidores, tres redundantes y uno de estadística de calidad u observabilidad, conectados a la vez. Por puerto, el árbitro ya implementado:
+PortGate sirve muchos puertos a un servidor, o varios puertos a varios servidores. Ejemplo: cuatro servidores, tres redundantes y uno de estadística de calidad u observabilidad, conectados a la vez. Por puerto, el árbitro ya implementado:
 
 - concede el puerto a un solo controlador (lease con generación y `transferId`); los demás quedan en cola por prioridad y luego orden de llegada, sin expropiar al dueño;
 - libera el puerto cuando el dueño lo suelta (`Release`), cuando cierra la conexión, cuando pasan tres heartbeats sin tráfico o cuando vence el lease sin `Renew`, y lo concede al siguiente en cola;
@@ -97,15 +97,15 @@ Lo que agrega la administración remota:
 - `RevokePort` administrativo para mantenimiento o para destrabar un controlador defectuoso.
 - La lista de controladores y prioridades incluye a la instancia local (`127.0.0.1`) cuando el servidor quiere permitir failover local.
 
-Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; RemoteUSB acota el daño, pero no adivina cuándo terminó una tarea.
+Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; PortGate acota el daño, pero no adivina cuándo terminó una tarea.
 
 ## Solicitud de cesión, kill switch e impugnación
 
-Decisión humana del 2026-10-26. Asegurar el kill switch es indispensable; el kill switch y su impugnación son **opciones de seguridad** que el servidor habilita por puerto para la empresa que quiera tenerlas a mano. Las reglas de cuándo un corte es legítimo (ventana de mantenimiento, failover) son de la empresa y las aplica el servidor u observador, no RemoteUSB.
+Decisión humana del 2026-10-26. Asegurar el kill switch es indispensable; el kill switch y su impugnación son **opciones de seguridad** que el servidor habilita por puerto para la empresa que quiera tenerlas a mano. Las reglas de cuándo un corte es legítimo (ventana de mantenimiento, failover) son de la empresa y las aplica el servidor u observador, no PortGate.
 
 ### Solicitud de cesión cooperativa (handover request)
 
-- Un controlador conectado que observa el semáforo envía `RequestHandover{portId, motivo}`. RemoteUSB lo reenvía al dueño y lo notifica a los observadores.
+- Un controlador conectado que observa el semáforo envía `RequestHandover{portId, motivo}`. PortGate lo reenvía al dueño y lo notifica a los observadores.
 - El dueño responde `HandoverAnswer{cede | mantiene}`. Si cede, libera y el puerto pasa por la cola normal (prioridad, luego orden). Si mantiene, el solicitante recibe la negativa.
 - Si el dueño no responde, **mantiene**: ceder por silencio permitiría robar el puerto saturando al dueño. Un dueño caído ya pierde el puerto al vencer su lease.
 - Límite de pedidos por controlador e intervalo, para que no se interrumpa al dueño en cada operación.
@@ -125,7 +125,7 @@ El dueño cortado recibe `Revoked` con código propio; el siguiente dueño recib
 ### Impugnación
 
 - Un observador autorizado (también por TLS y con permiso explícito) envía `Contest{eventId, motivo}` dentro del plazo de impugnación.
-- Efecto: RemoteUSB **corta la conexión del solicitante del kill switch** y lo bloquea por un plazo configurable (o hasta que el administrador lo habilite). No restablece la interfaz por sí misma: el puerto sigue en cuarentena y luego en la cola normal, salvo que el impugnante pida cierre por seguridad.
+- Efecto: PortGate **corta la conexión del solicitante del kill switch** y lo bloquea por un plazo configurable (o hasta que el administrador lo habilite). No restablece la interfaz por sí misma: el puerto sigue en cuarentena y luego en la cola normal, salvo que el impugnante pida cierre por seguridad.
 - Cierre por seguridad (`SecureClose`): opcional junto con la impugnación, deja el puerto cerrado para todos. Sólo el servidor administrador lo reabre, no quien lo cerró; así el cierre no se convierte en un modo de dejar el equipo fuera de servicio a voluntad.
 - Impugnación y cierre quedan en el registro y se notifican a todos, igual que el kill switch, para que un sistema de seguridad avanzado marque amenazas en su red. Ejemplo: un kill switch fuera de una ventana de mantenimiento o sin failover en curso es altamente impugnable según las reglas de la empresa.
 
@@ -140,7 +140,7 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 
 ## Neutralidad y reparto
 
-- RemoteUSB: agente C++ en `RemoteUSB/`, especificación `spec/link-v1.md` y su extensión de administración, vectores de conformidad.
+- PortGate: agente C++ en `PortGate/`, especificación `spec/link-v1.md` y su extensión de administración, vectores de conformidad.
 - ATSM neutral: biblioteca .NET cliente (canal `SerialTunnel` y administración), sin dependencia de un LIS. El plugin aporta lo específico del instrumento.
 - Diagnostics: UI local/remota sobre esa biblioteca.
 - EDC/LIMS Equipos: aprovisionamiento central (inventario, modos, asignación de instrumentos, versiones/historial, certificados), con su propio Issue en EDC.

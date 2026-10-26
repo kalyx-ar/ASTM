@@ -1,11 +1,11 @@
-# RemoteUSB administration v1 and semaphore extensions
+# PortGate administration v1 and semaphore extensions
 
-Normative extension of [RemoteUSB Link v1](link-v1.md): same unit framing (magic `AL`, version 1) and deterministic CBOR maps with unsigned integer keys. Design and decisions: [ADMINISTRACION-REMOTA](../Documentacion/ADMINISTRACION-REMOTA.md).
+Normative extension of [PortGate Link v1](link-v1.md): same unit framing (magic `AL`, version 1) and deterministic CBOR maps with unsigned integer keys. Design and decisions: [ADMINISTRACION-REMOTA](../Documentacion/ADMINISTRACION-REMOTA.md).
 
 ## Administration endpoint
 
-- Default port **28240** (`remoteusb run --admin host:port`). TLS and plain text share the port: a first byte `0x16` (TLS handshake record) selects TLS, anything else plain Link framing.
-- TLS uses the agent certificate, generated at first start (ECDSA P-256, self-signed, CN = agent name) and kept in the protected state, or the material installed with `SetTls` target 1, and/or a PSK. The fingerprint is printed at start (`REMOTEUSB-ADMIN <port> <sha256>`) and reported by `GetStatus`.
+- Default port **28240** (`portgate run --admin host:port`). TLS and plain text share the port: a first byte `0x16` (TLS handshake record) selects TLS, anything else plain Link framing.
+- TLS uses the agent certificate, generated at first start (ECDSA P-256, self-signed, CN = agent name) and kept in the protected state, or the material installed with `SetTls` target 1, and/or a PSK. The fingerprint is printed at start (`PORTGATE-ADMIN <port> <sha256>`) and reported by `GetStatus`.
 - The administering client may present any certificate: it is identified by the SHA-256 of that certificate (pinning), not chained to a CA. Without a certificate or PSK, its identity is its address.
 - After TCP/TLS setup the agent sends `Hello` (role `agent`). The client answers `Hello` {0 version 1, 1 role `admin`, 2 serverId}.
 
@@ -19,7 +19,7 @@ Normative extension of [RemoteUSB Link v1](link-v1.md): same unit framing (magic
 | Configured, `mode.restricted = false` | Any client; the last configurator is recorded. |
 | `mode.adminRequiresTls = true` | Plain-text administration is refused. It can only be set over TLS. |
 
-A refused `Hello` gets `AdminResult` {2 `REMOTEUSB-ADMIN-NOT-AUTHORIZED`} and the connection is closed; the attempt is an `admin-denied` event.
+A refused `Hello` gets `AdminResult` {2 `PORTGATE-ADMIN-NOT-AUTHORIZED`} and the connection is closed; the attempt is an `admin-denied` event.
 
 ### Requests and results
 
@@ -42,11 +42,11 @@ Every request carries `0 requestId`. The answer is `AdminResult` (0x4F) {0 reque
 
 Rules:
 
-1. `SetConfig` validates the whole configuration, starts the new Link endpoint and only then saves it. If the new configuration cannot start, the previous one keeps running and the answer is `REMOTEUSB-APPLY-FAILED`. Nothing is half-applied.
+1. `SetConfig` validates the whole configuration, starts the new Link endpoint and only then saves it. If the new configuration cannot start, the previous one keeps running and the answer is `PORTGATE-APPLY-FAILED`. Nothing is half-applied.
 2. The agent keeps only the configuration in force; versions and rollback are the server's. To roll back, the server sends a complete previous configuration.
 3. The agent always starts with the last installed configuration. It never returns to "not configured" by itself; a damaged state stops the service with an error (recovery: reinstall with operating-system administrator rights).
-4. `SetTls` with a private key or PSK over a plain channel is refused (`REMOTEUSB-INSECURE-CHANNEL`). PSKs shorter than 16 bytes are refused (`REMOTEUSB-WEAK-PSK`). Material is validated by building a TLS server before it is saved; it is never returned by `GetConfig`.
-5. Agent-initiated connections (`mode.initiator = 1`) are part of the configuration model but answer `REMOTEUSB-UNSUPPORTED` until P-09 implements the client role.
+4. `SetTls` with a private key or PSK over a plain channel is refused (`PORTGATE-INSECURE-CHANNEL`). PSKs shorter than 16 bytes are refused (`PORTGATE-WEAK-PSK`). Material is validated by building a TLS server before it is saved; it is never returned by `GetConfig`.
+5. Agent-initiated connections (`mode.initiator = 1`) are part of the configuration model but answer `PORTGATE-UNSUPPORTED` until P-09 implements the client role.
 
 ### Configuration map
 
@@ -80,22 +80,22 @@ Unknown keys and out-of-range values are rejected with the path of the field.
 
 Cooperative handover request:
 
-1. The requester must be queued on the port (`Acquire` answered with `Queued`); otherwise `REMOTEUSB-HANDOVER-NOT-QUEUED`. One pending request per port (`REMOTEUSB-HANDOVER-PENDING`) and one per controller per `handoverIntervalMs` (`REMOTEUSB-HANDOVER-RATE`).
-2. The owner answers within `handoverTimeoutMs`. Yield: the owner gets `Revoked` `REMOTEUSB-HANDOVER` and the queue grants the port (priority, then order). Keep: `REMOTEUSB-HANDOVER-KEPT`. No answer: the owner **keeps** the port (`REMOTEUSB-HANDOVER-NO-ANSWER`).
+1. The requester must be queued on the port (`Acquire` answered with `Queued`); otherwise `PORTGATE-HANDOVER-NOT-QUEUED`. One pending request per port (`PORTGATE-HANDOVER-PENDING`) and one per controller per `handoverIntervalMs` (`PORTGATE-HANDOVER-RATE`).
+2. The owner answers within `handoverTimeoutMs`. Yield: the owner gets `Revoked` `PORTGATE-HANDOVER` and the queue grants the port (priority, then order). Keep: `PORTGATE-HANDOVER-KEPT`. No answer: the owner **keeps** the port (`PORTGATE-HANDOVER-NO-ANSWER`).
 
 Kill switch (optional, `security.killSwitch`):
 
-1. Requires TLS with an authenticated peer (verified client certificate or PSK) — `REMOTEUSB-KILL-NEEDS-TLS` —, the right on the port — `REMOTEUSB-KILL-NOT-ALLOWED` —, an owner and `killCooldownMs` since the previous kill by the same controller. Refusals are `Error` units and `kill-switch-denied` events.
-2. The owner gets `Revoked` `REMOTEUSB-KILLED`; the port stays in quarantine (nobody is granted) for `quarantineMs`, which is also the contest window. Then the queue grants it normally: killing never hands the port to the killer.
+1. Requires TLS with an authenticated peer (verified client certificate or PSK) — `PORTGATE-KILL-NEEDS-TLS` —, the right on the port — `PORTGATE-KILL-NOT-ALLOWED` —, an owner and `killCooldownMs` since the previous kill by the same controller. Refusals are `Error` units and `kill-switch-denied` events.
+2. The owner gets `Revoked` `PORTGATE-KILLED`; the port stays in quarantine (nobody is granted) for `quarantineMs`, which is also the contest window. Then the queue grants it normally: killing never hands the port to the killer.
 3. A `kill-switch` SecurityEvent goes to every controller of the port and to the event log, with actor and address, target, generation, `uncertain` (a write in progress or of unknown outcome) and the contest deadline.
 
 Contest (optional, `security.contest`):
 
 1. Same TLS requirement and its own right; within the window; not by the killer itself.
-2. Effect: every connection of the killer is dropped and its `Hello` refused (`REMOTEUSB-CONTROLLER-BLOCKED`) for `contestBlockMs` or until `UnblockController`. The interface is not reset.
-3. With `secureClose`, the port is closed for everyone (`REMOTEUSB-SECURE-CLOSED`) until an administrator sends `ReopenPort`.
+2. Effect: every connection of the killer is dropped and its `Hello` refused (`PORTGATE-CONTROLLER-BLOCKED`) for `contestBlockMs` or until `UnblockController`. The interface is not reset.
+3. With `secureClose`, the port is closed for everyone (`PORTGATE-SECURE-CLOSED`) until an administrator sends `ReopenPort`.
 
-`maxHoldMs` (per port): while other controllers wait, an owner whose continuous tenure reached the limit gets `Revoked` `REMOTEUSB-MAX-HOLD` instead of a renewal.
+`maxHoldMs` (per port): while other controllers wait, an owner whose continuous tenure reached the limit gets `Revoked` `PORTGATE-MAX-HOLD` instead of a renewal.
 
 ## Events
 

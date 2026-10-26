@@ -1,6 +1,6 @@
-# RemoteUSB Link v1
+# PortGate Link v1
 
-Normative wire format between the RemoteUSB agent and a controller (host). Implemented by `RemoteUSB/core` (C++) and `dotnet/src/Atsm.Channels/SerialTunnel` (.NET). Shared test vectors: `conformance/link-v1/vectors.txt`.
+Normative wire format between the PortGate agent and a controller (host). Implemented by `PortGate/core` (C++) and `dotnet/src/Atsm.Channels/SerialTunnel` (.NET). Shared test vectors: `conformance/link-v1/vectors.txt`.
 
 ## Unit
 
@@ -55,4 +55,4 @@ CBOR (RFC 8949) with deterministic encoding: definite lengths, shortest integer 
 
 `Plain` mode carries the `controllerId` from `Hello` without authentication; it is accepted only when listed in the port configuration and must be used only on trusted networks.
 
-`Tls` mode (Mbed TLS 4.1 LTS in RemoteUSB) requires TLS 1.2 or 1.3 (`minimumVersion` may force 1.3) and, by default, a client certificate that chains to `clientCa`. The `controllerId` of `Hello` must equal the certificate subject CN, or the certificate SHA-256 (DER) must equal the `certificateSha256` configured for that controller; otherwise the agent answers `Error` `REMOTEUSB-IDENTITY-MISMATCH` and closes. A `Tls` endpoint never falls back to plain text, and an agent built without TLS refuses to start such an endpoint.
+`Tls` mode (Mbed TLS 4.1 LTS in PortGate) requires TLS 1.2 or 1.3 (`minimumVersion` may force 1.3) and, by default, a client certificate that chains to `clientCa`. The `controllerId` of `Hello` must equal the certificate subject CN, or the certificate SHA-256 (DER) must equal the `certificateSha256` configured for that controller; otherwise the agent answers `Error` `PORTGATE-IDENTITY-MISMATCH` and closes. A `Tls` endpoint never falls back to plain text, and an agent built without TLS refuses to start such an endpoint.

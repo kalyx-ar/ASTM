@@ -14,4 +14,4 @@ Para TCP nativo se sustituye el adaptador por `NativeTcpInstrumentChannel` y se 
 
 ## Configuración consumible del agente
 
-RemoteUSB no usa archivos de configuración desde P-16: el servidor la instala por el endpoint de administración ([spec/admin-v1.md](../../spec/admin-v1.md)) y el agente guarda sólo la vigente, protegida.
+PortGate no usa archivos de configuración desde P-16: el servidor la instala por el endpoint de administración ([spec/admin-v1.md](../../spec/admin-v1.md)) y el agente guarda sólo la vigente, protegida.

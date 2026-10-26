@@ -1,0 +1,26 @@
+# systemd unit for PortGate on Linux / Raspberry Pi.
+# Install: copy the binary to /usr/local/bin, create the user (useradd --system --groups dialout portgate),
+# copy this file to /etc/systemd/system and run: systemctl enable --now portgate
+# The state directory /var/lib/portgate is created by systemd with mode 0700 for the service user.
+# Optional: fix the administering server at installation by adding --server-cert <sha256> or --psk <id>:<hex>.
+
+[Unit]
+Description=PortGate - serial ports over the network, administered remotely
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=portgate
+Group=dialout
+StateDirectory=portgate
+StateDirectoryMode=0700
+ExecStart=/usr/local/bin/portgate run --state /var/lib/portgate --admin 0.0.0.0:28240 --quiet
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

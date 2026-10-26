@@ -57,7 +57,7 @@ public interface IInstrumentChannel : IAsyncDisposable
 - Usa `Memory<byte>`/`ValueTask` para no asignar por lectura.
 - Un canal sin exclusión real devuelve un `ControlLease` con `Enforcement = Advisory`; el motor puede negarse a operar si el perfil exige `Enforced`.
 
-## RemoteUSB Link v1: protocolo agente ↔ host
+## PortGate Link v1: protocolo agente ↔ host
 
 ### Requisitos
 
@@ -115,13 +115,13 @@ El esquema CDDL (RFC 8610) de cada mapa CBOR será el contrato normativo; los ve
 ## Agente nativo
 
 ```text
-RemoteUSB/
+PortGate/
   core/          bucle de eventos, Link v1, arbitraje, buffers, traza (C++17, sin excepciones en la ruta de datos)
   platform/win32 Win32 serial (overlapped I/O), Winsock, servicio de Windows
   platform/posix termios, epoll/poll, systemd
   platform/esp32 UART, lwIP, NVS, tarea FreeRTOS
   tls/           adaptador Mbed TLS
-  tools/         remoteusbctl (diagnóstico local)
+  tools/         portgatectl (diagnóstico local)
 ```
 
 - Un proceso, varios puertos. Cada puerto tiene su máquina de estados Puerto/Propiedad de CONTRATOS.

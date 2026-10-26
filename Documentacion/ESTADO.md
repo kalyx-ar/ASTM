@@ -53,9 +53,9 @@ Revisión UF-5000 (2026-10-25): reanálisis de casos antes marcados como incompa
 | DIAGAST QWALYS 3 | `dotnet/plugins/Atsm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |
 | Diagnóstico MAUI Windows independiente | `dotnet/tools/Atsm.Diagnostics.Maui`, `Atsm.Diagnostics.Core` | 8 equipos/familias y 13 perfiles técnicos, texto seleccionable en etiquetas/celdas, interpretación/grupos predeterminados, detección de logs/exportaciones, TCP/SerialTunnel y host de mantenimiento; journal DPAPI del usuario, custodia durable y reanálisis; ventana/handler, runtime privado y DPAPI comprobados por self-test |
 | UC-3500 serial propio | `Atsm.Plugin.Sysmex.Urinalysis`, puerto `IInstrumentTracePlugin` | Reconstrucción pasiva RQ02/CM00/ER, resultados, BCC/SUM/SUM2/NONE, controles y correlación. Captura sin envío; no host activo. 501 mensajes/2.251 observaciones en captura local, sin falsa interpretación ASTM. Ver [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md) |
-| RemoteUSB, agente C++17 con TLS (Mbed TLS 4.1.1) | `RemoteUSB/` | 639 verificaciones nativas (CBOR, Link v1, árbitro con tope de tenencia/cuarentena/cierre, configuración CBOR, estado DPAPI, registro de eventos con rotación, administración, cesión, rechazo de kill switch en plano, PSK de instalación); pruebas cruzadas .NET: mTLS, administración restringida por certificado, kill switch/impugnación/cierre y reapertura |
-| Administración remota de RemoteUSB (P-16) | `RemoteUSB/core/src/supervisor.cpp`, `spec/admin-v1.md`, `dotnet/src/Atsm.Channels/SerialTunnel/RemoteUsbAdminClient.cs` | Estado protegido sin historial de configuración, arranque con la última configuración, endpoint TLS/plano en un puerto, certificado autogenerado, SetTls sólo por TLS, PSK, ListDevices (SetupAPI), servicio Windows y unidad systemd. `service install` no se ejecutó en esta sesión (requiere elevación); POSIX sin compilar; modo iniciado por el agente pendiente (P-09) |
-| Especificación RemoteUSB Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
+| PortGate, agente C++17 con TLS (Mbed TLS 4.1.1) | `PortGate/` | 639 verificaciones nativas (CBOR, Link v1, árbitro con tope de tenencia/cuarentena/cierre, configuración CBOR, estado DPAPI, registro de eventos con rotación, administración, cesión, rechazo de kill switch en plano, PSK de instalación); pruebas cruzadas .NET: mTLS, administración restringida por certificado, kill switch/impugnación/cierre y reapertura |
+| Administración remota de PortGate (P-16) | `PortGate/core/src/supervisor.cpp`, `spec/admin-v1.md`, `dotnet/src/Atsm.Channels/SerialTunnel/PortGateAdminClient.cs` | Estado protegido sin historial de configuración, arranque con la última configuración, endpoint TLS/plano en un puerto, certificado autogenerado, SetTls sólo por TLS, PSK, ListDevices (SetupAPI), servicio Windows y unidad systemd. `service install` no se ejecutó en esta sesión (requiere elevación); POSIX sin compilar; modo iniciado por el agente pendiente (P-09) |
+| Especificación PortGate Link v1 y vectores | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` | Iguales en C++ y .NET |
 | Datos QC/calibración y consulta | `AnalyticalQualityContext`, `IQualityDataSource`, `ObservationQualityDataSource`, `IQualityResourceContent` | Lote/material/módulo, INV/ZCL, estadísticas/curva CSV CFX y referencias S.7 U-WAM con custodia del lote completo. Sin reglas QC, descarga de archivos ni informe R24. Ver [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md) |
 | Firma Strong Name con la SNK de la distribución | `dotnet/Directory.Build.targets` | Mismo token que EDC (`066190a23251f202`); la clave no está en el repositorio |
 
@@ -96,7 +96,7 @@ Detalle, alcance y criterios de aceptación de cada pendiente: [CONTINUACION](CO
 
 | Tema | Bloqueo |
 |---|---|
-| Build Windows XP | Toolset `v141_xp` y prueba en XP real; el código ya prevé la entropía propia (`-DREMOTEUSB_WINDOWS_XP=ON`) |
+| Build Windows XP | Toolset `v141_xp` y prueba en XP real; el código ya prevé la entropía propia (`-DPORTGATE_WINDOWS_XP=ON`) |
 | Build Linux / Raspberry | Distro WSL o equipo Linux; adaptador POSIX escrito, no compilado |
 | ESP32 | Sin escribir; requiere ESP-IDF y hardware |
 | Canal `LocalSerial` .NET | Paquete oficial `System.IO.Ports` |

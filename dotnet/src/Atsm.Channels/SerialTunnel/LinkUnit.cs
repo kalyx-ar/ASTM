@@ -41,7 +41,7 @@ public enum LinkType : byte
     Error = 0x7F,
 }
 
-/// <summary>One RemoteUSB Link v1 unit (spec/link-v1.md, spec/admin-v1.md): 12-byte big-endian header and payload.</summary>
+/// <summary>One PortGate Link v1 unit (spec/link-v1.md, spec/admin-v1.md): 12-byte big-endian header and payload.</summary>
 public sealed record LinkUnit(LinkType Type, ushort Flags, ushort Channel, byte[] Payload)
 {
     public const int HeaderSize = 12;

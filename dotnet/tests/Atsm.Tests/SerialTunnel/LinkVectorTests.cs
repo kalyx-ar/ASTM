@@ -6,7 +6,7 @@ public class LinkVectorTests
 {
     private static readonly byte[] Transfer = Enumerable.Range(0, 16).Select(i => (byte)i).ToArray();
 
-    /// <summary>Same units as RemoteUSB/tests/test_main.cpp; both must match conformance/link-v1/vectors.txt.</summary>
+    /// <summary>Same units as PortGate/tests/test_main.cpp; both must match conformance/link-v1/vectors.txt.</summary>
     public static IEnumerable<object[]> Units() =>
     [
         ["hello-controller", LinkUnit.Control(LinkType.Hello, 0, LinkCbor.Map((0, 1UL), (1, "controller"), (2, "edc-server-a")))],
@@ -15,9 +15,9 @@ public class LinkVectorTests
         ["confirm-transfer", LinkUnit.Control(LinkType.ConfirmTransfer, 1, LinkCbor.Map((1, 3UL), (2, Transfer)))],
         ["serial-data", LinkUnit.Serial(1, 2, 300, 3, [0x05])],
         ["write-status", LinkUnit.Control(LinkType.WriteStatus, 1, LinkCbor.Map((0, 2UL), (1, 1UL), (2, 1UL), (3, 0UL)))],
-        ["denied", LinkUnit.Control(LinkType.Denied, 1, LinkCbor.Map((0, 8UL), (1, "REMOTEUSB-QUEUE-FULL")))],
+        ["denied", LinkUnit.Control(LinkType.Denied, 1, LinkCbor.Map((0, 8UL), (1, "PORTGATE-QUEUE-FULL")))],
         ["heartbeat", LinkUnit.Control(LinkType.Heartbeat, 0, LinkCbor.Map((0, 4294967296UL)))],
-        ["error-negative", LinkUnit.Control(LinkType.Error, 0, LinkCbor.Map((0, "REMOTEUSB-X"), (1, -500L)))],
+        ["error-negative", LinkUnit.Control(LinkType.Error, 0, LinkCbor.Map((0, "PORTGATE-X"), (1, -500L)))],
     ];
 
     [Theory]

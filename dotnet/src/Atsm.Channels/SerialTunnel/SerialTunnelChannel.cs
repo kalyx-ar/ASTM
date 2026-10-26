@@ -17,12 +17,12 @@ public sealed record SerialTunnelOptions(string ControllerId, string PortId)
     public int MaxUnitBytes { get; init; } = 64 * 1024;
 
     /// <summary>Answer of this owner to a cooperative handover request; null keeps the port (spec/admin-v1.md).</summary>
-    public Func<RemoteUsbHandoverRequest, bool>? HandoverDecision { get; init; }
+    public Func<PortGateHandoverRequest, bool>? HandoverDecision { get; init; }
 }
 
-public sealed record RemoteUsbHandoverRequest(ulong HandoverId, string Requester, string? Reason, TimeSpan Timeout);
+public sealed record PortGateHandoverRequest(ulong HandoverId, string Requester, string? Reason, TimeSpan Timeout);
 
-public sealed record RemoteUsbHandoverResult(bool Yielded, string? Code);
+public sealed record PortGateHandoverResult(bool Yielded, string? Code);
 
 public sealed class SerialTunnelException(string code, string message) : Exception($"{code}: {message}")
 {
@@ -42,7 +42,7 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Channel<ReadOnlyMemory<byte>> _received = Channel.CreateUnbounded<ReadOnlyMemory<byte>>(new UnboundedChannelOptions { SingleReader = true });
     private readonly Channel<ChannelEvent> _events = Channel.CreateUnbounded<ChannelEvent>();
-    private readonly Channel<RemoteUsbEvent> _securityEvents = Channel.CreateUnbounded<RemoteUsbEvent>();
+    private readonly Channel<PortGateEvent> _securityEvents = Channel.CreateUnbounded<PortGateEvent>();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _controlReplies = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _writeReplies = new();
     private readonly CancellationTokenSource _stop = new();
@@ -214,10 +214,10 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
     }
 
     /// <summary>Asks the current owner to yield the port. The requester must already be queued (AcquireAsync pending).</summary>
-    public async Task<RemoteUsbHandoverResult> RequestHandoverAsync(string? reason, CancellationToken cancellationToken)
+    public async Task<PortGateHandoverResult> RequestHandoverAsync(string? reason, CancellationToken cancellationToken)
     {
         var map = await ControlRequestAsync(LinkType.RequestHandover, reason is null ? [] : LinkCbor.Map((1, reason)), cancellationToken).ConfigureAwait(false);
-        return new RemoteUsbHandoverResult(map.GetValueOrDefault(1UL) is true, map.GetValueOrDefault(2UL) as string);
+        return new PortGateHandoverResult(map.GetValueOrDefault(1UL) is true, map.GetValueOrDefault(2UL) as string);
     }
 
     /// <summary>Forced interruption of the current owner (needs TLS with an authenticated peer and the right). Returns the event id to contest.</summary>
@@ -235,7 +235,7 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
     }
 
     /// <summary>Semaphore and security events of this port (handover, kill switch, contest, secure close).</summary>
-    public async IAsyncEnumerable<RemoteUsbEvent> SecurityEventsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<PortGateEvent> SecurityEventsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var item in _securityEvents.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             yield return item;
@@ -347,14 +347,14 @@ public sealed class SerialTunnelChannel : IInstrumentChannel
                 result.TrySetResult(map);
                 break;
             case LinkType.HandoverAsked when unit.Channel == _port:
-                var asked = new RemoteUsbHandoverRequest(requestId, map.GetValueOrDefault(1UL) as string ?? "", map.GetValueOrDefault(2UL) as string,
+                var asked = new PortGateHandoverRequest(requestId, map.GetValueOrDefault(1UL) as string ?? "", map.GetValueOrDefault(2UL) as string,
                     TimeSpan.FromMilliseconds(map.GetValueOrDefault(3UL) as ulong? ?? 0));
                 var yield = _options.HandoverDecision?.Invoke(asked) ?? false;
                 _ = SendAsync(LinkUnit.Control(LinkType.HandoverAnswer, _port, LinkCbor.Map((0, asked.HandoverId), (1, yield))), _stop.Token)
                     .ContinueWith(_ => { }, TaskScheduler.Default);
                 break;
             case LinkType.SecurityEvent when unit.Channel == _port:
-                _securityEvents.Writer.TryWrite(new RemoteUsbEvent(requestId,
+                _securityEvents.Writer.TryWrite(new PortGateEvent(requestId,
                     DateTimeOffset.FromUnixTimeMilliseconds((long)(map.GetValueOrDefault(9UL) as ulong? ?? 0)), map.GetValueOrDefault(1UL) as string ?? "",
                     map.GetValueOrDefault(2UL) as string, map.GetValueOrDefault(3UL) as string, map.GetValueOrDefault(4UL) as string,
                     (uint)(map.GetValueOrDefault(5UL) as ulong? ?? 0), map.GetValueOrDefault(6UL) as string,

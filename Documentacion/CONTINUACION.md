@@ -11,15 +11,15 @@ dotnet test dotnet/Atsm.slnx
 ```
 
 ```bash
-cmake -S RemoteUSB -B RemoteUSB/build/win-x64 -G "Visual Studio 18 2026" -A x64
+cmake -S PortGate -B PortGate/build/win-x64 -G "Visual Studio 18 2026" -A x64
 ```
 
 ```bash
-cmake --build RemoteUSB/build/win-x64 --config Release
+cmake --build PortGate/build/win-x64 --config Release
 ```
 
 ```bash
-ctest --test-dir RemoteUSB/build/win-x64 -C Release
+ctest --test-dir PortGate/build/win-x64 -C Release
 ```
 
 Al cerrar los campos UF: 391 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y self-test de ventana/runtime privado/DPAPI por separado; incluye 8 vistas, 14 perfiles, avisos y contadores UF, campos por lectura, bloques cronológicos y tiempos HH:mm:ss.fff. SDK API 2: discriminación por perfil, intervalos de respuesta/operación/proceso separados y campos binarios con rangos. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
@@ -58,7 +58,7 @@ Los mismos pasos sirven con `legacy.interface-log` (logs `Documentacion/trazas_e
 | Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y legacy de pruebas) |
 | Catálogo compartido y anfitrión de mantenimiento | `dotnet/tools/Atsm.Diagnostics.Core` |
 | GUI MAUI Windows | `dotnet/tools/Atsm.Diagnostics.Maui` (DPAPI del usuario; no depende de EDC) |
-| Agente nativo | `RemoteUSB/core`, `RemoteUSB/platform`, `RemoteUSB/tls`, `RemoteUSB/app` |
+| Agente nativo | `PortGate/core`, `PortGate/platform`, `PortGate/tls`, `PortGate/app` |
 | Protocolo agente ↔ host | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` |
 | Sistema legacy (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md)) |
 
@@ -82,7 +82,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
-| P-16 | Parcial: RemoteUSB como servicio y administración remota implementados; faltan modo iniciado por el agente, verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
+| P-16 | Parcial: PortGate como servicio y administración remota implementados; faltan modo iniciado por el agente, verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 
@@ -126,17 +126,17 @@ Continuación: R24/ED de calibración ARCHITECT (incluido en P-02; puerto de inf
 
 ### P-06 Build Windows XP
 
-- Instalar el componente "C++ Windows XP Support for VS 2017 (v141) tools" y configurar con `-T v141_xp -A Win32 -DREMOTEUSB_WINDOWS_XP=ON`.
+- Instalar el componente "C++ Windows XP Support for VS 2017 (v141) tools" y configurar con `-T v141_xp -A Win32 -DPORTGATE_WINDOWS_XP=ON`.
 - Verificar que compilen Mbed TLS 4.1.1 y el agente. Riesgos: APIs posteriores a XP dentro de Mbed TLS más allá de la entropía, `std::filesystem` en el STL de v141, `getaddrinfo` y `select`.
 - Probar en XP real: puerto serial, TLS 1.2/1.3 contra el host .NET y entropía (`entropy_win32_xp.c`). Documentar exactamente qué se probó.
 
 ### P-07 Build Linux / Raspberry Pi
 
-`RemoteUSB/platform/posix/serial_posix.cpp` está escrito pero nunca se compiló. Compilar con GCC/Clang (`-Werror`), correr `ctest`, probar con un adaptador USB-serial real y generar el binario ARM (Raspberry). En POSIX, `threading_alt.cpp` funciona igual; no hace falta `MBEDTLS_THREADING_PTHREAD`.
+`PortGate/platform/posix/serial_posix.cpp` está escrito pero nunca se compiló. Compilar con GCC/Clang (`-Werror`), correr `ctest`, probar con un adaptador USB-serial real y generar el binario ARM (Raspberry). En POSIX, `threading_alt.cpp` funciona igual; no hace falta `MBEDTLS_THREADING_PTHREAD`.
 
 ### P-08 Firmware ESP32
 
-Crear `RemoteUSB/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae su propia versión de Mbed TLS: verificar compatibilidad con la API 4.x usada en `RemoteUSB/tls` o adaptar, y registrar la versión en DEPENDENCIAS. Hay que dimensionar la memoria (buffers, sesiones TLS simultáneas) y anunciar `traceCapture = 0` o RAM.
+Crear `PortGate/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae su propia versión de Mbed TLS: verificar compatibilidad con la API 4.x usada en `PortGate/tls` o adaptar, y registrar la versión en DEPENDENCIAS. Hay que dimensionar la memoria (buffers, sesiones TLS simultáneas) y anunciar `traceCapture = 0` o RAM.
 
 ### P-09 Agente: lo reservado en Link v1
 
@@ -158,13 +158,13 @@ Sin manual, el plugin se apoya en trazas. Quedan por confirmar:
 
 Con el manual o un equipo de prueba, actualizar el perfil y quitar las marcas de hipótesis.
 
-### P-16 RemoteUSB: servicio y administración remota — primer incremento entregado
+### P-16 PortGate: servicio y administración remota — primer incremento entregado
 
-Implementado según [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md) y [spec/admin-v1.md](../spec/admin-v1.md): estado protegido (DPAPI de máquina; 0600 en POSIX) con sólo la configuración vigente, arranque siempre con la última configuración, registro persistente de eventos con rotación, endpoint de administración TLS/plano en el puerto 28240 con certificado autogenerado y fijación por huella, PSK con (EC)DHE, `SetTls` rechazado por canal plano, `ListDevices` con identidad USB (SetupAPI) y eventos de aparición/retiro, semáforo con `maxHoldMs`, solicitud de cesión cooperativa, kill switch, impugnación, cierre por seguridad y reapertura administrativa. Cliente .NET `RemoteUsbAdminClient`, configuración tipada `RemoteUsbConfiguration` y extensiones de `SerialTunnelChannel`. Servicio Windows (`LocalService`, ACL protegida, reinicio ante fallos) y unidad systemd. Se retiró la configuración JSON (`--config`/`--check`).
+Implementado según [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md) y [spec/admin-v1.md](../spec/admin-v1.md): estado protegido (DPAPI de máquina; 0600 en POSIX) con sólo la configuración vigente, arranque siempre con la última configuración, registro persistente de eventos con rotación, endpoint de administración TLS/plano en el puerto 28240 con certificado autogenerado y fijación por huella, PSK con (EC)DHE, `SetTls` rechazado por canal plano, `ListDevices` con identidad USB (SetupAPI) y eventos de aparición/retiro, semáforo con `maxHoldMs`, solicitud de cesión cooperativa, kill switch, impugnación, cierre por seguridad y reapertura administrativa. Cliente .NET `PortGateAdminClient`, configuración tipada `PortGateConfiguration` y extensiones de `SerialTunnelChannel`. Servicio Windows (`LocalService`, ACL protegida, reinicio ante fallos) y unidad systemd. Se retiró la configuración JSON (`--config`/`--check`).
 
 Pendiente:
 
-- **Modo iniciado por el agente** (rol cliente TLS, P-09): el modelo de configuración lo admite y el agente responde `REMOTEUSB-UNSUPPORTED`.
+- **Modo iniciado por el agente** (rol cliente TLS, P-09): el modelo de configuración lo admite y el agente responde `PORTGATE-UNSUPPORTED`.
 - **Verificar `service install` elevado** en Windows (instalación, ACL, arranque automático y recuperación). En esta sesión sólo se comprobaron los caminos sin elevación.
 - **POSIX**: `devices_posix.cpp`, `protect_posix.cpp` y la unidad systemd están escritos sin compilar (igual que P-07).
 - **Windows XP (P-06)**: `std::filesystem` del STL v141 y SetupAPI por sondeo sin probar.
@@ -202,7 +202,7 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 ## Deuda conocida
 
 - El commit `a932694` no compila solo (la solución ya referenciaba el plugin, que llegó en el commit siguiente). No afecta a `main`.
-- Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado. RemoteUSB ya no usa archivos de configuración: se aprovisiona por `spec/admin-v1.md`.
+- Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado. PortGate ya no usa archivos de configuración: se aprovisiona por `spec/admin-v1.md`.
 - `atsm-trace` registra los plugins de forma estática por decisión humana; no es deuda de carga dinámica.
 
 ### Usabilidad y Lang (2026-10-25)

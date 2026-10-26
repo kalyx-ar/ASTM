@@ -1,6 +1,6 @@
 # ATSM
 
-Neutral integration of clinical laboratory instruments: RemoteUSB (a protocol-agnostic serial ↔ TCP agent, administered by ATSM), a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
+Neutral integration of clinical laboratory instruments: PortGate (a protocol-agnostic serial ↔ TCP agent, administered by ATSM), a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
 
 Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](Documentacion/CONTINUACION.md) · documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
 
@@ -10,7 +10,7 @@ Aplicación gráfica MAUI (entrega Windows autónoma): [diagnóstico de mantenim
 
 ```text
 dotnet/      engine, channels, runtime, plugin SDK, plugins, tools and tests (net10.0)
-RemoteUSB/   remoteusb agent, C++17 (Windows, POSIX; ESP32 planned)
+PortGate/   portgate agent, C++17 (Windows, POSIX; ESP32 planned)
 spec/        normative wire formats
 conformance/ vectors shared by the C++ and .NET implementations
 ```
@@ -22,18 +22,18 @@ dotnet test dotnet/Atsm.slnx
 ```
 
 ```bash
-cmake -S RemoteUSB -B RemoteUSB/build/win-x64 -G "Visual Studio 18 2026" -A x64
+cmake -S PortGate -B PortGate/build/win-x64 -G "Visual Studio 18 2026" -A x64
 ```
 
 ```bash
-cmake --build RemoteUSB/build/win-x64 --config Release
+cmake --build PortGate/build/win-x64 --config Release
 ```
 
 ```bash
-ctest --test-dir RemoteUSB/build/win-x64 -C Release
+ctest --test-dir PortGate/build/win-x64 -C Release
 ```
 
-The first CMake configure downloads Mbed TLS 4.1.1 and checks its SHA-256 (offline: `-DREMOTEUSB_MBEDTLS_SOURCE_DIR=<folder>`; without TLS: `-DREMOTEUSB_ENABLE_TLS=OFF`). The .NET suite also runs interoperability tests (plain and mutual TLS) against `remoteusb` when it has been built (or when `REMOTEUSB_EXE` points to it); otherwise they are reported as skipped.
+The first CMake configure downloads Mbed TLS 4.1.1 and checks its SHA-256 (offline: `-DPORTGATE_MBEDTLS_SOURCE_DIR=<folder>`; without TLS: `-DPORTGATE_ENABLE_TLS=OFF`). The .NET suite also runs interoperability tests (plain and mutual TLS) against `portgate` when it has been built (or when `PORTGATE_EXE` points to it); otherwise they are reported as skipped.
 
 ## Data
 
