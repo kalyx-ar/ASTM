@@ -100,7 +100,7 @@ public class RegexLogAdapter(RegexLogFormat format) : ITraceLogAdapter, ITraceLo
 
     protected virtual string? InstrumentHint(MatchCollection matches) => null;
 
-    private byte[] Decode(string payload)
+    protected byte[] Decode(string payload)
     {
         if (Format.Tokens.Count == 0)
             return Format.Encoding.GetBytes(payload);

@@ -473,7 +473,8 @@ public sealed class MainPage : ContentPage
                 { Attention = ProtocolExplainer.RequiresAttention(o, knowledge as Atsm.Plugins.IInstrumentFlagKnowledge) || series.PotentialOutliers.Contains(o.ObservationId) }).ToArray();
             var measuredValues = series.ValueFrequencies.Where(f => !f.NotPerformed && f.Value.Length > 0).ToArray();
             var modes = measuredValues.Where(f => f.Count == measuredValues.Max(v => v.Count)).ToArray();
-            var displays = series.Records.Select(o => knowledge?.DescribeValue(o)?.DisplayValue is null ? null : ProtocolExplainer.ResultValue(o, Profile)).Distinct(StringComparer.Ordinal).ToArray();
+            var displays = series.Records.Select(o => knowledge?.DescribeValue(o) is { DisplayText: not null } or { DisplayValue: not null }
+                ? ProtocolExplainer.ResultValue(o, Profile) : null).Distinct(StringComparer.Ordinal).ToArray();
             var compactValue = _interpret.IsChecked && displays.Length == 1 ? displays[0] : null;
             var result = series.Range.Median ?? (series.NumericCount > 0 ? Number(series.Median)
                 : series.Range.BoundedCount > 0 ? "—" : compactValue ?? (modes.Length == 1 ? modes[0].Value : modes.Length > 1 ? T("Quality.MixedResults") : "—"));
@@ -566,6 +567,21 @@ public sealed class MainPage : ContentPage
         _tab = 4; ShowTable();
         VerifySemanticPresentation();
         VerifyQualityPresentation();
+        VerifyKnowledgePresentation();
+    }
+    private void VerifyKnowledgePresentation()
+    {
+        _interpret.IsChecked = true; SelectProfile(SysmexUrinalysisPlugin.WithChemistryProfile);
+        var payload = "H|\\^&|||U-WAM\rP|1\rO|1|SYN-QC|||||||||Q||||||||||||||F\rR|1|^^^BACT-Info.^A^1^S|3^RAW|||N|||||||UF-5000\rL|1|N\r"u8.ToArray();
+        _case = DiagnosticReader.Read(payload, DiagnosticInputFormat.AstmMessage, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        var group = QualityGroups().Single();
+        if (group.SummaryRow!.Cells[2] != "Indicador de investigación" || group.SummaryRow.Cells[5] != "Posible mezcla grampositiva/gramnegativa"
+            || group.SummaryRow.Cells[3] != "—" || group.SummaryRow.Cells[4] != "—" || group.Children.Single().Cells[5] != group.SummaryRow.Cells[5])
+            throw new InvalidDataException("ATSM-MAUI-KNOWLEDGE-SELFTEST");
+        _tab = 4; ShowTable(); _table.VerifyAutomaticLayout();
+        _interpret.IsChecked = false;
+        if (QualityGroups().Single().Children.Single().Cells[5] != "3") throw new InvalidDataException("ATSM-MAUI-KNOWLEDGE-RAW-SELFTEST");
+        _interpret.IsChecked = true;
     }
     private void VerifySemanticPresentation()
     {

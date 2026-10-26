@@ -24,6 +24,10 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "finding.ATSM-UWAM-CHEMISTRY-UC3500-9902")] = "ERROR TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "flag.UC3500.00CC")] = "ESTADO DE ERROR TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "unit.NotTransmitted")] = "UNIDAD NO INFORMADA TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.Cs2500", "evaluation.0000.4000.0030")] = "CALIBRACION TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.XnL", "ip.PLT_Clumps?")] = "SOSPECHA TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Diagast.Qwalys", "reaction.A.CMP")] = "COMPATIBILIDAD TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "research.BACT-Info..3")] = "INDICADOR TRADUCIDO";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -46,6 +50,20 @@ public sealed class LangIntegrationTests
         var directProfile = catalog.Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         Assert.Equal("ESTADO DE ERROR TRADUCIDO", ProtocolExplainer.Status(direct, directProfile));
         Assert.Equal("UNIDAD NO INFORMADA TRADUCIDA", ProtocolExplainer.Unit(direct, directProfile));
+        var cs = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("PT", null, "urn:atsm:vendor:sysmex.cs2500")),
+            Flags = [new("0000.4000.0030", null, "urn:atsm:vendor:sysmex.cs2500:evaluation-error")] };
+        Assert.Equal("CALIBRACION TRADUCIDA", ProtocolExplainer.Status(cs, catalog.Resolve("sysmex.cs2500.astm02.results")));
+        var xn = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("PLT_Clumps?", null, "urn:atsm:vendor:sysmex.xnl")),
+            Flags = [new("A", null, "urn:atsm:vendor:sysmex.xnl:flag")] };
+        Assert.Equal("SOSPECHA TRADUCIDA", ProtocolExplainer.Status(xn, catalog.Resolve("sysmex.xnl.astm02.results")));
+        var qw = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("SYN", null, "urn:atsm:vendor:diagast.qwalys3")),
+            ResultKind = "A", Value = new("^^^^^^CMP", Coded: new("CMP", null, "urn:synthetic")) };
+        Assert.Equal("COMPATIBILIDAD TRADUCIDA", ProtocolExplainer.ResultValue(qw, catalog.Resolve("diagast.qwalys3.astm.results")));
+        Assert.Equal("^^^^^^CMP", qw.Value.RawText);
+        var research = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("BACT-Info.", null, "urn:atsm:vendor:sysmex.uwam")),
+            Instrument = observation.Instrument with { Model = "U-WAM" }, VendorIdentity = new(new Dictionary<string, string> { ["instrument.id"] = "UF-5000" }),
+            ResultKind = "S/RAW", Value = new("3", Coded: new("3", null, "urn:synthetic")) };
+        Assert.Equal("INDICADOR TRADUCIDO", ProtocolExplainer.ResultValue(research, profile));
         Assert.Equal(ConnectionState.Open, database.State);
     }
 

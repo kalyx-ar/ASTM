@@ -70,7 +70,18 @@ internal static class NativeSelfTest
         if (ProtocolExplainer.Status(semantic.Observations[0], uwam) != "Normal" || ProtocolExplainer.ResultValue(semantic.Observations[0], uwam) != "Imagen"
             || !semantic.Diagnostics.Any(d => DiagnosticText.Finding(d, uwam) == "Error de solicitud (9902)"))
             throw new InvalidDataException("Native semantic presentation mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok");
+        var cs = catalog.Resolve("sysmex.cs2500.astm02.results");
+        var csInput = DiagnosticReader.Read("H|\\^&|||CS-2500\rP|1\rO|1||01^02^SYN||||||||Q\rR|1|^^^PT^PT^100^1|******|s||N^[0000.4000.0030 SOURCE]||F\rL|1|N\r"u8.ToArray(), DiagnosticInputFormat.AstmMessage, cs, "synthetic", TimeSpan.Zero);
+        var csResult = DiagnosticReader.Analyze(csInput, cs, timing).Observations.Single();
+        if (ProtocolExplainer.Status(csResult, cs) != "Sin curva de calibración validada") throw new InvalidDataException("Native CS-2500 knowledge mismatch.");
+        var xn = catalog.Resolve("sysmex.xnl.astm02.results");
+        var ip = csResult with { Test = CodeSet.Of(new("PLT_Clumps?", null, "urn:atsm:vendor:sysmex.xnl")), Flags = [new("A", null, "urn:atsm:vendor:sysmex.xnl:flag")] };
+        if (ProtocolExplainer.Status(ip, xn) != "Sospecha de agregados plaquetarios"
+            || ((Atsm.Plugins.IInstrumentFlagKnowledge)xn.AstmPlugin!).DescribeFlag(ip, ip.Flags[0])!.IsError)
+            throw new InvalidDataException("Native XN-L knowledge mismatch.");
+        var qw = csResult with { Test = CodeSet.Of(new("SYN", null, "urn:atsm:vendor:diagast.qwalys3")), ResultKind = "A", Value = new("^^^^^^CMP", Coded: new("CMP", null, "urn:synthetic")) };
+        if (ProtocolExplainer.ResultValue(qw, catalog.Resolve("diagast.qwalys3.astm.results")) != "Compatible") throw new InvalidDataException("Native QWALYS knowledge mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

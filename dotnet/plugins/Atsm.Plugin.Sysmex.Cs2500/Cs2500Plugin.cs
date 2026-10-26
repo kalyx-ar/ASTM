@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Model;
 using Atsm.Plugins;
@@ -20,7 +21,7 @@ public sealed partial class Cs2500Plugin : IInstrumentPlugin, IInstrumentHeaderP
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => profile.Id == Profiles[0].Id ? new Cs2500Dialect(context) : throw new ArgumentException("Unknown profile.", nameof(profile));
 }
 
-public sealed class Cs2500Dialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor("sysmex.cs2500"))
+public sealed partial class Cs2500Dialect(DialectContext context) : StandardAstmDialect(context, CodeSystems.Vendor("sysmex.cs2500"))
 {
     public override AstmInterpretation Interpret(Lis02Message message, Atsm.Abstractions.Tracing.TraceRef trace)
     {
@@ -32,10 +33,33 @@ public sealed class Cs2500Dialect(DialectContext context) : StandardAstmDialect(
     { Rack = record.Text(4), Position = record.Text(4, 2) };
     protected override SpecimenRef Specimen(OrderContext order) => base.Specimen(order) with { Position = order.Rack + "^" + order.Position };
     protected override string? ResultKind(Lis02Record result) => result.Text(3, 7);
+    // R.9 S/F describe completion of assay groups, not clinical validation.
+    protected override InstrumentStatusMeaning StatusMeaning(string status) => InstrumentStatusMeaning.Unknown;
+    protected override IReadOnlyList<CodedValue> Flags(Lis02Record result)
+    {
+        var flags = new List<CodedValue>();
+        for (var repeat = 1; repeat <= result.Repeats(7).Count; repeat++)
+        {
+            if (result.Text(7, 1, repeat) is { Length: > 0 } flag) flags.Add(new(flag, null, VendorSystem + ":flag"));
+            foreach (var (component, suffix) in new[] { (2, ":evaluation-error"), (3, ":instrument-error") })
+            {
+                var raw = result.Text(7, component, repeat); if (raw.Length == 0) continue;
+                var entries = ErrorInformation().Matches(raw);
+                if (entries.Count == 0) { flags.Add(new(raw, null, VendorSystem + suffix)); continue; }
+                foreach (Match entry in entries) flags.Add(new(entry.Groups["code"].Value, entry.Groups["text"].Value.Trim(), VendorSystem + suffix));
+            }
+        }
+        return flags;
+    }
+    [GeneratedRegex(@"\[(?<code>[0-9]{4}\.[0-9]{4}\.[0-9]{4}|[0-9]{5})(?:\s+(?<text>[^\]]*))?\]", RegexOptions.CultureInvariant)]
+    private static partial Regex ErrorInformation();
     protected override InstrumentObservation ReadResult(InstrumentRef instrument, OrderContext order, Lis02Record result, Atsm.Abstractions.Tracing.TraceRef trace,
         List<string> comments, List<Atsm.Abstractions.Diagnostics.AtsmDiagnostic> diagnostics)
     {
         var observation = base.ReadResult(instrument, order, result, trace, comments, diagnostics);
+        foreach (var flag in observation.Flags.Where(f => f.System == VendorSystem + ":evaluation-error"))
+            if (Cs2500Errors.Definitions.FirstOrDefault(e => e.Code == flag.Code) is { Attention: true } error)
+                diagnostics.Add(new(Cs2500Errors.FindingCode(error.Code), Atsm.Abstractions.Diagnostics.AtsmSeverity.Warning, error.Text, result.Field(2)));
         // rev.2.04 p.28: fixed-width QC + control name (7) + lot (6); no level is separately transmitted.
         var encoded = order.SpecimenId;
         var material = order.Role == SpecimenRole.Control ? new QualityMaterial(QualityMaterialKind.Control,

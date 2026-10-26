@@ -117,6 +117,7 @@ public static class ProtocolExplainer
     {
         var plugin = (object?)profile.TracePlugin ?? profile.AstmPlugin ?? (object?)profile.ContentPlugin;
         var meaning = (plugin as IInstrumentValueKnowledge)?.DescribeValue(observation);
+        if (meaning?.DisplayText is { } text) return DiagnosticText.Plugin(plugin!, text);
         return meaning?.DisplayValue is { } display ? display == meaning.Kind.Fallback ? DiagnosticText.Plugin(plugin!, meaning.Kind) : display : observation.Value.RawText;
     }
     public static string Status(InstrumentObservation observation, DiagnosticProfile? profile = null)

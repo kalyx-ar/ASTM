@@ -116,6 +116,26 @@ Mensajes conserva las explicaciones de identificación del paciente/muestra/soli
 
 ### UF-5000Control: límite pendiente
 
-El archivo local UF-5000Control tiene 34.058 entradas binarias, sin cabeceras H/MSH ni comandos UC-3500. No es el log de resultados UF-5000 ya interpretado. No se identifica el modelo desde el nombre de archivo ni se deducen mediciones de bytes arbitrarios. La GUI informa «Protocolo binario sin intérprete documentado; bytes disponibles en Trama»; cambiar a una captura compatible actualiza ese estado.
+El archivo local UF-5000Control se importaba parcialmente: el monitor reparte los bloques largos en lecturas con contador de tres dígitos, pero las llaves de decoración pueden abrirse y cerrarse en líneas distintas. Se recuperaron 315 lecturas; ahora son 34.373 entradas (34.371 lecturas y 2 eventos), 500.444 bytes y 399.939 NUL, sin diferencias con los contadores declarados. El adaptador usa esos contadores y estado por dirección para distinguir decoración de bytes literales; preserva espacios, NUL y llaves que son datos. Una ambigüedad sin estado previo conserva la interpretación anterior de la línea e informa la diferencia de longitud.
+
+La captura completa sigue sin cabeceras H/MSH ni comandos UC-3500. No es el log de resultados UF-5000 ya interpretado. Quitar NUL o interpretar UTF-16/UTF-32 en ambas endianidades no recupera mensajes reconocibles; no se aplican esas transformaciones en producción. No se identifica el modelo desde el nombre ni se deducen mediciones o estados de bytes arbitrarios. La GUI mantiene «Protocolo binario sin intérprete documentado; bytes disponibles en Trama»; cambiar a una captura compatible actualiza ese estado. El usuario desconoce qué puerto captura.
 
 La revisión del manual de servicio del fabricante [UF-3000/4000/5000, capítulo 5, §5.4.10](https://www.scribd.com/document/906087031/UF-5000-E-05) distingue modos U-WAM/host y documenta la interfaz ASTM externa, pero no especifica el encuadre ni los campos de este contenido binario. El [capítulo 3 de electrónica](https://www.scribd.com/document/906087014/UF-5000-E-03) tampoco proporciona esa tabla de comandos. No se afirma haber identificado el canal interno preciso por ausencia de cabecera. Para P-15 se necesita la especificación de comunicación/control correspondiente y corpus conocido por comando; la captura queda preservada, sin intérprete ficticio ni órdenes activas.
+
+## Tablas de conocimiento ampliadas (2026-10-25)
+
+| Plugin | Conocimiento incorporado | Fuente primaria y contexto |
+|---|---|---|
+| U-WAM / UF | 11 valores de RBC-Info., UTI-Info. y BACT-Info.; 19 comentarios de revisión RC | R315168 rev.22, appendices C/D/F pp.74-76/80; tipo S/RC y nombre reservado; UF-3000/3000x/4000/5000 con restricciones por modelo |
+| XN-L | 49 indicadores IP de anormalidad, sospecha, juicio y acción; 8 flags base, máscaras y estados de repetición | 1273-MKT rev.3, tablas 5/7-10 pp.24-25/29-33; R.3.5, R.4, R.7 y R.9 |
+| CS-2500 | 68 códigos numéricos de evaluación; 34422 (reactivo insuficiente); tipos de emisión y flags HIL/volumen separados | [R316009 rev.2.04](https://doclib.siemens-healthineers.com/rest/v1/view?document-id=372255), pp.32-35 y appendix C tabla 19 pp.53-55; R.3.7 y componentes independientes R.7.1/R.7.2/R.7.3 |
+| QWALYS 3 | 9 tipos de reacción/interpretación, 4 soportes, estados R/M y códigos CMP/INCMP/E según tipo | ASTM Connection Manual §4.6 p.10; R.3.4, R.4.7, R.5 y R.9 |
+| ARCHITECT | F/P/I (concentración/respuesta/interpretación), ensayo primario/correlación y 7 flags con definición explícita, incluido EXP | ASI 91407-108, tablas 1.13/2.4, pp.1-60/2-16/2-17; R.3.7, R.3.11 y R.7 |
+
+El lookup exige perfil/registro/campo/modelo; los puertos de presentación validan además el sistema de códigos y contexto de la observación. Desconocidos y mensajes originales se conservan. Toda etiqueta tiene clave de seed y evidencia; DisplayText traduce el significado sin traducir el código almacenado. No se copiaron los manuales al repositorio ni se añadieron dependencias.
+
+Los indicadores IP son avisos para revisión. Un A sobre PLT_Clumps? significa sospecha de agregados plaquetarios; no equivale al A de un resultado enmascarado por fallo del analizador. Los índices Q-Flag no reciben umbrales inventados y sin A no se convierten en positivos por su valor numérico. Los códigos de investigación U-WAM permanecen cualitativos; no se presentan como diagnósticos confirmados. Un comentario RC genera atención por revisión, sin convertirse en error de análisis.
+
+CS-2500 puede comunicar N junto con un código de cálculo, calibración o un valor enmascarado; el estado muestra el código específico. HIL y volumen tienen sus propios significados. 1100.4000.0000 se presenta como comprobación de volumen: no prueba volumen inadecuado por sí solo, pues N/A y el registro de muestra aportan ese contexto. El sentinel Unknown9999 no se trata como comodín para inventar interpretaciones. Los símbolos internos de la tabla 19 se resumen sin atribuirles una causa de hardware no documentada.
+
+Se revisó ARCHITECT sin extender significados a indicadores que el manual sólo enumera (p. ej. A#1/A#2 o códigos específicos sin definición); sus originales continúan disponibles. CELL-DYN Ruby no incorpora tablas ajenas: aún requiere su manual propio. No se amplía por semejanza a otros modelos ni se declara homologación física.

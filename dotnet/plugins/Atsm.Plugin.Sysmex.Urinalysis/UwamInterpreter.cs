@@ -73,7 +73,7 @@ public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogForm
 {
     public override LogExtraction Extract(ReadOnlySpan<byte> log, LogAdapterOptions options)
     {
-        var extraction = base.Extract(log, options);
+        var extraction = base.Extract(NormalizeBlocks(log), options);
         var framed = new HashSet<TraceDirection>();
         var segments = extraction.Segments.Select(segment =>
         {
@@ -88,6 +88,51 @@ public sealed partial class SysmexPortMonitorAdapter() : RegexLogAdapter(LogForm
         }).ToArray();
         return extraction with { Segments = segments };
     }
+
+    private byte[] NormalizeBlocks(ReadOnlySpan<byte> log)
+    {
+        // The monitor splits long blocks into reads with separate counters, but braces span those reads.
+        // A brace can also be a real binary byte: use decoded lengths, never Trim('{', '}') or NUL removal.
+        var output = new StringBuilder(); var open = new Dictionary<string, bool?>();
+        foreach (var line in LogFormat.Encoding.GetString(log).Split('\n'))
+        {
+            var complete = EntryPattern().Match(line);
+            if (complete.Success && complete.Groups["label"].Success)
+            {
+                if (complete.Groups["label"].Value is "OPEN" or "CLOSE") { open["R"] = false; open["S"] = false; }
+                output.Append(line).Append('\n'); continue;
+            }
+            if (complete.Success && int.TryParse(complete.Groups["length"].Value, out var completeLength)
+                && Decode(complete.Groups["payload"].Value).Length == completeLength)
+            {
+                open[complete.Groups["dir"].Value] = false;
+                output.Append(line).Append('\n'); continue;
+            }
+            var match = BlockLine().Match(line);
+            if (!match.Success) { output.Append(line).Append('\n'); continue; }
+            var raw = match.Groups["payload"].Value; var direction = match.Groups["dir"].Value;
+            if (!int.TryParse(match.Groups["length"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var length))
+            { output.Append(line).Append('\n'); continue; }
+            var candidates = new List<(string Text, bool Start, bool End)> { (raw, false, false) };
+            if (raw.StartsWith('{')) candidates.Add((raw[1..], true, false));
+            if (raw.EndsWith('}')) candidates.Add((raw[..^1], false, true));
+            if (raw.StartsWith('{') && raw.EndsWith('}') && raw.Length > 1) candidates.Add((raw[1..^1], true, true));
+            var valid = candidates.Where(c => Decode(c.Text).Length == length).ToArray();
+            if (valid.Length == 0 && complete.Success) { output.Append(line).Append('\n'); continue; }
+            var state = open.GetValueOrDefault(direction);
+            if (valid.Length > 1 && !state.HasValue && complete.Success) { output.Append(line).Append('\n'); continue; }
+            (string Text, bool Start, bool End) unchanged = (raw, false, false);
+            var selected = valid.Length == 1 ? valid[0] : valid.Length > 1 && state.HasValue
+                ? valid.FirstOrDefault(c => state.Value ? c.End && !c.Start : c.Start && !c.End, unchanged) : unchanged;
+            if (selected.Start || selected.End) open[direction] = selected.Start && !selected.End;
+            output.Append(match.Groups["prefix"].Value).Append('{').Append(selected.Text).Append('}').Append('\n');
+        }
+        return LogFormat.Encoding.GetBytes(output.ToString());
+    }
+    // The split-block form uses the monitor's three-digit, zero-padded byte counter (512-byte lines in the capture).
+    // Complete braced records above continue to accept other counter widths.
+    [GeneratedRegex(@"^(?<prefix>(?<time>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?<dir>[RS]) +(?<length>\d{3}))(?<payload>[^\r\n]*)\r?$", RegexOptions.CultureInvariant)]
+    private static partial Regex BlockLine();
 
     public static readonly RegexLogFormat LogFormat = new(
         "sysmex.port-monitor",
@@ -158,6 +203,10 @@ public sealed class UwamDialect(DialectContext context, string profile = SysmexU
         List<string> comments, List<Atsm.Abstractions.Diagnostics.AtsmDiagnostic> diagnostics)
     {
         var observation = base.ReadResult(instrument, order, result, trace, comments, diagnostics);
+        if (UwamIndicators.IsResearch(observation)) observation = observation with
+        { Value = observation.Value with { Numeric = null, Comparator = null, Coded = new(observation.Value.RawText, null, VendorSystem + ":research:" + observation.Test.Vendor.Code) } };
+        if (UwamIndicators.IsReview(observation)) observation = observation with
+        { Flags = [.. observation.Flags, new(observation.Test.Vendor.Code, null, VendorSystem + ":review-comment")] };
         var symbol = InstrumentUnits.Symbol(observation.Value);
         if (symbol is not null) observation = observation with { Value = observation.Value with { Unit = new(symbol, symbol, VendorSystem + ":unit") } };
         // R315168 pp.39-40: identifier combines lot/level/method and qualitative output can omit level.

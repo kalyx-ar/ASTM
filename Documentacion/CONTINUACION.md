@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar la revisión de Calidad: 290 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado; el self-test incluye once columnas de Calidad, Tipo/Unidad separados y Estado real, además de lote ausente «-», N = Normal, IF = Imagen, consulta sin H/L y transición desde binario no compatible. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar la ampliación de knowledge: 326 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado; el self-test incluye once columnas de Calidad, Tipo/Unidad separados, Estado real y valores codificados interpretados, además de lote ausente «-», N = Normal, IF = Imagen, consulta sin H/L y transición desde binario no compatible. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Última salida verificada: GUI y CLI 0.1.0+ba8b2f405480c05fa1671005029b791df4c97756; self-tests, auditoría de referencias y corpus agregado correctos. Lang real: 1 prueba correcta (170 ms). [Informe de Calidad en #205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405151002). El perfil se detecta por contenido, nunca por nombre de archivo; P-15 sigue pendiente para el contenido binario UF-5000Control.
 
@@ -81,7 +81,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-12 | Robustez del agente | Ninguno |
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
-| P-15 | Analizar encuadre y contenido de UF-5000Control dentro de la misma familia UF-5000 | Primero identificar paquetes/control/codificación y contrastar documentación; no hay un título de especificación concreto confirmado. No crear otro modelo/perfil por el nombre del archivo |
+| P-15 | Identificar encuadre/codificación de UF-5000Control dentro de la familia UF-5000 | Corregida la importación: 315 lecturas recuperadas, 34.373 entradas/500.444 bytes. No hay cabeceras ASTM/HL7 ni especificación del contenido identificada. El usuario desconoce qué puerto captura. No crear un modelo por el nombre ni quitar NUL |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 

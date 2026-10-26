@@ -8,7 +8,7 @@ internal static class UrinalysisValueKnowledge
     internal static ProtocolText? Unit(InstrumentObservation observation, IReadOnlyDictionary<string, ProtocolText> vocabulary)
     {
         if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
-            return observation.ResultKind?.Split('/')[0] is "IF" or "RC" ? vocabulary["unit.NonMeasurement"] : null;
+            return observation.ResultKind?.Split('/')[0] is "IF" or "RC" || UwamIndicators.IsResearch(observation) ? vocabulary["unit.NonMeasurement"] : null;
         if (observation.Test.Vendor.System != CodeSystems.Vendor(Uc3500Interpreter.PluginId)) return null;
         return vocabulary[observation.ResultKind switch
         {
@@ -34,6 +34,10 @@ internal static class UrinalysisValueKnowledge
         if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
         {
             var kind = observation.ResultKind?.Split('/')[0];
+            if (UwamIndicators.IsResearch(observation)) return new(vocabulary["value.ResearchIndicator"], "research:" + observation.Test.Vendor.Code, false)
+            { DisplayText = vocabulary.GetValueOrDefault("research." + observation.Test.Vendor.Code + "." + observation.Value.RawText.Trim()), IsStructuredContent = true };
+            if (UwamIndicators.IsReview(observation)) return new(vocabulary["resultKind.RC"], "reported:RC", false)
+            { DisplayText = vocabulary["review." + observation.Test.Vendor.Code], IsStructuredContent = true };
             if (kind == "IF") return new(vocabulary["value.Image"], "image", false) { DisplayValue = vocabulary["value.Image"].Fallback, IsStructuredContent = true };
             if (kind is "RC" or "RP") return new(vocabulary["resultKind." + kind], "reported:" + kind, false);
         }

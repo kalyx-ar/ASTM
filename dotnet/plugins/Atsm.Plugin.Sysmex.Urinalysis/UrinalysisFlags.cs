@@ -15,6 +15,8 @@ internal static class UrinalysisFlags
         }
         if (observation.Test.Vendor.System != CodeSystems.Vendor(UwamInterpreter.PluginId)) return null;
         var code = flag.Code.Trim(); var system = CodeSystems.Vendor(UwamInterpreter.PluginId);
+        if (flag.System == system + ":review-comment" && UwamIndicators.IsReview(observation)
+            && code == observation.Test.Vendor.Code && vocabulary.TryGetValue("review." + code, out var review)) return new(review, true);
         if (flag.System == system + ":lh-flag")
         {
             var key = observation.Specimen.Role == SpecimenRole.Control && code is "L" or "H" ? "QC." + code : "LH." + code;

@@ -23,6 +23,10 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
         }
         foreach (var profile in new[] { UwamInterpreter.WithChemistryProfile, UwamInterpreter.WithoutChemistryProfile })
         {
+            foreach (var (parameter, code, _) in UwamIndicators.Research)
+                facts.Add((new(profile, "R", "4.1:" + parameter), code), new(vocabulary["research." + parameter + "." + code]));
+            foreach (var (code, _) in UwamIndicators.Reviews)
+                facts.Add((new(profile, "R", "3.4:RC"), code), new(vocabulary["review." + code]));
             foreach (var code in new[] { "A", "M" }) facts.Add((new(profile, "R", "3.5"), code), new(vocabulary["method." + code]));
             foreach (var code in new[] { "S", "RC", "RP", "IF" }) facts.Add((new(profile, "R", "3.7"), code), new(vocabulary[code == "IF" ? "value.Image" : "resultKind." + code]));
             foreach (var code in new[] { "RAW", "MAINFORMAT", "RAW_Q", "RAW_C", "RAW_R1", "RAW_R2" }) facts.Add((new(profile, "R", "4.2"), code), new(vocabulary["resultFormat." + code]));
@@ -47,6 +51,13 @@ internal sealed class UrinalysisKnowledge : IInstrumentKnowledge
     }
     public InstrumentKnowledgeFact? Lookup(InstrumentKnowledgeContext context, string code)
     {
+        if (context.Profile is UwamInterpreter.WithChemistryProfile or UwamInterpreter.WithoutChemistryProfile
+            && (context.Field.StartsWith("4.1:", StringComparison.Ordinal) || context.Field == "3.4:RC"))
+        {
+            if (context.Model is not (null or "U-WAM" or "UF-3000" or "UF-3000X" or "UF-4000" or "UF-5000")) return null;
+            if (code == "RC_MNPMN" && context.Model is "UF-3000" or "UF-3000X") return null;
+            context = context with { Model = null };
+        }
         if (context.Record == "R" && context.Field == UwamDialect.ChemistryErrorParameter)
             context = context with { Model = UwamChemistryErrors.Model(context.Model) };
         if (facts.TryGetValue((context, code), out var exact)) return exact;

@@ -19,6 +19,11 @@ internal sealed partial class UwamInterpreter : IInstrumentDiagnosticVocabulary
         Add("message.QuerySamples", "Consulta {0} por número de muestra", "R315168 rev.22 §5.3.3.5, Q.3");
         Add("value.Image", "Imagen", "R315168 rev.22 §5.3.3.4, R.3 result type IF / appendix E");
         Add("unit.NonMeasurement", "—", "R315168 rev.22 §5.3.3.4, IF/RC: imagen o comentario, sin magnitud física");
+        Add("value.ResearchIndicator", "Indicador de investigación", "R315168 rev.22 appendices C/F.2 pp.74/80; códigos sin unidad, no concentraciones");
+        foreach (var (parameter, code, text) in UwamIndicators.Research)
+            Add("research." + parameter + "." + code, text, "R315168 rev.22 appendix C p.74 y F.2 p.80; parámetro reservado y tipo S, UF-3000/3000x/4000/5000");
+        foreach (var (code, text) in UwamIndicators.Reviews)
+            Add("review." + code, text, "R315168 rev.22 appendix D pp.75-76 y F.3 p.80; comentario RC requiere revisión, no diagnóstico ni error confirmado");
         foreach (var (key, label) in new (string, string)[] { ("S", "Resultado"), ("RC", "Comentario de revisión"), ("RP", "Parámetro de sensibilidad") })
             Add("resultKind." + key, label, "R315168 rev.22 §5.3.3.4, R.3.7");
         Add("method.A", "Equipo", "R315168 rev.22 §5.3.3.4, R.3.5");
