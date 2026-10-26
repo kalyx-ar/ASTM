@@ -82,6 +82,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
+| P-16 | Agente como servicio, administración remota y selección de puerto por identidad física | Decisiones abiertas de [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md) |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 
