@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remoteusb VERSION 0.2.0 LANGUAGES C CXX)
+project(remoteusb VERSION 0.3.0 LANGUAGES C CXX)
 
 # C++17 keeps the core buildable with the v141_xp toolset (Windows XP) and with ESP-IDF.
 set(CMAKE_CXX_STANDARD 17)
@@ -42,6 +42,11 @@ add_library(remoteusb_core STATIC
     core/src/arbiter.cpp
     core/src/json.cpp
     core/src/config.cpp
+    core/src/config_cbor.cpp
+    core/src/events.cpp
+    core/src/state.cpp
+    core/src/supervisor.cpp
+    platform/common/files.cpp
     core/src/agent.cpp
     platform/common/net.cpp
     platform/common/tcp_device.cpp)
@@ -57,17 +62,18 @@ else()
 endif()
 
 if(WIN32)
-    target_sources(remoteusb_core PRIVATE platform/win32/serial_win32.cpp)
-    target_link_libraries(remoteusb_core PUBLIC ws2_32)
+    target_sources(remoteusb_core PRIVATE platform/win32/serial_win32.cpp platform/win32/protect_win32.cpp platform/win32/devices_win32.cpp)
+    target_link_libraries(remoteusb_core PUBLIC ws2_32 crypt32 setupapi cfgmgr32)
     # 0x0501 = Windows XP: fail the build if an API newer than the oldest supported target slips into RemoteUSB code.
     target_compile_definitions(remoteusb_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0501)
 else()
-    target_sources(remoteusb_core PRIVATE platform/posix/serial_posix.cpp)
+    target_sources(remoteusb_core PRIVATE platform/posix/serial_posix.cpp platform/posix/protect_posix.cpp platform/posix/devices_posix.cpp)
     find_package(Threads REQUIRED)
     target_link_libraries(remoteusb_core PUBLIC Threads::Threads)
 endif()
 
 target_include_directories(remoteusb_core PUBLIC core/include)
+target_compile_definitions(remoteusb_core PUBLIC REMOTEUSB_VERSION="${PROJECT_VERSION}")
 
 # Warnings as errors apply to RemoteUSB sources only (C++); Mbed TLS keeps its own settings.
 if(MSVC)

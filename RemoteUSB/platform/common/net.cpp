@@ -241,3 +241,19 @@ bool Socket::wait_readable(int timeout_ms) const {
 }
 
 }  // namespace remoteusb::platform
+
+namespace remoteusb::platform {
+
+int Socket::peek(std::uint8_t* buffer, std::size_t size, int timeout_ms) {
+    const auto s = to_native(handle_);
+    if (s == kInvalid) return -1;
+    if (!select_readable(s, timeout_ms)) return -2;
+#ifdef _WIN32
+    const int n = ::recv(s, reinterpret_cast<char*>(buffer), static_cast<int>(size), MSG_PEEK);
+#else
+    const auto n = ::recv(s, buffer, size, MSG_PEEK);
+#endif
+    return n < 0 ? -1 : static_cast<int>(n);
+}
+
+}  // namespace remoteusb::platform

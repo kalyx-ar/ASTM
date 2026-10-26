@@ -4,8 +4,8 @@
 
 namespace remoteusb {
 
-Arbiter::Arbiter(std::uint32_t lease_ms, std::size_t max_queue, std::map<std::string, int> controllers, std::uint64_t seed)
-    : lease_ms_(lease_ms), max_queue_(max_queue), controllers_(std::move(controllers)), random_(seed) {}
+Arbiter::Arbiter(std::uint32_t lease_ms, std::size_t max_queue, std::map<std::string, int> controllers, std::uint64_t seed, std::uint32_t max_hold_ms)
+    : lease_ms_(lease_ms), max_queue_(max_queue), controllers_(std::move(controllers)), random_(seed), max_hold_ms_(max_hold_ms) {}
 
 void Arbiter::acquire(ConnectionId connection, const std::string& controller_id, std::uint64_t request_id, std::uint64_t deadline_ms,
                       std::uint64_t now, std::vector<ArbiterEvent>& out) {
@@ -18,6 +18,10 @@ void Arbiter::acquire(ConnectionId connection, const std::string& controller_id,
         }
         priority = it->second;
     }
+    if (closed_) {
+        out.push_back({ArbiterEvent::Kind::Denied, connection, request_id, 0, {}, 0, "REMOTEUSB-SECURE-CLOSED"});
+        return;
+    }
     if (owner_ && owner_->connection == connection) {
         // Re-acquiring an owned port behaves as a renewal of the current grant.
         renew(connection, request_id, owner_->generation, now, out);
@@ -29,7 +33,7 @@ void Arbiter::acquire(ConnectionId connection, const std::string& controller_id,
         return;
     }
     Request request{connection, request_id, priority, order_++, deadline_ms == 0 ? UINT64_MAX : now + deadline_ms};
-    if (!owner_) {
+    if (!owner_ && now >= quarantine_until_) {
         grant(request, now, out);
         return;
     }
@@ -48,15 +52,17 @@ void Arbiter::renew(ConnectionId connection, std::uint64_t request_id, std::uint
         out.push_back({ArbiterEvent::Kind::Denied, connection, request_id, generation, {}, 0, "REMOTEUSB-STALE-LEASE"});
         return;
     }
+    if (max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
+        end_tenure("REMOTEUSB-MAX-HOLD", now, out);
+        return;
+    }
     owner_->expires = now + lease_ms_;
     out.push_back({ArbiterEvent::Kind::Granted, connection, request_id, owner_->generation, owner_->transfer_id, 0, {}});
 }
 
 void Arbiter::release(ConnectionId connection, std::uint32_t generation, std::uint64_t now, std::vector<ArbiterEvent>& out) {
     if (!owner_ || owner_->connection != connection || owner_->generation != generation) return;
-    out.push_back({ArbiterEvent::Kind::Revoked, connection, 0, owner_->generation, {}, 0, "REMOTEUSB-RELEASED"});
-    owner_.reset();
-    grant_next(now, out);
+    end_tenure("REMOTEUSB-RELEASED", now, out);
 }
 
 void Arbiter::disconnect(ConnectionId connection, std::uint64_t now, std::vector<ArbiterEvent>& out) {
@@ -83,10 +89,35 @@ void Arbiter::tick(std::uint64_t now, std::vector<ArbiterEvent>& out) {
         }
     }
     if (owner_ && now >= owner_->expires) {
-        out.push_back({ArbiterEvent::Kind::Revoked, owner_->connection, 0, owner_->generation, {}, 0, "REMOTEUSB-LEASE-EXPIRED"});
-        owner_.reset();
-        grant_next(now, out);
+        end_tenure("REMOTEUSB-LEASE-EXPIRED", now, out);
+    } else if (owner_ && max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
+        end_tenure("REMOTEUSB-MAX-HOLD", now, out);
+    } else if (!owner_ && !closed_) {
+        grant_next(now, out);  // a quarantine that just ended
     }
+}
+
+bool Arbiter::revoke(const std::string& code, std::uint64_t quarantine_ms, std::uint64_t now, std::vector<ArbiterEvent>& out) {
+    if (!owner_) return false;
+    if (quarantine_ms > 0) quarantine_until_ = now + quarantine_ms;
+    end_tenure(code, now, out);
+    return true;
+}
+
+void Arbiter::close(const std::string& code, std::vector<ArbiterEvent>& out) {
+    closed_ = true;
+    if (owner_) {
+        out.push_back({ArbiterEvent::Kind::Revoked, owner_->connection, 0, owner_->generation, {}, 0, code});
+        owner_.reset();
+    }
+    for (const auto& r : queue_) out.push_back({ArbiterEvent::Kind::Denied, r.connection, r.request_id, 0, {}, 0, code});
+    queue_.clear();
+}
+
+void Arbiter::reopen(std::uint64_t now, std::vector<ArbiterEvent>& out) {
+    closed_ = false;
+    quarantine_until_ = 0;
+    grant_next(now, out);
 }
 
 bool Arbiter::may_write(ConnectionId connection, std::uint32_t generation) const {
@@ -97,15 +128,25 @@ std::optional<ConnectionId> Arbiter::owner() const {
     return owner_ ? std::optional<ConnectionId>(owner_->connection) : std::nullopt;
 }
 
+bool Arbiter::is_queued(ConnectionId connection) const {
+    return std::any_of(queue_.begin(), queue_.end(), [&](const Request& r) { return r.connection == connection; });
+}
+
+void Arbiter::end_tenure(const std::string& code, std::uint64_t now, std::vector<ArbiterEvent>& out) {
+    out.push_back({ArbiterEvent::Kind::Revoked, owner_->connection, 0, owner_->generation, {}, 0, code});
+    owner_.reset();
+    grant_next(now, out);
+}
+
 void Arbiter::grant_next(std::uint64_t now, std::vector<ArbiterEvent>& out) {
-    if (queue_.empty()) return;
+    if (queue_.empty() || closed_ || now < quarantine_until_) return;
     const Request next = queue_.front();
     queue_.pop_front();
     grant(next, now, out);
 }
 
 void Arbiter::grant(const Request& request, std::uint64_t now, std::vector<ArbiterEvent>& out) {
-    owner_ = Owner{request.connection, ++generation_, random_id(), now + lease_ms_, false};
+    owner_ = Owner{request.connection, ++generation_, random_id(), now + lease_ms_, false, now};
     out.push_back({ArbiterEvent::Kind::Granted, request.connection, request.request_id, owner_->generation, owner_->transfer_id, 0, {}});
 }
 

@@ -1,10 +1,11 @@
-// Platform services used by the agent core. Implemented per target under native/platform/.
+// Platform services used by the agent core. Implemented per target under RemoteUSB/platform/.
 #pragma once
 
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "remoteusb/config.hpp"
 
@@ -46,6 +47,8 @@ public:
     bool send_all(const std::uint8_t* data, std::size_t size);
     /// Returns bytes read, 0 on orderly close, -1 on failure, -2 on timeout.
     int receive(std::uint8_t* buffer, std::size_t size, int timeout_ms);
+    /// Like receive() but leaves the bytes in the socket (used to tell TLS from plain on one port).
+    int peek(std::uint8_t* buffer, std::size_t size, int timeout_ms);
     /// True when data (or a close) is ready to read within timeout_ms.
     bool wait_readable(int timeout_ms) const;
     void shutdown();
@@ -76,5 +79,38 @@ private:
 
 bool network_startup(std::string& error);
 void network_cleanup();
+
+using Bytes = std::vector<std::uint8_t>;
+
+/// Milliseconds since the Unix epoch (UTC), for event timestamps.
+std::uint64_t utc_ms();
+
+/// Seals data for this machine: DPAPI with machine scope on Windows. On POSIX the data is returned unchanged and the
+/// protection is the owner-only permission of the files written by write_file_atomic/append_file.
+bool protect(const Bytes& plain, Bytes& sealed, std::string& error);
+bool unprotect(const Bytes& sealed, Bytes& plain, std::string& error);
+
+bool ensure_directory(const std::string& path, std::string& error);
+bool read_file(const std::string& path, Bytes& out);
+/// Writes a temporary file and renames it over `path`, so a crash never leaves a half-written state.
+bool write_file_atomic(const std::string& path, const Bytes& data, std::string& error);
+bool append_file(const std::string& path, const Bytes& data, std::string& error);
+std::uint64_t file_size(const std::string& path);
+bool replace_file(const std::string& from, const std::string& to, std::string& error);
+std::string join_path(const std::string& directory, const std::string& name);
+
+/// Serial port present on this machine, with the physical identity the server uses to recognize an instrument.
+struct SerialDeviceInfo {
+    std::string name;           // COM5, /dev/ttyUSB0
+    std::string friendly_name;  // "USB Serial Port (COM5)"
+    std::string usb_vid;        // upper-case hex, empty when not USB
+    std::string usb_pid;
+    std::string usb_serial;     // serial number of the adapter, empty when it has none
+    std::string location;       // physical location (hub port path)
+    std::string instance_id;    // platform device instance id
+};
+
+/// Enumerates the serial ports present now. Never opens them.
+std::vector<SerialDeviceInfo> list_serial_devices();
 
 }  // namespace remoteusb::platform
