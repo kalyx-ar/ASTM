@@ -73,6 +73,7 @@ public static class ProtocolExplainer
         observation.InstrumentStatusMeaning == InstrumentStatusMeaning.Warning || observation.Flags.Any(f => knowledge?.DescribeFlag(observation, f)?.RequiresAttention != false);
     public static string Entry(TraceEntry entry, DiagnosticProfile profile)
     {
+        if (profile.TracePlugin is not null) return DiagnosticText.Format("Message.Wire", entry.Data.Length);
         if (entry.Code == TraceReconstruction.MessageCode)
             return profile.IsHl7 ? DiagnosticText.Text("Event.lis02.message") : RecordNames((profile.AstmProfile?.Encoding ?? Encoding.UTF8).GetString(entry.Data.Span), profile);
         if (entry.Data.Length == 1)

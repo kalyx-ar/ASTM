@@ -22,7 +22,7 @@ Encabezados con fondo claro, regla inferior y agarre de redimensionado discreto 
 
 ## Una entrada U-WAM y configuraciones de comunicación
 
-La lista presenta **8 equipos/familias**, que conservan **13 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
+La lista presenta **8 equipos/familias**, que conservan **14 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
 
 | Configuración | Límite de consulta según R315168 §5.2.5 | Presupuesto del anfitrión ATSM |
 |---|---|---|
@@ -30,6 +30,8 @@ La lista presenta **8 equipos/familias**, que conservan **13 perfiles técnicos*
 | Sin analizador químico | 18 s | 15 s |
 
 Ambas utilizan el mismo plugin, dialecto, encuadre y comunicación. No se abren conexiones adicionales. La diferencia implementada es el presupuesto de consulta; el operador confirma la configuración real antes de conectar. Un archivo no demuestra por sí solo qué configuración de hardware está instalada.
+
+La misma familia contiene los intérpretes pasivos UC-3500 y UF de control binario parcial. El segundo reconoce avisos de necesidad de limpieza/chequeo de fondo y bloques recurrentes, sin atribuir significado a campos desconocidos. La detección es por contenido; no requiere otra entrada en el selector principal. [Evidencia y límites](UF-CONTROL-Y-TIEMPOS.md).
 
 Si la cabecera permite sugerir U-WAM y todavía estaba seleccionado otro equipo, la importación propone la variante de presupuesto más corto (6 s, compatible con el límite más exigente). Es una selección conservadora del intérprete, no una detección de hardware instalado. Si el operador ya había seleccionado una variante U-WAM, se conserva.
 
@@ -39,7 +41,7 @@ Si la cabecera permite sugerir U-WAM y todavía estaba seleccionado otro equipo,
 
 En Sysmex se infiere quién registró la comunicación a partir de registros R/Q que origina el instrumento. Esto corrige el sentido instrumento→anfitrión entre un monitor del puerto LIS de U-WAM y un monitor donde el software actúa como anfitrión del analizador. La inferencia puede reemplazarse en **Quién registró el log**. Una captura sin evidencia suficiente muestra una advertencia; no se infiere la dirección por ACK o solicitudes O solamente.
 
-Reconocer el formato de un monitor **no** acredita el protocolo de su contenido. Si un log binario interno no contiene cabeceras ASTM compatibles, se conserva en Trama y se indica que requiere otro perfil. No se lo interpreta como una secuencia de registros ASTM ni se inventan observaciones. Un fragmento de captura sin cabecera puede requerir intervención técnica; no se declara compatible automáticamente.
+Reconocer el formato de un monitor **no** acredita el protocolo de su contenido. Los plugins pueden reconocer formatos propios sin cabeceras ASTM, como UC-3500 y el control UF parcial. Si ninguno reconoce el contenido, se conserva en Trama y se indica que requiere otro perfil. No se lo interpreta como una secuencia de registros ASTM ni se inventan observaciones. Un fragmento de captura sin firma suficiente puede requerir intervención técnica; no se declara compatible automáticamente.
 
 Regresión local, sólo agregados y sin publicar los archivos:
 
@@ -70,7 +72,9 @@ La publicación independiente no incluye esa referencia ni sus dependencias SQLi
 
 ## Verificación y límites
 
-231 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye 20 casos adicionales UC-3500 y los 19 de usabilidad anteriores. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las siete vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
+Incremento del 26 de octubre: **Comunicación** es la octava vista. Agrupa intervalos entre lecturas, cambios de sentido, recepción de mensajes y respuestas identificadas, con mínimo, mediana, P95, máximo y subfilas de origen. Duración total y proceso de operaciones se mantienen separados y requieren límites explícitos. Un archivo sin reloj muestra duración no disponible; un aviso de mantenimiento requerido no se convierte en ejecución. [Métricas y puertos](UF-CONTROL-Y-TIEMPOS.md).
+
+346 pruebas .NET y 542 verificaciones nativas, corridas completas repetidas; incluye los casos de usabilidad, UC-3500, control UF y tiempos. Prueba opcional Lang adicional: 1 correcta. Se verifican idiomas, dependencias y arranque/DPAPI en la salida directa; recorre las ocho vistas con y sin interpretación, comprueba handlers y alineación de la tabla en la ventana real.
 
 Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El usuario detuvo Computer Use con Esc antes de probar el arrastre; no se realizaron más acciones de control visual. Los ajustes posteriores de encabezados/espaciado/contraste se verificaron por compilación y pruebas de la aplicación, sin afirmar inspección visual manual ni arrastre manual del diseño final. No se interrumpe la instancia abierta del usuario para sustituirla.
 

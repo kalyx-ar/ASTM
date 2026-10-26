@@ -33,7 +33,7 @@ internal static class NativeSelfTest
         if (Encoding.UTF8.GetString(encrypted).Contains(Convert.ToBase64String(data), StringComparison.Ordinal)) throw new InvalidDataException("Unprotected self-test payload.");
         var read = ProtectedCaseJournal.Read(new MemoryStream(encrypted), protection);
         var stored = read.Batches!.Single().Observations.Single();
-        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 13)
+        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 14)
             throw new InvalidDataException("Native self-test mismatch.");
         using var text = new StringWriter(); TraceFile.Write(text, input.Header, input.Entries);
         if (TraceFile.Read(new StringReader(text.ToString())).Entries.Count != 1) throw new InvalidDataException("Native trace JSON mismatch.");
@@ -81,7 +81,16 @@ internal static class NativeSelfTest
             throw new InvalidDataException("Native XN-L knowledge mismatch.");
         var qw = csResult with { Test = CodeSet.Of(new("SYN", null, "urn:atsm:vendor:diagast.qwalys3")), ResultKind = "A", Value = new("^^^^^^CMP", Coded: new("CMP", null, "urn:synthetic")) };
         if (ProtocolExplainer.ResultValue(qw, catalog.Resolve("diagast.qwalys3.astm.results")) != "Compatible") throw new InvalidDataException("Native QWALYS knowledge mismatch.");
-        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=13 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok");
+        var notice = new byte[266]; notice[0] = 1; notice[265] = 3;
+        Encoding.ASCII.GetBytes("SYNTHETIC").CopyTo(notice.AsSpan(3)); Encoding.ASCII.GetBytes("Limpieza").CopyTo(notice.AsSpan(37));
+        Encoding.ASCII.GetBytes("DBS_LANG_02215Necesidad").CopyTo(notice.AsSpan(87)); Encoding.ASCII.GetBytes("DBS_LANG_01745").CopyTo(notice.AsSpan(151));
+        var controlInput = DiagnosticReader.Read(notice, DiagnosticInputFormat.Auto, uwam, "synthetic", TimeSpan.Zero);
+        var controlProfile = catalog.Resolve(controlInput.Header.Profile!); var control = DiagnosticReader.Analyze(controlInput, controlProfile, timing);
+        if (controlProfile.Id != SysmexUrinalysisPlugin.UfControlProfile || control.Observations.Count != 1
+            || ProtocolExplainer.ResultValue(control.Observations[0], controlProfile) != "Limpieza requerida"
+            || CommunicationStatistics.Build(control).Any(s => s.Code.StartsWith("Operation", StringComparison.Ordinal)))
+            throw new InvalidDataException("Native UF control/communication mismatch.");
+        Console.WriteLine("ATSM_NATIVE_SELFTEST_OK catalog=14 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok uf-control-partial=ok communication-stats=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

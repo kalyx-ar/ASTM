@@ -88,5 +88,5 @@ public interface IInstrumentPlugin
 
 public static class PluginApi
 {
-    public const int Version = 1;
+    public const int Version = 2;
 }

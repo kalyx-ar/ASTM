@@ -4,6 +4,8 @@ Estado: contratos de motor implementados; kits formales de conformidad pendiente
 
 ## Qué hace y qué no hace
 
+SDK vigente: `PluginApi.Version = 2`. `IInstrumentTracePlugin.Recognizes(profile, segments)` e `InferRecorder(profile, segments)` reciben el perfil concreto. La discriminación de UC-3500 y control UF parcial convive en el mismo plugin de familia. Los consumidores se recompilan con este contrato; no se mantienen las firmas anteriores. `TraceInterpretation.Timings` aporta límites explícitos separados en respuesta, duración total de operación y proceso. Véase [Control UF y tiempos](UF-CONTROL-Y-TIEMPOS.md).
+
 | El plugin hace | El plugin no hace |
 |---|---|
 | Declarar perfiles (capa baja, codec, desviaciones, flujos) | Abrir puertos, sockets o archivos |

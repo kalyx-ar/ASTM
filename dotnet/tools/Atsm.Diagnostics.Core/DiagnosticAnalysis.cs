@@ -23,6 +23,7 @@ public sealed record DiagnosticAnalysis(IReadOnlyList<TraceEntry> Entries, IRead
     IReadOnlyList<DecodedMessage> Messages, IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<AtsmDiagnostic> Diagnostics)
 {
     public IReadOnlyList<QualityResourceReference> QualityResources { get; init; } = [];
+    public IReadOnlyList<InstrumentTraceTiming> Timings { get; init; } = [];
 }
 public sealed record DiagnosticCase(TraceHeader Header, IReadOnlyList<TraceEntry> Entries, IReadOnlyList<InstrumentObservationBatch>? Batches = null, bool IsComplete = true);
 
@@ -56,7 +57,7 @@ public static class DiagnosticReader
             var adapter = new DiagnosticCatalog().LogAdapters.Single(a => a.Id == adapterId);
             var original = adapter.Extract(bytes, new(RecordedBy.Host) { UtcOffset = utcOffset });
             if (!profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(original.Segments)) throw new InvalidDataException("ATSM-DIAG-HL7-PROFILE-REQUIRED");
-            var inferred = profile.TracePlugin?.InferRecorder(original.Segments) ?? (format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments));
+            var inferred = profile.TracePlugin?.InferRecorder(profile.TraceProfile!, original.Segments) ?? (format == DiagnosticInputFormat.LegacyLog ? RecordedBy.Host : DiagnosticInputDetector.InferRecorder(original.Segments));
             var recorder = recordedBy ?? inferred ?? RecordedBy.Instrument;
             var extracted = recorder == RecordedBy.Host ? original : adapter.Extract(bytes, new(recorder) { UtcOffset = utcOffset });
             if (extracted.Segments.Count == 0) throw new InvalidDataException("ATSM-DIAG-NO-LOG-ENTRIES");
@@ -72,7 +73,14 @@ public static class DiagnosticReader
             limitations.Add($"Adapter {adapterId}; recorded by {recorder}; {extracted.Skipped} skipped lines.");
             limitations.AddRange(extracted.Findings);
         }
-        else segments = [new(null, TraceDirection.Received, format == DiagnosticInputFormat.WireBytes ? SegmentContent.Wire : SegmentContent.Message, bytes)];
+        else
+        {
+            segments = [new(null, TraceDirection.Received, format == DiagnosticInputFormat.WireBytes ? SegmentContent.Wire : SegmentContent.Message, bytes)];
+            if (format == DiagnosticInputFormat.WireBytes && profile.TracePlugin is { } passive && recordedBy is null
+                && passive.InferRecorder(profile.TraceProfile!, segments) is null)
+            { properties["directionUncertain"] = "true"; properties["recordedBy"] = "Unknown"; }
+        }
+        properties["timingSource"] = segments.Any(s => s.Timestamp is not null) ? "recorder" : "none";
         var (newHeader, newEntries) = TraceReconstruction.Real(segments, sourceName, "diagnostic", limitations);
         return new(newHeader with { Profile = profile.Id, Properties = properties }, newEntries);
     }
@@ -93,7 +101,7 @@ public static class DiagnosticReader
             { FirstSequence = m.FirstSequence, Explanation = m.Explanation, Fields = m.Fields,
                 Diagnostics = interpreted.Diagnostics.Where(d => InMessage(d, m.FirstSequence, m.LastSequence)).ToArray() }));
             return new(input.Entries, interpreted.Events.Select(e => new StackEvent(Enum.Parse<StackLevel>(e.Level.ToString()), e.LastSequence,
-                e.Elapsed, e.Direction, e.Code, e.Code, e.FirstSequence) { Explanation = e.Explanation }).ToArray(), messages, interpreted.Observations, findings);
+                e.Elapsed, e.Direction, e.Code, e.Code, e.FirstSequence) { Explanation = e.Explanation }).ToArray(), messages, interpreted.Observations, findings) { Timings = interpreted.Timings };
         }
         if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") == "true")
         {
@@ -182,7 +190,7 @@ public static class DiagnosticReader
         if (input.Header.Properties?.GetValueOrDefault("unsupportedProtocol") != "true") return input;
         var segments = input.Entries.Select(e => new TraceSegment(e.Utc, e.Direction,
             e.Direction == TraceDirection.Event ? SegmentContent.Event : e.Code == TraceReconstruction.MessageCode ? SegmentContent.Message : SegmentContent.Wire, e.Data)).ToArray();
-        var recognized = profile.TracePlugin?.Recognizes(segments) == true
+        var recognized = profile.TracePlugin?.Recognizes(profile.TraceProfile!, segments) == true
             || profile.AstmProfile is not null && DiagnosticInputDetector.HasAstmHeader(segments)
             || profile.IsHl7 && DiagnosticInputDetector.HasHl7Header(segments);
         if (!recognized) return input;

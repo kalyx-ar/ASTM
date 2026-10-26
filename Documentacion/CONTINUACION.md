@@ -1,6 +1,6 @@
 # Continuación del trabajo
 
-Guía para retomar ATSM desde otra sesión o agente. Estado al 25 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
+Guía para retomar ATSM desde otra sesión o agente. Estado al 26 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
 
 ## Cómo retomar
 
@@ -22,7 +22,7 @@ cmake --build native/build/win-x64 --config Release
 ctest --test-dir native/build/win-x64 -C Release
 ```
 
-Al cerrar la ampliación de knowledge: 326 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y prueba MAUI de ventana/runtime privado/DPAPI por separado; el self-test incluye once columnas de Calidad, Tipo/Unidad separados, Estado real y valores codificados interpretados, además de lote ausente «-», N = Normal, IF = Imagen, consulta sin H/L y transición desde binario no compatible. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
+Al cerrar control UF y métricas: 346 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y self-test de ventana/runtime privado/DPAPI por separado; incluye 8 vistas, 14 perfiles, avisos UF, Comunicación y límites pendientes, además de los controles previos de Calidad/interpretación. SDK API 2: discriminación por perfil e intervalos de respuesta/operación/proceso separados. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
 
 Última salida verificada: GUI y CLI 0.1.0+daef5fbaa0fe1da325f87b2397fd87abe1d34720; self-tests, auditoría de referencias y corpus agregado correctos. Lang real: 1 prueba correcta (164 ms). [Informe de knowledge y captura en #205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6405834890). El perfil se detecta por contenido, nunca por nombre de archivo; P-15 sigue pendiente para el contenido binario UF-5000Control, con 315 lecturas recuperadas y 34.373 entradas completas.
 
@@ -81,7 +81,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-12 | Robustez del agente | Ninguno |
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
-| P-15 | Identificar encuadre/codificación de UF-5000Control dentro de la familia UF-5000 | Corregida la importación: 315 lecturas recuperadas, 34.373 entradas/500.444 bytes. No hay cabeceras ASTM/HL7 ni especificación del contenido identificada. El usuario desconoce qué puerto captura. No crear un modelo por el nombre ni quitar NUL |
+| P-15 | Completar control UF en la familia Sysmex | Lectura parcial: 1.981 bloques y 2 avisos de necesidad; 34.373 entradas/500.444 bytes. Faltan semántica 90/100 y otros recursos, integridad, roles y límites de operaciones reales. No usar etiquetas de necesidad como inicio/fin ni tiempos entre lecturas como RTT. Ver UF-CONTROL-Y-TIEMPOS |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 

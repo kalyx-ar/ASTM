@@ -35,8 +35,8 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
     }
     private static IEnumerable<TraceEntry> Entries(IReadOnlyList<TraceSegment> segments) => segments.Select((s, i) =>
         new TraceEntry(i, TimeSpan.Zero, DateTimeOffset.UnixEpoch, s.Direction, s.Data));
-    public bool Recognizes(IReadOnlyList<TraceSegment> segments) => Decode(Entries(segments), checkMode).Packets.Any(p => Code(p.Text) != "UNKNOWN");
-    public RecordedBy? InferRecorder(IReadOnlyList<TraceSegment> segments)
+    public bool Recognizes(InstrumentTraceProfile profile, IReadOnlyList<TraceSegment> segments) => profile.Id == ProfileId && Decode(Entries(segments), checkMode).Packets.Any(p => Code(p.Text) != "UNKNOWN");
+    public RecordedBy? InferRecorder(InstrumentTraceProfile profile, IReadOnlyList<TraceSegment> segments)
     {
         var host = 0; var instrument = 0;
         foreach (var packet in Decode(Entries(segments), checkMode).Packets)
@@ -69,6 +69,7 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
         var decoder = Decode(entries, checkMode);
         var messages = new List<InstrumentTraceMessage>(); var events = new List<InstrumentTraceEvent>();
         var observations = new List<InstrumentObservation>(); var findings = new List<AtsmDiagnostic>();
+        var timings = new List<InstrumentTraceTiming>();
         void Finding(string code, long sequence, AtsmSeverity severity = AtsmSeverity.Warning) => findings.Add(new("ATSM-UC3500-" + code, severity,
             DiagnosticVocabulary.GetValueOrDefault("finding.ATSM-UC3500-" + code)?.Fallback ?? "Unknown UC-3500 record/code; original retained.", "entry:" + sequence));
         foreach (var (entry, value) in decoder.Controls)
@@ -157,6 +158,7 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
             else if (code.StartsWith("ER", StringComparison.Ordinal))
             {
                 if (order is null) Finding("CORRELATION", packet.Last);
+                else timings.Add(new(InstrumentTimingKind.Response, "uc3500.order-response", order.Value.Sequence, packet.Last));
                 if (fact?.FindingCode is { } findingCode) Finding(findingCode["ATSM-UC3500-".Length..], packet.Last, fact.Severity);
                 else if (code != "ER00") Finding("UNKNOWN", packet.Last);
                 query = null; order = null;
@@ -175,7 +177,8 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
             }
         }
         if (query is not null || order is not null) Finding("PENDING", order?.Sequence ?? query!.Value.Sequence);
-        return new(messages, events.OrderBy(e => e.LastSequence).ToArray(), observations, findings);
+        if (order is { } pending) timings.Add(new(InstrumentTimingKind.Response, "uc3500.order-response", pending.Sequence, null));
+        return new(messages, events.OrderBy(e => e.LastSequence).ToArray(), observations, findings) { Timings = timings };
     }
     private static DateTimeOffset? ParseTime(string date, string time, TimeZoneInfo zone)
     {

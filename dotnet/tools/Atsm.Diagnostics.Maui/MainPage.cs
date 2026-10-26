@@ -40,7 +40,7 @@ public sealed class MainPage : ContentPage
     private readonly ScrollView _sourceScroll;
     private readonly List<Button> _tabButtons = [];
     private readonly IDispatcherTimer _refresh;
-    private readonly string[] _tabs = [T("View.Wire"), T("View.Messages"), T("View.Observations"), T("View.Findings"), T("View.Quality"), T("View.Events"), T("View.Catalog")];
+    private readonly string[] _tabs = [T("View.Wire"), T("View.Messages"), T("View.Observations"), T("View.Findings"), T("View.Quality"), T("View.Events"), T("View.Catalog"), T("View.Communication")];
     private readonly DiagnosticInputFormat[] _inputFormats = [DiagnosticInputFormat.Auto, DiagnosticInputFormat.Export, DiagnosticInputFormat.AstmMessage, DiagnosticInputFormat.Hl7Message, DiagnosticInputFormat.SysmexLog, DiagnosticInputFormat.LegacyLog, DiagnosticInputFormat.WireBytes, DiagnosticInputFormat.AtsmTrace];
     private DiagnosticCase? _case;
     private DiagnosticAnalysis? _analysis;
@@ -52,6 +52,7 @@ public sealed class MainPage : ContentPage
     private byte[]? _sourceBytes;
     private string? _sourceName;
     private string? _detectedProfile;
+    private string? _protocolNotice;
     private int _tab = 2, _lastCount = -1;
     public bool IsCapturing => _liveStop is not null;
     private DiagnosticInstrument SelectedInstrument => _catalog.Instruments[_profiles.SelectedIndex];
@@ -124,7 +125,7 @@ public sealed class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=13, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, seven-views-raw-and-interpreted, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=14, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-control-partial, communication-statistics, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name); Environment.Exit(1); }
             });
         }
@@ -329,9 +330,11 @@ public sealed class MainPage : ContentPage
             }
             _case = DiagnosticReader.RevalidateProtocol(_case, Profile);
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
-            if (_analysis.Diagnostics.FirstOrDefault(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") is { } unsupported) _status.Text = DiagnosticText.Finding(unsupported, Profile);
+            if (_analysis.Diagnostics.FirstOrDefault(d => d.Code is "ATSM-DIAG-UNSUPPORTED-PROTOCOL" or "ATSM-UF-CONTROL-PARTIAL") is { } protocolNotice)
+                _status.Text = _protocolNotice = DiagnosticText.Finding(protocolNotice, Profile);
             else if (_status.Text == DiagnosticText.Text("Detection.Unsupported") || _status.Text == DiagnosticText.Text("Finding.UnsupportedBinary")
-                || _status.Text == DiagnosticText.Text("Finding.ATSM-DIAG-UNSUPPORTED-PROTOCOL")) _status.Text = T("View.FileRead");
+                || _status.Text == DiagnosticText.Text("Finding.ATSM-DIAG-UNSUPPORTED-PROTOCOL") || _status.Text == _protocolNotice)
+            { _status.Text = T("View.FileRead"); _protocolNotice = null; }
             _summary.Text = F("View.Summary", _case.Entries.Count, _analysis.Messages.Count, _analysis.Observations.Count, _analysis.Diagnostics.Count); ShowTable();
         }
         catch (Exception error) { ShowError(error); }
@@ -344,7 +347,7 @@ public sealed class MainPage : ContentPage
         var interpreted = _interpret.IsChecked;
         foreach (var (button, index) in _tabButtons.Select((b, i) => (b, i))) button.BackgroundColor = index == _tab ? Teal : Color.FromArgb("#38576B");
         string[] headers; IEnumerable<DiagnosticRow> rows;
-        string D(string raw) => interpreted ? DiagnosticText.Direction(raw) : raw;
+        string D(string raw) => interpreted ? CaptureDirection(raw) : raw;
         string Detail(string meaning, string raw) => meaning + "\n\n" + DiagnosticText.Text("Original") + "\n" + raw;
         var unsupported = _analysis?.Diagnostics.Any(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") == true;
         switch (_tab)
@@ -421,6 +424,9 @@ public sealed class MainPage : ContentPage
                     return Row(interpreted ? [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), meaning] : [DiagnosticText.Text("Level." + item.Level), item.Sequence.ToString(), item.Code, item.Detail ?? ""],
                         Detail(meaning, item.Level + "\n" + item.Code + "\n" + item.Detail), item.Level.ToString(), item.Code);
                 }); break;
+            case 7:
+                headers = [T("Timing.Metric"), T("Column.Direction"), T("Timing.N"), T("Timing.Minimum"), T("Timing.Median"), T("Timing.P95"), T("Timing.Maximum"), T("Timing.Pending")];
+                _table.SetGroups("communication", headers, CommunicationGroups(), 0); return;
             default:
                 headers = [T("Column.Profile"), T("Column.Configuration"), T("Column.Evidence")];
                 rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration)), string.Join(" · ", instrument.Profiles.Select(p => p.Evidence).Distinct(StringComparer.Ordinal))],
@@ -428,6 +434,38 @@ public sealed class MainPage : ContentPage
         }
         var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 2 };
         _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible);
+    }
+    private string CaptureDirection(string direction)
+    {
+        if (direction == "All") return T("Timing.All");
+        if (direction == nameof(TraceDirection.Event)) return DiagnosticText.Direction(direction);
+        if (_case?.Header.Properties?.GetValueOrDefault("directionUncertain") != "true") return DiagnosticText.Direction(direction);
+        var reversed = _case.Header.Properties.GetValueOrDefault("recordedBy") == nameof(RecordedBy.Instrument);
+        var read = (direction == nameof(TraceDirection.Received)) != reversed;
+        return T(read ? "Timing.CaptureRead" : "Timing.CaptureWrite");
+    }
+    private IReadOnlyList<DiagnosticRowGroup> CommunicationGroups()
+    {
+        static string Ms(TimeSpan? value) => value?.TotalMilliseconds.ToString("G6", CultureInfo.CurrentCulture) ?? "—";
+        var groups = new List<DiagnosticRowGroup>();
+        if (_analysis is null) return groups;
+        foreach (var item in CommunicationStatistics.Build(_analysis, _case is not null && CommunicationStatistics.HasCaptureClock(_case)))
+        {
+            var stats = item.Distribution; var metric = T("Timing." + item.Code); var direction = CaptureDirection(item.Direction);
+            if (item.ExchangeCode is { } exchange && Profile.TracePlugin is { } plugin
+                && _analysis.Timings.FirstOrDefault(t => t.Code == exchange && t.Kind.ToString() == item.Code)?.Explanation is { } explanation)
+                metric += " · " + DiagnosticText.Explanation(plugin, explanation);
+            var key = DiagnosticGrouping.Key(item.Code, item.Direction, item.ExchangeCode);
+            var detail = T("Timing.Detail") + "\n" + F("Timing.Flow", item.Reads, item.Bytes, item.InvalidIntervals)
+                + (item.ExchangeCode is { } code ? "\n" + code : "") + (item.Pending > 0 ? "\n" + T("Timing.NoEnd") : "")
+                + (item.ClockAvailable ? "" : "\n" + T("Timing.NoClock"));
+            var children = item.Intervals.Select(i => new DiagnosticRow([i.FirstSequence + " → " + i.LastSequence, direction, "1", "", Ms(i.Duration), "", "", ""],
+                F("Timing.Boundaries", i.FirstSequence, i.LastSequence, Ms(i.Duration)) + "\n" + T("Timing.Detail"), key)).ToArray();
+            var pending = item.Code is "ReadInterval" or "DirectionTurn" or "MessageReception" ? "—" : item.Pending.ToString(CultureInfo.CurrentCulture);
+            groups.Add(new(key, children) { SummaryRow = new([metric, direction, stats.Count.ToString(CultureInfo.CurrentCulture), Ms(stats.Minimum), Ms(stats.Median), Ms(stats.P95), Ms(stats.Maximum), pending], detail, key)
+                { Attention = item.InvalidIntervals > 0 } });
+        }
+        return groups;
     }
     private IReadOnlyList<DiagnosticRowGroup> QualityGroups()
     {
@@ -506,7 +544,7 @@ public sealed class MainPage : ContentPage
         {
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
-            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 13 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
+            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 14 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ATSM-MAUI-SELFTEST");
             var quality = QualitySeriesBuilder.Build(analyzed.Observations);
             if (quality.Sum(s => s.NumericCount) != 2 || quality.Sum(s => s.MeasurementCount) != 3 || QualityGroups().Any(g => g.SummaryRow is null)) throw new InvalidDataException("ATSM-MAUI-QUALITY-SELFTEST");
             var unknownCq = QualityGroups().Single(g => g.Children.Any(r => r.Cells[5] == "Undetermined"));
@@ -525,7 +563,7 @@ public sealed class MainPage : ContentPage
         foreach (var interpreted in new[] { false, true })
         {
             _interpret.IsChecked = interpreted;
-            for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
+            for (_tab = 0; _tab < _tabs.Length; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
         }
         if (_title.Handler?.PlatformView is not Microsoft.UI.Xaml.Controls.TextBlock { IsTextSelectionEnabled: true })
             throw new InvalidOperationException("ATSM-MAUI-TEXT-NOT-SELECTABLE");
@@ -562,12 +600,39 @@ public sealed class MainPage : ContentPage
         foreach (var interpreted in new[] { false, true })
         {
             _interpret.IsChecked = interpreted;
-            for (_tab = 0; _tab < 7; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
+            for (_tab = 0; _tab < _tabs.Length; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
         }
         _tab = 4; ShowTable();
         VerifySemanticPresentation();
         VerifyQualityPresentation();
         VerifyKnowledgePresentation();
+        VerifyControlCommunication();
+    }
+    private void VerifyControlCommunication()
+    {
+        _interpret.IsChecked = true; SelectProfile(SysmexUrinalysisPlugin.WithChemistryProfile);
+        var notice = new byte[266]; notice[0] = 1; notice[265] = 3;
+        Encoding.ASCII.GetBytes("SYNTHETIC").CopyTo(notice.AsSpan(3)); Encoding.ASCII.GetBytes("Limpieza").CopyTo(notice.AsSpan(37));
+        Encoding.ASCII.GetBytes("DBS_LANG_02215Necesidad").CopyTo(notice.AsSpan(87)); Encoding.ASCII.GetBytes("DBS_LANG_01745").CopyTo(notice.AsSpan(151));
+        var block = new byte[] { 2, 0, 0, 0, 0, 0, 247, 9, 100, 0, 0, 0, 3 };
+        _case = DiagnosticReader.Read(notice, DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero);
+        _case = _case with { Header = _case.Header with { Properties = new Dictionary<string, string>(_case.Header.Properties!) { ["timingSource"] = "synthetic" } } };
+        _case = _case with { Entries = [new(0, TimeSpan.Zero, DateTimeOffset.UnixEpoch, TraceDirection.Received, notice[..100]),
+            new(1, TimeSpan.FromMilliseconds(10), DateTimeOffset.UnixEpoch, TraceDirection.Received, notice[100..]),
+            new(2, TimeSpan.FromMilliseconds(100), DateTimeOffset.UnixEpoch, TraceDirection.Received, block),
+            new(3, TimeSpan.FromMilliseconds(110), DateTimeOffset.UnixEpoch, TraceDirection.Received, block)] };
+        Analyze();
+        if (Profile.Id != SysmexUrinalysisPlugin.UfControlProfile || _analysis!.Messages.Count != 3 || _analysis.Observations.Count != 1
+            || ProtocolExplainer.ResultValue(_analysis.Observations[0], Profile) != "Limpieza requerida"
+            || CaptureDirection("Received") != T("Timing.CaptureRead")) throw new InvalidDataException("ATSM-MAUI-UF-CONTROL-SELFTEST");
+        var flow = CommunicationGroups().First();
+        if (flow.SummaryRow!.Cells[2] != "3" || flow.SummaryRow.Cells[4] != "10" || flow.SummaryRow.Cells[6] != "90" || flow.Children.Count != 3)
+            throw new InvalidDataException("ATSM-MAUI-COMMUNICATION-SELFTEST");
+        _tab = 7; ShowTable(); _table.VerifyAutomaticLayout();
+        _case = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero); Analyze();
+        if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile || _status.Text.Contains("Interpretación parcial", StringComparison.Ordinal))
+            throw new InvalidDataException("ATSM-MAUI-UF-STALE-STATUS-SELFTEST");
+        _tab = 7; ShowTable(); _table.VerifyAutomaticLayout();
     }
     private void VerifyKnowledgePresentation()
     {

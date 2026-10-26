@@ -68,7 +68,7 @@ public sealed class DiagnosticCatalog
         foreach (var plugin in TracePlugins)
         foreach (var profile in plugin.Profiles)
             profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, string.Join(", ", plugin.Describe().Models), profile.Protocol,
-                "Manual y captura local; intérprete pasivo de órdenes, respuestas y resultados. Sin envío de órdenes ni homologación en hardware.")
+                string.Join("; ", profile.Evidence))
             { TracePlugin = plugin, TraceProfile = profile });
         foreach (var plugin in ContentPlugins)
         foreach (var profile in plugin.Profiles)
@@ -118,7 +118,7 @@ public sealed class DiagnosticCatalog
         var family = Instruments.Single(i => i.Id == selected.InstrumentId);
         var segments = input.Entries.Select(e => new TraceSegment(e.Utc, e.Direction,
             e.Code == TraceReconstruction.MessageCode ? SegmentContent.Message : SegmentContent.Wire, e.Data)).ToArray();
-        var matched = family.Profiles.Where(p => p.TracePlugin?.Recognizes(segments) == true).ToArray();
+        var matched = family.Profiles.Where(p => p.TracePlugin?.Recognizes(p.TraceProfile!, segments) == true).ToArray();
         var astm = DiagnosticInputDetector.HasAstmHeader(segments);
         if (matched.Length > 1 || matched.Length == 1 && astm) throw new InvalidDataException("ATSM-DIAG-AMBIGUOUS-INPUT");
         if (matched.Length == 1) return matched[0];

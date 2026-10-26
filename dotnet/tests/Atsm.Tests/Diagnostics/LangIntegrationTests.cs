@@ -28,6 +28,7 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Sysmex.XnL", "ip.PLT_Clumps?")] = "SOSPECHA TRADUCIDA";
         database.Translations[("Atsm.Plugin.Diagast.Qwalys", "reaction.A.CMP")] = "COMPATIBILIDAD TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "research.BACT-Info..3")] = "INDICADOR TRADUCIDO";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "uf.need.DBS_LANG_02215")] = "LIMPIEZA TRADUCIDA";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -64,6 +65,9 @@ public sealed class LangIntegrationTests
             Instrument = observation.Instrument with { Model = "U-WAM" }, VendorIdentity = new(new Dictionary<string, string> { ["instrument.id"] = "UF-5000" }),
             ResultKind = "S/RAW", Value = new("3", Coded: new("3", null, "urn:synthetic")) };
         Assert.Equal("INDICADOR TRADUCIDO", ProtocolExplainer.ResultValue(research, profile));
+        var ufNeed = observation with { Test = Atsm.Abstractions.Model.CodeSet.Of(new("DBS_LANG_02215", null, "urn:atsm:vendor:sysmex.uf.control")), Value = new("Necesidad") };
+        Assert.Equal("LIMPIEZA TRADUCIDA", ProtocolExplainer.ResultValue(ufNeed, catalog.Resolve(SysmexUrinalysisPlugin.UfControlProfile)));
+        Assert.Equal("Necesidad", ufNeed.Value.RawText);
         Assert.Equal(ConnectionState.Open, database.State);
     }
 
