@@ -8,11 +8,6 @@
 namespace remoteusb {
 
 struct TlsServerSettings {
-    // Legacy file paths of the JSON configuration (retired in P-16 stage 4); TlsMaterial takes precedence.
-    std::string certificate_file;
-    std::string private_key_file;
-    std::string private_key_password;
-    std::string client_ca_file;
     bool require_client_certificate = true;
     bool minimum_tls13 = false;
 };

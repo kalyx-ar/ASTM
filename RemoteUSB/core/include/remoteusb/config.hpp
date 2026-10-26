@@ -88,9 +88,6 @@ struct AgentConfig {
     std::vector<PortConfig> ports;
 };
 
-/// Legacy JSON form (schema "remoteusb/1"); retired when TLS provisioning through the admin endpoint lands (P-16, stage 4).
-std::optional<AgentConfig> parse_config(const std::string& text, std::string& error);
-
 /// CBOR form used by SetConfig/GetConfig and by the protected state. Private keys and PSKs are never encoded here:
 /// TLS material travels only through SetTls.
 cbor::Value encode_config(const AgentConfig& config);

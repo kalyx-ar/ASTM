@@ -201,7 +201,7 @@ public:
         mbedtls_x509_crt_init(&ca_);
         if (!global_init(error)) return false;
 
-        const bool has_certificate = material.has_certificate() || !settings.certificate_file.empty();
+        const bool has_certificate = material.has_certificate();
         if (!has_certificate && !material.has_psk()) {
             error = "TLS needs a certificate and key or a pre-shared key";
             return false;
@@ -213,21 +213,11 @@ public:
             ret = mbedtls_pk_parse_key(&key_, reinterpret_cast<const unsigned char*>(material.private_key_pem.c_str()), material.private_key_pem.size() + 1,
                                        nullptr, 0);
             if (ret != 0) return fail(error, "private key", ret);
-        } else if (has_certificate) {
-            ret = mbedtls_x509_crt_parse_file(&certificate_, settings.certificate_file.c_str());
-            if (ret != 0) return fail(error, "certificate " + settings.certificate_file, ret);
-            ret = mbedtls_pk_parse_keyfile(&key_, settings.private_key_file.c_str(),
-                                           settings.private_key_password.empty() ? nullptr : settings.private_key_password.c_str());
-            if (ret != 0) return fail(error, "private key " + settings.private_key_file, ret);
         }
         bool has_ca = false;
         if (!material.ca_pem.empty()) {
             ret = parse_certificates(&ca_, material.ca_pem);
             if (ret != 0) return fail(error, "client CA", ret);
-            has_ca = true;
-        } else if (!settings.client_ca_file.empty()) {
-            ret = mbedtls_x509_crt_parse_file(&ca_, settings.client_ca_file.c_str());
-            if (ret != 0) return fail(error, "client CA " + settings.client_ca_file, ret);
             has_ca = true;
         }
         if (settings.require_client_certificate && !has_ca && !material.has_psk()) {

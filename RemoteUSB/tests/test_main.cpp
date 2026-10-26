@@ -20,6 +20,11 @@
 #include "remoteusb/link.hpp"
 #include "remoteusb/state.hpp"
 #include "remoteusb/supervisor.hpp"
+#include "remoteusb/transport.hpp"
+
+extern "C" {
+#include "mbedtls/ssl.h"
+}
 
 using namespace remoteusb;
 using cbor::Value;
@@ -196,44 +201,42 @@ void test_arbiter() {
     CHECK(events.size() == 1 && events[0].code == "REMOTEUSB-QUEUE-TIMEOUT");
 }
 
-void test_config() {
-    std::string error;
-    const char* valid = R"({"schemaVersion":"remoteusb/1","agentId":"a1","listen":{"host":"127.0.0.1","port":0},
-        "ports":[{"portId":"p1","instrumentId":"i1","device":{"kind":"serial","path":"COM3","baudRate":9600,"parity":"None"},
-        "ownership":{"leaseMs":15000,"controllers":[{"id":"edc-server-a","priority":10}]}}]})";
-    auto config = parse_config(valid, error);
-    CHECK(config && config->ports.size() == 1 && config->ports[0].controllers.at("edc-server-a") == 10);
-
-    error.clear();
-    CHECK(!parse_config(R"({"schemaVersion":"remoteusb/1","agentId":"a1","listen":{"port":1},"ports":[{"portId":"p","instrumentId":"i","device":{"kind":"serial","path":"COM1","baudrate":9600}}]})", error));
-    CHECK(error.find("baudrate") != std::string::npos);
-    error.clear();
-    CHECK(!parse_config(R"({"schemaVersion":"remoteusb/1",)", error));
-
-    error.clear();
-    auto tls = parse_config(R"({"schemaVersion":"remoteusb/1","agentId":"a1","listen":{"port":0,"tls":{"mode":"Tls","certificate":"s.pem","privateKey":"s.key","clientCa":"ca.pem","minimumVersion":"1.3"}},
-        "ports":[{"portId":"p","instrumentId":"i","device":{"kind":"tcp","host":"h","port":1},
-        "ownership":{"controllers":[{"id":"edc","certificateSha256":"AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"}]}}]})", error);
-    CHECK(tls && tls->tls == TlsMode::Tls && tls->tls_settings.minimum_tls13 && tls->tls_settings.require_client_certificate);
-    CHECK(tls && tls->ports[0].controller_certificates.at("edc") == "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899");
-
-    error.clear();
-    CHECK(!parse_config(R"({"schemaVersion":"remoteusb/1","agentId":"a1","listen":{"port":0,"tls":{"mode":"Tls","certificate":"s.pem","privateKey":"s.key"}},"ports":[{"portId":"p","instrumentId":"i","device":{"kind":"tcp","host":"h","port":1}}]})", error));
-    CHECK(error.find("clientCa") != std::string::npos);
-}
-
-void test_tls_refuses_to_start_without_valid_files() {
+void test_tls_material() {
     AgentConfig config;
     config.agent_id = "tls";
     config.listen_host = "127.0.0.1";
     config.tls = TlsMode::Tls;
-    config.tls_settings.certificate_file = "missing-certificate.pem";
-    config.tls_settings.private_key_file = "missing-key.pem";
-    config.tls_settings.client_ca_file = "missing-ca.pem";
-    Agent agent(config, [](LogLevel, const std::string&) {});
     std::string error;
-    CHECK(!agent.start(error));
-    CHECK(!error.empty());
+    {
+        Agent agent(config, [](LogLevel, const std::string&) {});
+        CHECK(!agent.start(error) && error.find("certificate and key or a pre-shared key") != std::string::npos);
+    }
+    TlsMaterial broken;
+    broken.certificate_pem = "-----BEGIN CERTIFICATE-----\nnot a certificate\n-----END CERTIFICATE-----\n";
+    broken.private_key_pem = "not a key";
+    error.clear();
+    {
+        Agent agent(config, [](LogLevel, const std::string&) {}, broken);
+        CHECK(!agent.start(error) && !error.empty());
+    }
+    TlsMaterial generated;
+    CHECK(tls::generate_self_signed("unit", generated, error));
+    CHECK(tls::certificate_sha256(generated.certificate_pem).size() == 64);
+    error.clear();
+    {
+        // Client certificates required but no CA to verify them: refused instead of accepting anybody.
+        Agent agent(config, [](LogLevel, const std::string&) {}, generated);
+        CHECK(!agent.start(error) && error.find("client CA") != std::string::npos);
+    }
+    config.tls_settings.require_client_certificate = false;
+    error.clear();
+    {
+        Agent agent(config, [](LogLevel, const std::string&) {}, generated);
+        CHECK(platform::network_startup(error));
+        CHECK(agent.start(error));
+        agent.shutdown();
+        platform::network_cleanup();
+    }
 }
 
 /// Fake instrument: a TCP server that the agent uses as its "serial" device.
@@ -664,6 +667,117 @@ void test_supervisor_administration() {
     std::filesystem::remove_all(fixed_directory, ignored);
 }
 
+/// Minimal TLS-PSK client (Mbed TLS) for the administration endpoint; .NET SslStream has no PSK support.
+struct PskClient {
+    platform::Socket socket;
+    mbedtls_ssl_config config;
+    mbedtls_ssl_context ssl;
+    link::Decoder decoder{1024 * 1024};
+    std::vector<link::Unit> pending;
+
+    PskClient() {
+        mbedtls_ssl_config_init(&config);
+        mbedtls_ssl_init(&ssl);
+    }
+    ~PskClient() {
+        mbedtls_ssl_free(&ssl);
+        mbedtls_ssl_config_free(&config);
+    }
+
+    static int bio_send(void* context, const unsigned char* data, std::size_t size) {
+        return static_cast<PskClient*>(context)->socket.send_all(data, size) ? static_cast<int>(size) : -1;
+    }
+    static int bio_receive(void* context, unsigned char* buffer, std::size_t size, std::uint32_t timeout_ms) {
+        const int n = static_cast<PskClient*>(context)->socket.receive(buffer, size, timeout_ms == 0 ? 1000 : static_cast<int>(timeout_ms));
+        return n == -2 ? MBEDTLS_ERR_SSL_TIMEOUT : n < 0 ? -1 : n;
+    }
+
+    bool connect(std::uint16_t port, const std::string& identity, const std::vector<std::uint8_t>& psk) {
+        std::string error;
+        auto s = platform::Socket::connect("127.0.0.1", port, 3000, error);
+        if (!s) return false;
+        socket = std::move(*s);
+        if (mbedtls_ssl_config_defaults(&config, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT) != 0) return false;
+        mbedtls_ssl_conf_authmode(&config, MBEDTLS_SSL_VERIFY_NONE);  // the PSK authenticates both ends
+        mbedtls_ssl_conf_read_timeout(&config, 100);
+        if (mbedtls_ssl_conf_psk(&config, psk.data(), psk.size(), reinterpret_cast<const unsigned char*>(identity.data()), identity.size()) != 0) return false;
+        mbedtls_ssl_conf_tls13_key_exchange_modes(&config, MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL);
+        if (mbedtls_ssl_setup(&ssl, &config) != 0) return false;
+        mbedtls_ssl_set_bio(&ssl, this, bio_send, nullptr, bio_receive);
+        const auto deadline = platform::monotonic_ms() + 5000;
+        int ret;
+        while ((ret = mbedtls_ssl_handshake(&ssl)) != 0) {
+            if ((ret == MBEDTLS_ERR_SSL_TIMEOUT || ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE) && platform::monotonic_ms() < deadline) continue;
+            return false;
+        }
+        return true;
+    }
+
+    bool send(const link::Unit& unit) {
+        const auto bytes = link::encode(unit);
+        return mbedtls_ssl_write(&ssl, bytes.data(), bytes.size()) == static_cast<int>(bytes.size());
+    }
+
+    std::optional<link::Unit> next(link::Type type) {
+        const auto deadline = platform::monotonic_ms() + 5000;
+        while (platform::monotonic_ms() < deadline) {
+            for (auto it = pending.begin(); it != pending.end(); ++it)
+                if (it->type == type) {
+                    auto unit = std::move(*it);
+                    pending.erase(it);
+                    return unit;
+                }
+            std::uint8_t buffer[4096];
+            const int n = mbedtls_ssl_read(&ssl, buffer, sizeof(buffer));
+            if (n == MBEDTLS_ERR_SSL_TIMEOUT || n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) continue;
+            if (n <= 0) return std::nullopt;
+            decoder.feed(buffer, static_cast<std::size_t>(n), pending);
+        }
+        return std::nullopt;
+    }
+};
+
+void test_admin_psk_fixed_at_installation() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    const auto directory = temporary_directory("psk");
+    SupervisorOptions options;
+    options.state_directory = directory;
+    options.admin_host = "127.0.0.1";
+    options.admin_port = 0;
+    options.agent_name = "psk";
+    options.device_poll_ms = 100000;
+    options.install_psk_identity = "edc-central";
+    options.install_psk = std::vector<std::uint8_t>(32, 0x5A);
+    Supervisor supervisor(options, [](LogLevel, const std::string&) {});
+    CHECK(supervisor.start(error));
+
+    PskClient wrong;
+    CHECK(!wrong.connect(supervisor.admin_port(), "edc-central", std::vector<std::uint8_t>(32, 0x00)));  // wrong key: no handshake
+
+    PskClient client;
+    CHECK(client.connect(supervisor.admin_port(), "edc-central", options.install_psk));
+    CHECK(client.send(link::control(link::Type::Hello, 0, Value::map({{0, Value::uint(1)}, {1, Value::text("admin")}, {2, Value::text("edc-central")}}))));
+    CHECK(client.next(link::Type::Hello).has_value());
+    CHECK(client.send(link::control(link::Type::GetStatus, 0, Value::map({{0, Value::uint(1)}}))));
+    auto status = client.next(link::Type::AdminResult);
+    CHECK(status && *link::parse_map(*status)->get(1)->as_bool() && *link::parse_map(*status)->get(4)->get(6)->as_bool());
+
+    // Over this channel TLS material is accepted; a plain client is not the fixed server.
+    CHECK(client.send(link::control(link::Type::SetTls, 0, Value::map({{0, Value::uint(2)}, {1, Value::uint(0)}, {5, Value::text("edc")}, {6, Value::bytes(cbor::Bytes(32, 7))}}))));
+    auto installed = client.next(link::Type::AdminResult);
+    CHECK(installed && *link::parse_map(*installed)->get(1)->as_bool());
+    Client plain = hello_client(supervisor.admin_port(), "admin", "edc-central");
+    auto refused = plain.next(link::Type::AdminResult);
+    CHECK(refused && *link::parse_map(*refused)->get(2)->as_text() == "REMOTEUSB-ADMIN-NOT-AUTHORIZED");
+    plain.socket.close();
+    mbedtls_ssl_close_notify(&client.ssl);
+    supervisor.shutdown();
+    platform::network_cleanup();
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+}
+
 void test_handover_and_plain_security() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -757,14 +871,15 @@ int main(int argc, char** argv) {
     test_link_decoder();
     test_vectors_file();
     test_arbiter();
-    test_config();
-    test_tls_refuses_to_start_without_valid_files();
+
+    test_tls_material();
     test_agent_end_to_end();
     test_config_cbor();
     test_state_and_events();
     test_arbiter_semaphore();
     test_supervisor_administration();
     test_handover_and_plain_security();
+    test_admin_psk_fixed_at_installation();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

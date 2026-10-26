@@ -50,7 +50,7 @@ public:
     /// Runs the handshake on an accepted socket. Returns nullptr and an error on failure (never falls back to plain).
     virtual std::unique_ptr<Transport> accept(platform::Socket socket, int timeout_ms, std::string& error) = 0;
 
-    /// Certificate and key from `material` (PEM) or, for the legacy JSON configuration, from the files of `settings`.
+    /// Certificate, key and client CA from `material` (PEM, provisioned through SetTls).
     /// A PSK in `material` enables (EC)DHE-PSK key exchanges; plain PSK without forward secrecy is never offered.
     static std::unique_ptr<TlsServer> create(const TlsServerSettings& settings, const TlsMaterial& material, std::string& error);
     static bool available();

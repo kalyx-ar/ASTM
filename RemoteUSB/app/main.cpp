@@ -1,19 +1,19 @@
 // remoteusb: serial ↔ TCP bridge with exclusive controller arbitration (RemoteUSB Link v1), administered remotely
 // (spec/admin-v1.md). It keeps only the configuration in force and always starts with it.
+#include <algorithm>
 #include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <mutex>
-#include <sstream>
 #include <string>
+#include <vector>
 
-#include "remoteusb/agent.hpp"
 #include "remoteusb/supervisor.hpp"
+#include "service.hpp"
 
 namespace {
 
@@ -32,10 +32,27 @@ const char* level_name(remoteusb::LogLevel level) {
 }
 
 int usage() {
-    std::cerr << "usage: remoteusb run [--state <dir>] [--admin <host:port>] [--name <agent>]\n"
-                 "                     [--server-cert <sha256>] [--psk <identity>:<hex>] [--quiet]\n"
-                 "       remoteusb --config <agent.json> [--quiet]   (legacy, retired in P-16 stage 4)\n";
+    std::cerr << "usage: remoteusb run [options]                 run in this console\n"
+                 "       remoteusb service install [options]     install the service (automatic start)\n"
+                 "       remoteusb service uninstall [--state <dir>] [--purge]\n"
+                 "       remoteusb service start | stop\n"
+                 "options: --state <dir>  --admin <host:port> (default 0.0.0.0:28240)  --name <agent>\n"
+                 "         --server-cert <sha256> | --psk <identity>:<hex>   fix the administering server at installation\n"
+                 "         --quiet\n";
     return 64;
+}
+
+std::string stamp() {
+    const std::time_t now = std::time(nullptr);
+    std::tm utc{};
+#ifdef _WIN32
+    gmtime_s(&utc, &now);
+#else
+    gmtime_r(&now, &utc);
+#endif
+    char text[32];
+    std::strftime(text, sizeof(text), "%Y-%m-%dT%H:%M:%SZ", &utc);
+    return text;
 }
 
 remoteusb::Logger console_logger(bool quiet) {
@@ -43,29 +60,43 @@ remoteusb::Logger console_logger(bool quiet) {
     return [quiet](remoteusb::LogLevel level, const std::string& message) {
         if (quiet && level == remoteusb::LogLevel::Debug) return;
         std::lock_guard<std::mutex> lock(log_mutex);
-        const std::time_t now = std::time(nullptr);
-        std::tm utc{};
-#ifdef _WIN32
-        gmtime_s(&utc, &now);
-#else
-        gmtime_r(&now, &utc);
-#endif
-        char stamp[32];
-        std::strftime(stamp, sizeof(stamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
-        std::cerr << stamp << " " << level_name(level) << " " << message << std::endl;
+        std::cerr << stamp() << " " << level_name(level) << " " << message << std::endl;
     };
+}
+
+/// Service log next to the state (the directory is protected by `service install`), bounded to two files of 1 MiB.
+remoteusb::Logger file_logger(const std::string& directory, bool quiet) {
+    static std::mutex log_mutex;
+    const std::string path = remoteusb::platform::join_path(directory, "remoteusb.log");
+    return [quiet, path](remoteusb::LogLevel level, const std::string& message) {
+        if (quiet && level == remoteusb::LogLevel::Debug) return;
+        std::lock_guard<std::mutex> lock(log_mutex);
+        std::string ignored;
+        if (remoteusb::platform::file_size(path) > 1024 * 1024) remoteusb::platform::replace_file(path, path + ".1", ignored);
+        const std::string line = stamp() + " " + level_name(level) + " " + message + "\n";
+        remoteusb::platform::append_file(path, remoteusb::platform::Bytes(line.begin(), line.end()), ignored);
+    };
+}
+
+std::string environment(const char* name, const std::string& fallback) {
+#ifdef _WIN32
+    char* value = nullptr;
+    std::size_t length = 0;
+    std::string out = fallback;
+    if (_dupenv_s(&value, &length, name) == 0 && value) {
+        out = value;
+        std::free(value);
+    }
+    return out;
+#else
+    const char* value = std::getenv(name);
+    return value ? value : fallback;
+#endif
 }
 
 std::string default_state_directory() {
 #ifdef _WIN32
-    char* value = nullptr;
-    std::size_t length = 0;
-    std::string base = "C:\\ProgramData";
-    if (_dupenv_s(&value, &length, "ProgramData") == 0 && value) {
-        base = value;
-        std::free(value);
-    }
-    return base + "\\RemoteUSB";
+    return environment("ProgramData", "C:\\ProgramData") + "\\RemoteUSB";
 #else
     return "/var/lib/remoteusb";
 #endif
@@ -73,14 +104,7 @@ std::string default_state_directory() {
 
 std::string host_name() {
 #ifdef _WIN32
-    char* value = nullptr;
-    std::size_t length = 0;
-    std::string name = "remoteusb";
-    if (_dupenv_s(&value, &length, "COMPUTERNAME") == 0 && value) {
-        name = value;
-        std::free(value);
-    }
-    return name;
+    return environment("COMPUTERNAME", "remoteusb");
 #else
     std::ifstream file("/etc/hostname");
     std::string name;
@@ -98,8 +122,15 @@ bool parse_hex(const std::string& text, std::vector<std::uint8_t>& out) {
     return true;
 }
 
-int run_supervisor(int argc, char** argv) {
-    remoteusb::SupervisorOptions options;
+struct RunOptions {
+    remoteusb::SupervisorOptions supervisor;
+    bool quiet = false;
+    bool purge = false;
+};
+
+/// Parses the `run` options; returns 0 or an exit code.
+int parse(const std::vector<std::string>& args, RunOptions& out) {
+    auto& options = out.supervisor;
     options.state_directory = default_state_directory();
     options.agent_name = host_name();
 #ifdef _WIN32
@@ -107,25 +138,24 @@ int run_supervisor(int argc, char** argv) {
 #else
     options.platform_profile = "posix";
 #endif
-    bool quiet = false;
-    for (int i = 2; i < argc; ++i) {
-        const std::string arg = argv[i];
-        const bool has_value = i + 1 < argc;
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string& arg = args[i];
+        const bool has_value = i + 1 < args.size();
         if (arg == "--state" && has_value) {
-            options.state_directory = argv[++i];
+            options.state_directory = args[++i];
         } else if (arg == "--admin" && has_value) {
-            const std::string value = argv[++i];
+            const std::string& value = args[++i];
             const auto colon = value.rfind(':');
             if (colon == std::string::npos) return usage();
             options.admin_host = value.substr(0, colon);
             options.admin_port = static_cast<std::uint16_t>(std::stoul(value.substr(colon + 1)));
         } else if (arg == "--name" && has_value) {
-            options.agent_name = argv[++i];
+            options.agent_name = args[++i];
         } else if (arg == "--server-cert" && has_value) {
-            options.install_server_certificate_sha256 = argv[++i];
+            options.install_server_certificate_sha256 = args[++i];
             for (auto& c : options.install_server_certificate_sha256) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         } else if (arg == "--psk" && has_value) {
-            const std::string value = argv[++i];
+            const std::string& value = args[++i];
             const auto colon = value.find(':');
             if (colon == std::string::npos || !parse_hex(value.substr(colon + 1), options.install_psk) || options.install_psk.size() < 16) {
                 std::cerr << "--psk needs <identity>:<hex> with at least 16 random bytes\n";
@@ -133,75 +163,32 @@ int run_supervisor(int argc, char** argv) {
             }
             options.install_psk_identity = value.substr(0, colon);
         } else if (arg == "--quiet") {
-            quiet = true;
+            out.quiet = true;
+        } else if (arg == "--purge") {
+            out.purge = true;
         } else {
             return usage();
         }
     }
-    std::string error;
-    if (!remoteusb::platform::network_startup(error)) {
-        std::cerr << error << "\n";
-        return 71;
-    }
-    remoteusb::Supervisor supervisor(options, console_logger(quiet));
-    if (!supervisor.start(error)) {
-        std::cerr << "cannot start: " << error << "\n";
-        remoteusb::platform::network_cleanup();
-        return 69;
-    }
-    // Machine-readable lines for supervisors and tests that use an ephemeral port.
-    std::cout << "REMOTEUSB-ADMIN " << supervisor.admin_port() << " " << supervisor.admin_certificate_sha256() << std::endl;
-
-    std::signal(SIGINT, on_signal);
-    std::signal(SIGTERM, on_signal);
-    supervisor.run(g_stop);
-    supervisor.shutdown();
-    remoteusb::platform::network_cleanup();
     return 0;
 }
 
-int run_legacy(int argc, char** argv) {
-    std::string config_path;
-    bool quiet = false;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if (arg == "--config" && i + 1 < argc) config_path = argv[++i];
-        else if (arg == "--quiet") quiet = true;
-        else return usage();
-    }
-    if (config_path.empty()) return usage();
-    std::ifstream file(config_path, std::ios::binary);
-    if (!file) {
-        std::cerr << "cannot read " << config_path << "\n";
-        return 66;
-    }
-    std::stringstream text;
-    text << file.rdbuf();
+int run(const RunOptions& options, const remoteusb::Logger& logger, std::atomic<bool>& stop, bool announce) {
     std::string error;
-    auto config = remoteusb::parse_config(text.str(), error);
-    if (!config) {
-        std::cerr << "invalid configuration: " << error << "\n";
-        return 65;
-    }
-    const auto base = std::filesystem::absolute(std::filesystem::path(config_path)).parent_path();
-    for (auto* path : {&config->tls_settings.certificate_file, &config->tls_settings.private_key_file, &config->tls_settings.client_ca_file}) {
-        if (!path->empty() && std::filesystem::path(*path).is_relative()) *path = (base / *path).string();
-    }
     if (!remoteusb::platform::network_startup(error)) {
-        std::cerr << error << "\n";
+        logger(remoteusb::LogLevel::Error, error);
         return 71;
     }
-    remoteusb::Agent agent(std::move(*config), console_logger(quiet));
-    if (!agent.start(error)) {
-        std::cerr << "cannot start: " << error << "\n";
+    remoteusb::Supervisor supervisor(options.supervisor, logger);
+    if (!supervisor.start(error)) {
+        logger(remoteusb::LogLevel::Error, "cannot start: " + error);
         remoteusb::platform::network_cleanup();
         return 69;
     }
-    std::cout << "REMOTEUSB-LISTENING " << agent.listen_port() << std::endl;
-    std::signal(SIGINT, on_signal);
-    std::signal(SIGTERM, on_signal);
-    agent.run(g_stop);
-    agent.shutdown();
+    // Machine-readable line for supervisors and tests that use an ephemeral port.
+    if (announce) std::cout << "REMOTEUSB-ADMIN " << supervisor.admin_port() << " " << supervisor.admin_certificate_sha256() << std::endl;
+    supervisor.run(stop);
+    supervisor.shutdown();
     remoteusb::platform::network_cleanup();
     return 0;
 }
@@ -209,6 +196,35 @@ int run_legacy(int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc >= 2 && std::string(argv[1]) == "run") return run_supervisor(argc, argv);
-    return run_legacy(argc, argv);
+    const std::vector<std::string> args(argv + 1, argv + argc);
+    if (args.empty()) return usage();
+    RunOptions options;
+    if (args[0] == "run") {
+        if (const int code = parse({args.begin() + 1, args.end()}, options)) return code;
+        std::signal(SIGINT, on_signal);
+        std::signal(SIGTERM, on_signal);
+        return run(options, console_logger(options.quiet), g_stop, true);
+    }
+    if (args[0] == "service" && args.size() >= 2) {
+        const std::vector<std::string> rest(args.begin() + 2, args.end());
+        if (const int code = parse(rest, options)) return code;
+        if (args[1] == "run") {
+            std::string ignored;
+            remoteusb::platform::ensure_directory(options.supervisor.state_directory, ignored);
+            const auto logger = file_logger(options.supervisor.state_directory, options.quiet);
+            return remoteusb::service::dispatch([&](std::atomic<bool>& stop) { return run(options, logger, stop, false); });
+        }
+        if (args[1] == "install" || args[1] == "uninstall" || args[1] == "start" || args[1] == "stop") {
+            std::vector<std::string> stored;
+            for (const auto& arg : rest)
+                if (arg != "--purge") stored.push_back(arg);
+            // The state directory is fixed in the service command line so `uninstall --purge` and the ACL agree.
+            if (args[1] == "install" && std::find(stored.begin(), stored.end(), "--state") == stored.end()) {
+                stored.push_back("--state");
+                stored.push_back(options.supervisor.state_directory);
+            }
+            return remoteusb::service::command(args[1], stored, options.supervisor.state_directory, options.purge);
+        }
+    }
+    return usage();
 }

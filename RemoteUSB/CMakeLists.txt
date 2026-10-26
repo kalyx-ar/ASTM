@@ -40,8 +40,6 @@ add_library(remoteusb_core STATIC
     core/src/cbor.cpp
     core/src/link.cpp
     core/src/arbiter.cpp
-    core/src/json.cpp
-    core/src/config.cpp
     core/src/config_cbor.cpp
     core/src/events.cpp
     core/src/state.cpp
@@ -82,7 +80,12 @@ else()
     target_compile_options(remoteusb_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic -Werror>)
 endif()
 
-add_executable(remoteusb app/main.cpp)
+if(WIN32)
+    add_executable(remoteusb app/main.cpp app/service_win32.cpp)
+    target_link_libraries(remoteusb PRIVATE advapi32)
+else()
+    add_executable(remoteusb app/main.cpp app/service_posix.cpp)
+endif()
 target_link_libraries(remoteusb PRIVATE remoteusb_core)
 
 if(REMOTEUSB_BUILD_TESTS)
