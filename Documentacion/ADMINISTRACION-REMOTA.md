@@ -41,7 +41,7 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 | `SetTls` | servidor → agente | certificado, clave privada y CA de controladores, provistos por el servidor |
 | `DeviceEvent` | agente → servidor | aparición/desaparición de un dispositivo serie, con su identidad física |
 | `RevokePort` | servidor → agente | revoca la tenencia vigente de un puerto (mantenimiento o controlador defectuoso) |
-| `RequestHandover` / `HandoverAnswer` | controlador ↔ agente ↔ dueño | botón de peatón: pedido de cesión y respuesta del dueño |
+| `RequestHandover` / `HandoverAnswer` | controlador ↔ agente ↔ dueño | solicitud de cesión cooperativa y respuesta del dueño |
 | `KillSwitch`, `Contest`, `SecureClose` | servidor → agente | interrupción forzada, impugnación y cierre por seguridad (sólo TLS con autenticación mutua y permiso explícito) |
 | `ReadEvents` | servidor → agente | consulta del registro de eventos |
 | `Restart` | servidor → agente | reinicio controlado |
@@ -99,11 +99,11 @@ Lo que agrega la administración remota:
 
 Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; RemoteUSB acota el daño, pero no adivina cuándo terminó una tarea.
 
-## Botón de peatón, kill switch e impugnación
+## Solicitud de cesión, kill switch e impugnación
 
 Decisión humana del 2026-10-26. Asegurar el kill switch es indispensable; el kill switch y su impugnación son **opciones de seguridad** que el servidor habilita por puerto para la empresa que quiera tenerlas a mano. Las reglas de cuándo un corte es legítimo (ventana de mantenimiento, failover) son de la empresa y las aplica el servidor u observador, no RemoteUSB.
 
-### Botón de peatón (pedido de cesión)
+### Solicitud de cesión cooperativa (handover request)
 
 - Un controlador conectado que observa el semáforo envía `RequestHandover{portId, motivo}`. RemoteUSB lo reenvía al dueño y lo notifica a los observadores.
 - El dueño responde `HandoverAnswer{cede | mantiene}`. Si cede, libera y el puerto pasa por la cola normal (prioridad, luego orden). Si mantiene, el solicitante recibe la negativa.
@@ -151,4 +151,4 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 
 ## Pruebas requeridas
 
-Botón de peatón (cede, mantiene, sin respuesta, límite de pedidos); kill switch rechazado sin TLS o sin permiso, cuarentena sin ventaja para el solicitante, espera entre cortes, impugnación que corta y bloquea al solicitante, cierre por seguridad reabierto sólo por el administrador y registro persistente de eventos; semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
+Solicitud de cesión (cede, mantiene, sin respuesta, límite de pedidos); kill switch rechazado sin TLS o sin permiso, cuarentena sin ventaja para el solicitante, espera entre cortes, impugnación que corta y bloquea al solicitante, cierre por seguridad reabierto sólo por el administrador y registro persistente de eventos; semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
