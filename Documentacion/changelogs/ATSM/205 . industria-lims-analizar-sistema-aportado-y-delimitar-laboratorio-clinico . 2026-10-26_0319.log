@@ -1,0 +1,43 @@
+Fecha local: 2026-10-26 03:19 America/Buenos_Aires
+Issue: https://github.com/kalyx-ar/EDC/issues/205
+Alcance previo: issuecomment-6406750904, issuecomment-6408271252, issuecomment-6408514429, issuecomment-6408776174 e issuecomment-6409157408.
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6409576587
+Commits de código ATSM:
+  2b2e58f3612579c24239ec8de25a53748ca315f0
+  33abd2486c15b3cc80e40114ba2f7c8a93219580
+Tipo: feat/fix/refactor/test/docs.
+
+Decisiones aplicadas:
+- Decodificación binaria/hex y encuadre por longitud en el SDK neutral, declarados por layout del plugin. Mismos bytes/modelo sin importar representación. No se interpreta un formato propietario como ASTM sólo por contener STX/ETX.
+- Semántica ASTM H/P/O/R/Q/C/M/L, controles y conceptos comunes con seed único Atsm.Plugins. Extensiones por fabricante sólo donde cambia el significado/disposición. ProtoText.SourceAssembly selecciona propietario de traducción; originales intactos.
+- Familia Sysmex única, sin modelos inferidos de nombres de archivos. Perfil sysmex.uf.binary, sin aliases anteriores.
+- Se reconstruyen 2.193 envolturas que cubren los 500.444 bytes: 1.981 tipo 2, 105 tipo 6, 105 tipo 11, 2 tipo 12. Los patrones de 13 bytes están dentro del payload tipo 2; no se duplican.
+- 349 avisos técnicos por estructura: 205 cierre, 105 reactivo caducado, 31 material de control caducado, 6 RBC alto y 2 necesidades. Se admiten etiquetas/códigos nuevos. No se fabrican muestra, QC, magnitud ni ejecución de operación.
+- Trama/Mensajes/Eventos conservan orden y agrupan repeticiones consecutivas idénticas. Trama agrupa comunicaciones completas con lecturas originales; el detalle del padre muestra el mensaje reconstruido. Identificador estable una vez en el encabezado, cambios explícitos.
+- Colección observable persistente y actualización diferencial sin reemplazar filas iguales. Puerto Windows conserva offset/modo del panel nativo. Paginación por 300 grupos completos, sin cortar hijos.
+- Tiempos HH:mm:ss.fff, reloj ausente distinto de cero registrado. Distribuciones generales y respuestas verificadas separadas de duración total/proceso de operaciones largas con límites explícitos. No inferir ejecuciones desde Necesidad/Ejecute cierre.
+- Imágenes por referencia en tratamiento común, sin abrir recursos y fuera de estadísticas aritméticas. Notas de desarrollo/enlaces retirados de código/ensamblados; importación correcta no fabrica hallazgos. Omisiones/discrepancias reales con texto y cantidad concretos.
+
+Rutas afectadas:
+  dotnet/src/Atsm.Plugins/{TraceInterpreterContracts,DiagnosticVocabularyContracts,InstrumentContent,Tracing/BinaryWireParser}.cs
+  dotnet/plugins/Atsm.Plugin.Sysmex.Urinalysis (UF binario, UC, knowledge y vocabulario)
+  Vocabularios de Abbott ARCHITECT/CELL-DYN, Sysmex XN-L/CS-2500 y DIAGAST QWALYS
+  dotnet/tools/Atsm.Diagnostics.Core, Atsm.Diagnostics.Maui y Atsm.Tools.Trace
+  dotnet/tests/Atsm.Tests/Diagnostics
+  Documentacion/{ESTADO,CONTINUACION,PLUGINS,USABILIDAD-DIAGNOSTICS,DIAGNOSTICO-MANTENIMIENTO,UF-CONTROL-Y-TIEMPOS}.md
+
+Verificación:
+- dotnet test dotnet/Atsm.slnx -c Release --no-restore -p:AtsmRequireStrongName=true: 384 correctas, 0 fallos/0 omitidas, repetida, ~1 s de ejecución.
+- ctest --test-dir native/build/win-x64 -C Release: 542 comprobaciones, repetidas correctas, ~0,3 s. La ejecución restringida inicial no aceptó loopback; reejecuciones válidas con TCP local, sin aumentar timeouts.
+- Lang real opcional: 1 correcta, 171 ms. Traducciones comunes y específicas separadas.
+- GUI: publicación final autónoma/ReadyToRun en bin/Release, self-test correcto en 8,6 s. Ocho vistas, 14 perfiles, DPAPI, runtime privado, bloques/identificador, desplazamiento y grupo al borde de página.
+- CLI NativeAOT: publicación final y self-test correctos, auditoría de dependencias GUI correcta.
+- Corpus privado (sólo agregados, sin publicar): UF binario 34373 entradas/2193 mensajes/349 avisos; UF ASTM 7089/425/5006; UC 2006/501/2251 y 501 BCC válidos; AMS 20929/118/9572, 220 códigos 9902. UC: 128 respuestas CM00→ER, mediana 155 ms.
+- 19 DLL propias con token 066190A23251F202. Cinco CS8002 de MAUI oficial permanecen visibles. Authenticode de ejecutables NotSigned, pendiente de release; sin alta de confianza.
+- Escaneo de DLL propias y CLI: sin cadenas de PDFCoffee, nota de captura UF ni etiqueta que encubría limitaciones.
+
+Salidas (ambas versión 0.1.0+33abd2486c15b3cc80e40114ba2f7c8a93219580):
+  dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+  dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+Sin ZIP, scripts de empaquetado, copias legacy ni rutas extra de publicación. Sin cambios en funciones protegidas de Identidades ni dependencias nuevas. Sin push/PR.
+Estado: incremento entregado; #205 continúa abierto/In Progress. P-15 conserva semántica de campos numéricos restantes, integridad/roles y límites de operaciones. Sin homologación física nueva ni conformidad LAW completa declarada.
