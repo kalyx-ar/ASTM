@@ -29,6 +29,7 @@ public sealed class LangIntegrationTests
         database.Translations[("Atsm.Plugin.Diagast.Qwalys", "reaction.A.CMP")] = "COMPATIBILIDAD TRADUCIDA";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "research.BACT-Info..3")] = "INDICADOR TRADUCIDO";
         database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "uf.need.DBS_LANG_02215")] = "LIMPIEZA TRADUCIDA";
+        database.Translations[("Atsm.Plugin.Sysmex.Urinalysis", "uf.field.counter")] = "CONTADOR TRADUCIDO {0}: {1}";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ATSM-DIAG-INCOMPLETE-CASE", AtsmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
@@ -69,6 +70,10 @@ public sealed class LangIntegrationTests
             Value = new("Necesidad", Coded: new("DBS_LANG_02215", null, "urn:atsm:vendor:sysmex.uf.binary:need")) };
         Assert.Equal("LIMPIEZA TRADUCIDA", ProtocolExplainer.ResultValue(ufNeed, catalog.Resolve(SysmexUrinalysisPlugin.UfBinaryProfile)));
         Assert.Equal("Necesidad", ufNeed.Value.RawText);
+        var binaryProfile = catalog.Resolve(SysmexUrinalysisPlugin.UfBinaryProfile);
+        var binary = new DecodedMessage(1, "Received", "UF_COUNTERS", "0000") { FirstSequence = 1,
+            BinaryFields = [new(0, 2, "counter.1.value", "1541", new(binaryProfile.TracePlugin!.DiagnosticVocabulary["uf.field.counter"], ["1", "1541"]))] };
+        Assert.Contains("CONTADOR TRADUCIDO 1: 1541", BinaryTracePresentation.DescribeMessage(binary, binaryProfile));
         Assert.Equal(ConnectionState.Open, database.State);
     }
 

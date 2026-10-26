@@ -17,6 +17,8 @@ public sealed record DecodedMessage(long Sequence, string Direction, string Type
 {
     public long FirstSequence { get; init; } = Sequence;
     public ProtocolExplanation? Explanation { get; init; }
+    public int FirstByteOffset { get; init; }
+    public IReadOnlyList<InstrumentTraceField> BinaryFields { get; init; } = [];
     public IReadOnlyDictionary<string, string> Fields { get; init; } = new Dictionary<string, string>();
     public IReadOnlyList<AtsmDiagnostic> Diagnostics { get; init; } = [];
 }
@@ -120,7 +122,7 @@ public static class DiagnosticReader
             if (input.Header.Properties?.GetValueOrDefault("directionUncertain") == "true")
                 findings.Add(new("ATSM-DIAG-DIRECTION-UNCERTAIN", AtsmSeverity.Warning, "Recorder side could not be inferred; confirm instrument or host."));
             messages.AddRange(interpreted.Messages.Select(m => new DecodedMessage(m.LastSequence, m.Direction.ToString(), m.Code, m.Text)
-            { FirstSequence = m.FirstSequence, Explanation = m.Explanation, Fields = m.Fields,
+            { FirstSequence = m.FirstSequence, FirstByteOffset = m.FirstByteOffset, BinaryFields = m.BinaryFields, Explanation = m.Explanation, Fields = m.Fields,
                 Diagnostics = interpreted.Diagnostics.Where(d => InMessage(d, m.FirstSequence, m.LastSequence)).ToArray() }));
             return new(input.Entries, interpreted.Events.Select(e => new StackEvent(Enum.Parse<StackLevel>(e.Level.ToString()), e.LastSequence,
                 e.Elapsed, e.Direction, e.Code, e.Code, e.FirstSequence) { Explanation = e.Explanation }).ToArray(), messages, interpreted.Observations, findings) { Timings = interpreted.Timings };

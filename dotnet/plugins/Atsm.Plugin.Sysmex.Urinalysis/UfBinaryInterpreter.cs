@@ -21,8 +21,15 @@ internal static class UfBinaryInterpreter
     internal static IReadOnlyDictionary<string, ProtocolText> Vocabulary { get; } = new Dictionary<string, string>
     {
         ["kind.UF_ACTIVITY"] = "Aviso del equipo", ["kind.UF_NOTICE"] = "Aviso del equipo", ["kind.UF_ALERTS"] = "Avisos del equipo",
-        ["kind.UF_DATA"] = "Datos del equipo", ["kind.UF_BINARY"] = "Bloque binario",
-        ["uf.binary"] = "Bloque binario · {0}", ["uf.data"] = "Datos del equipo · {0} bytes", ["uf.notice"] = "{0}",
+        ["kind.UF_DATA"] = "Datos del equipo", ["kind.UF_COUNTERS"] = "Estado y contadores",
+        ["uf.data"] = "Datos del equipo · {0} bytes", ["uf.notice"] = "{0}",
+        ["uf.counters"] = "Contadores: {0} · Niveles: {1} · Nivel general: {3} · Estado: {2}",
+        ["uf.field.state"] = "Código de estado: {0}", ["uf.field.indicator"] = "Indicador {0}: {1}",
+        ["uf.field.level"] = "Nivel general: {0}", ["uf.field.counter"] = "Contador {0}: {1}",
+        ["uf.field.counterLevel"] = "Nivel {0}: {1}", ["uf.field.slot"] = "Registro del contador {0}",
+        ["uf.field.unknown"] = "Campo {0}: {1}", ["uf.field.type"] = "Tipo de mensaje: {0}",
+        ["uf.field.length"] = "Longitud del contenido: {0} bytes", ["uf.field.start"] = "Inicio del bloque",
+        ["uf.field.end"] = "Fin del bloque", ["uf.field.payload"] = "Contenido del mensaje",
         ["uf.header"] = "Cabecera del equipo", ["uf.identityChanged"] = "Cambio de identificador: {0} → {1}", ["uf.value.Kind"] = "Aviso del equipo", ["uf.state.Notice"] = "Aviso",
         ["uf.need.DBS_LANG_01746"] = "Chequeo de fondo requerido", ["uf.need.DBS_LANG_02215"] = "Limpieza requerida",
         ["uf.state.Need"] = "Requiere atención", ["uf.unit.None"] = "—",
@@ -31,7 +38,11 @@ internal static class UfBinaryInterpreter
     }.ToDictionary(p => p.Key, p => new ProtocolText(p.Key, p.Value, ""));
     internal sealed record Notice(string Code, string Label, string Qualifier = "", string Context = "");
     internal sealed record Block(int Offset, long First, long Last, TimeSpan At, TraceDirection Direction, byte[] Data, string Kind,
-        IReadOnlyDictionary<string, string> Fields, IReadOnlyList<Notice> Notices);
+        IReadOnlyDictionary<string, string> Fields, IReadOnlyList<Notice> Notices)
+    {
+        internal int FirstByteOffset { get; init; }
+        internal IReadOnlyList<InstrumentTraceField> BinaryFields { get; init; } = [];
+    }
     internal static IReadOnlyList<Block> Decode(IReadOnlyList<TraceEntry> entries)
     {
         var blocks = new List<Block>();
@@ -45,6 +56,7 @@ internal static class UfBinaryInterpreter
                 for (var i = 0; i < data.Length; i++)
                 {
                     var length = 0; var kind = ""; var fields = new Dictionary<string, string>(); var notices = new List<Notice>();
+                    var binaryFields = new List<InstrumentTraceField>();
                     // Fixed outer header and a length-delimited sub-envelope. ETX inside the payload is data.
                     if (BinaryWireParser.TryReadFrame(data.AsSpan(i), Envelope, out var envelope)
                         && CString(data.AsSpan(i + 1, 20)) is { Length: > 0 } identity && CString(data.AsSpan(i + 21, 12)) is { Length: > 0 } secondary)
@@ -53,26 +65,24 @@ internal static class UfBinaryInterpreter
                             fields["device.identifier"] = identity; fields["device.secondary"] = secondary; fields["message.type"] = type.ToString(CultureInfo.InvariantCulture);
                             fields["payload.length"] = size.ToString(CultureInfo.InvariantCulture);
                             kind = ReadPayload(data.AsSpan(i + envelope.PayloadOffset, size), type, fields, notices);
+                            binaryFields.AddRange(UfBinaryFields.Read(data.AsSpan(i, length), envelope.PayloadOffset, size, kind, true, notices.Select(Meaning).ToArray()));
                     }
                     if (length == 0 && BinaryWireParser.TryReadFrame(data.AsSpan(i), SubEnvelope, out var sub)
                         && sub.PayloadLength is 102 or 1500 or 376 or 262)
                     {
                             length = sub.TotalLength;
                             kind = ReadPayload(data.AsSpan(i + sub.PayloadOffset, sub.PayloadLength), sub.PayloadLength switch { 1500 => 6, 376 => 11, 262 => 12, _ => 2 }, fields, notices);
+                            binaryFields.AddRange(UfBinaryFields.Read(data.AsSpan(i, length), sub.PayloadOffset, sub.PayloadLength, kind, false, notices.Select(Meaning).ToArray()));
                     }
                     // The monitor can begin inside an envelope: retain recognizable isolated records.
                     if (length == 0 && i + 266 <= data.Length && data[i] == 1 && data[i + 1] == 0 && data[i + 2] == 0 && data[i + 265] == 3
-                        && ReadNeed(data.AsSpan(i + 3, 262), fields, notices)) { length = 266; kind = "UF_ACTIVITY"; }
-                    if (length == 0 && i + 13 <= data.Length && data[i] == 2 && data.AsSpan(i + 1, 5).IndexOfAnyExcept((byte)0) < 0
-                        && data[i + 8] is 90 or 100 && data.AsSpan(i + 9, 3).IndexOfAnyExcept((byte)0) < 0 && data[i + 12] == 3)
-                    {
-                        length = 13; kind = "UF_BINARY";
-                        fields["variant.offset8.u32le"] = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(i + 8, 4)).ToString(CultureInfo.InvariantCulture);
-                        fields["field.offset6.u16le"] = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(i + 6, 2)).ToString(CultureInfo.InvariantCulture);
-                    }
+                        && ReadNeed(data.AsSpan(i + 3, 262), fields, notices))
+                    { length = 266; kind = "UF_ACTIVITY"; binaryFields.Add(new(0, length, "notice", "", Meaning(notices[0]))); }
                     if (length == 0) continue;
                     var first = At(i); var last = At(i + length - 1);
-                    blocks.Add(new(i, first.Sequence, last.Sequence, last.Elapsed, direction, data.AsSpan(i, length).ToArray(), kind, fields, notices)); i += length - 1;
+                    var firstRead = Array.BinarySearch(starts, i); if (firstRead < 0) firstRead = ~firstRead - 1;
+                    blocks.Add(new(i, first.Sequence, last.Sequence, last.Elapsed, direction, data.AsSpan(i, length).ToArray(), kind, fields, notices)
+                    { FirstByteOffset = i - starts[firstRead], BinaryFields = binaryFields }); i += length - 1;
                 }
                 value.Data.Dispose();
             }
@@ -89,6 +99,11 @@ internal static class UfBinaryInterpreter
     }
     private static string ReadPayload(ReadOnlySpan<byte> payload, int type, Dictionary<string, string> fields, List<Notice> notices)
     {
+        if (type == 2 && UfBinaryFields.IsCounterLayout(payload))
+        {
+            foreach (var field in UfBinaryFields.Counters(payload)) fields[field.Code] = field.RawValue;
+            return "UF_COUNTERS";
+        }
         if (type == 12 && payload.Length == 262 && ReadNeed(payload, fields, notices)) return "UF_ACTIVITY";
         if (type == 11 && payload.Length == 376 && CString(payload.Slice(62, 200)) is { Length: > 0 } label
             && CString(payload.Slice(262, 114)) is { } resource && Resource(resource))
@@ -136,9 +151,10 @@ internal static class UfBinaryInterpreter
         {
             var text = block.Notices.Count == 1 ? Meaning(block.Notices[0]) : block.Notices.Count > 1
                 ? new ProtocolExplanation(Vocabulary["uf.notice"], [string.Join(" · ", block.Notices.Select(n => n.Label))])
-                : block.Kind == "UF_BINARY" ? new(Vocabulary["uf.binary"], [block.Fields["variant.offset8.u32le"]])
+                : block.Kind == "UF_COUNTERS" ? CounterMeaning(block.Fields)
                 : new(Vocabulary["uf.data"], [block.Fields.GetValueOrDefault("payload.length", block.Data.Length.ToString(CultureInfo.InvariantCulture))]);
-            messages.Add(new(block.First, block.Last, block.Direction, block.Kind, Convert.ToHexString(block.Data), text, block.Fields));
+            messages.Add(new(block.First, block.Last, block.Direction, block.Kind, Convert.ToHexString(block.Data), text, block.Fields)
+            { FirstByteOffset = block.FirstByteOffset, BinaryFields = block.BinaryFields });
             events.Add(new(ProtocolEventLevel.Message, block.First, block.Last, block.At, block.Direction, "uf.binary." + block.Kind, text));
             if (block.Fields.TryGetValue("device.identifier", out var identifier))
             {
@@ -161,5 +177,12 @@ internal static class UfBinaryInterpreter
             }
         }
         return new(messages, events.OrderBy(e => e.LastSequence).ThenBy(e => e.FirstSequence).ToArray(), observations, diagnostics);
+    }
+    private static ProtocolExplanation CounterMeaning(IReadOnlyDictionary<string, string> fields)
+    {
+        var populated = Enumerable.Range(1, 7).Where(i => fields[$"counter.{i}.value"] != "0" || fields[$"counter.{i}.level"] != "0").ToArray();
+        if (populated.Length == 0) populated = Enumerable.Range(1, 7).ToArray();
+        return new(Vocabulary["uf.counters"], [string.Join(", ", populated.Select(i => i + "=" + fields[$"counter.{i}.value"])),
+            string.Join(", ", populated.Select(i => i + "=" + fields[$"counter.{i}.level"])), fields["status.code"], fields["status.level"]]);
     }
 }

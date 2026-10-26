@@ -52,13 +52,12 @@ public sealed class UfBinaryInterpreterTests
         }
     }
     [Fact]
-    public void The_user_block_is_structured_but_its_numeric_fields_are_not_given_unproved_meanings()
+    public void Isolated_counter_bytes_do_not_prove_a_frame_or_an_acknowledgement()
     {
         var bytes = new byte[] { 2, 0, 0, 0, 0, 0, 247, 9, 100, 0, 0, 0, 3 };
         var profile = Catalog.Resolve(SysmexUrinalysisPlugin.UfBinaryProfile);
         var input = DiagnosticReader.Read(bytes, DiagnosticInputFormat.WireBytes, profile, "synthetic", TimeSpan.Zero);
-        var result = DiagnosticReader.Analyze(input, profile, Timing); var message = Assert.Single(result.Messages);
-        Assert.Equal("100", message.Fields["variant.offset8.u32le"]); Assert.Equal("2551", message.Fields["field.offset6.u16le"]);
+        var result = DiagnosticReader.Analyze(input, profile, Timing); Assert.Empty(result.Messages);
         Assert.Empty(result.Observations); Assert.Empty(result.Timings);
         Assert.DoesNotContain(CommunicationStatistics.Build(result), s => s.Code is "EnquiryAck" or "FrameAck" or "OperationTotal");
         Assert.Null(DiagnosticInputDetector.Detect(bytes, Catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile), Catalog).ProfileId);
@@ -66,8 +65,7 @@ public sealed class UfBinaryInterpreterTests
         {
             var fragments = input with { Entries = [new(1, TimeSpan.Zero, DateTimeOffset.UnixEpoch, TraceDirection.Received, bytes[..split]),
                 new(2, TimeSpan.FromMilliseconds(10), DateTimeOffset.UnixEpoch, TraceDirection.Received, bytes[split..])] };
-            var parsed = Assert.Single(DiagnosticReader.Analyze(fragments, profile, Timing).Messages);
-            Assert.Equal(message.Text, parsed.Text); Assert.Equal(1, parsed.FirstSequence); Assert.Equal(2, parsed.Sequence);
+            Assert.Empty(DiagnosticReader.Analyze(fragments, profile, Timing).Messages);
         }
     }
     [Theory]

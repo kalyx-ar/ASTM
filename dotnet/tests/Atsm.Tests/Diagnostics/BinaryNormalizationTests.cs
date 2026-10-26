@@ -9,6 +9,21 @@ namespace Atsm.Tests.Diagnostics;
 public sealed class BinaryNormalizationTests
 {
     [Theory]
+    [InlineData(1, 1U, 1U)]
+    [InlineData(2, 513U, 258U)]
+    [InlineData(3, 197121U, 66051U)]
+    [InlineData(4, 67305985U, 16909060U)]
+    public void Neutral_unsigned_fields_respect_width_order_and_boundaries(int width, uint little, uint big)
+    {
+        var bytes = new byte[] { 255, 1, 2, 3, 4 };
+        Assert.True(BinaryWireParser.TryReadUnsigned(bytes, 1, width, BinaryByteOrder.LittleEndian, out var a)); Assert.Equal(little, a);
+        Assert.True(BinaryWireParser.TryReadUnsigned(bytes, 1, width, BinaryByteOrder.BigEndian, out var b)); Assert.Equal(big, b);
+        Assert.False(BinaryWireParser.TryReadUnsigned(bytes, -1, width, BinaryByteOrder.LittleEndian, out _));
+        Assert.False(BinaryWireParser.TryReadUnsigned(bytes, bytes.Length - width + 1, width, BinaryByteOrder.BigEndian, out _));
+        Assert.False(BinaryWireParser.TryReadUnsigned(bytes, 0, 0, BinaryByteOrder.LittleEndian, out _));
+        Assert.False(BinaryWireParser.TryReadUnsigned(bytes, 0, 5, BinaryByteOrder.LittleEndian, out _));
+    }
+    [Theory]
     [InlineData("02 00 FF 03")]
     [InlineData("0200FF03")]
     [InlineData("0x02, 0x00, 0xFF, 0x03")]

@@ -358,19 +358,21 @@ public sealed class MainPage : ContentPage
                 headers = [T("Column.Sequence"), T("Column.Time"), T("Column.Direction"), T("Column.Bytes"), T("Column.Command")];
                 var protocolMessages = (_analysis?.Messages ?? []).Where(m => m.Explanation is not null).ToLookup(m => m.FirstSequence);
                 var protocolEvents = (_analysis?.Events ?? []).Where(e => e.Explanation is not null && e.Level == Atsm.Tracing.StackLevel.Link).ToLookup(e => e.Sequence);
+                var binaryEntries = BinaryTracePresentation.DescribeEntries(_case?.Entries ?? [], _analysis?.Messages ?? [], Profile);
                 var captureClock = _case is not null && CommunicationStatistics.HasCaptureClock(_case);
                 rows = (_case?.Entries ?? []).Select(entry =>
                 {
                     var meaning = unsupported && entry.Direction != TraceDirection.Event && (entry.Data.Length == 0 || entry.Data.Span.IndexOfAnyExcept((byte)0) >= 0)
                         ? DiagnosticText.Format("Message.Wire", entry.Data.Length) : ProtocolExplainer.Entry(entry, Profile);
-                    if (Profile.TracePlugin is { } plugin)
+                    if (binaryEntries.TryGetValue(entry.Sequence, out var binaryEntry)) meaning = binaryEntry.Meaning;
+                    else if (Profile.TracePlugin is { } plugin)
                     {
                         var explanations = protocolMessages[entry.Sequence].Select(m => m.Explanation!).Concat(protocolEvents[entry.Sequence].Select(e => e.Explanation!)).ToArray();
                         if (explanations.Length > 0) meaning = string.Join(" · ", explanations.Select(e => DiagnosticText.Explanation(plugin, e)));
                     }
                     var raw = DiagnosticReader.DescribeBytes(entry.Data, _hex.IsChecked);
                     return Row([entry.Sequence.ToString(), DiagnosticDuration.Format(captureClock ? entry.Elapsed : null), D(entry.Direction.ToString()), entry.Data.Length.ToString(), interpreted ? meaning : entry.Code ?? raw],
-                        Detail(meaning, "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), entry.Code, Convert.ToHexString(entry.Data.Span));
+                        Detail(meaning + (binaryEntry is not null ? "\n" + binaryEntry.Details : ""), "#" + entry.Sequence + "\n" + entry.Code + "\n" + entry.Detail + "\n" + raw), entry.Direction.ToString(), entry.Code, Convert.ToHexString(entry.Data.Span));
                 }).ToArray();
                 if (_group.IsChecked && Profile.TracePlugin is not null)
                 { _table.SetGroups("wire:" + interpreted + ":blocks", headers, WireGroups(rows.ToArray()), 4); return; }
@@ -384,7 +386,7 @@ public sealed class MainPage : ContentPage
                     var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
                     return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
                         Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + (message.Explanation?.Text.Evidence ?? ProtocolExplainer.RecordEvidence(message.Text, Profile))
-                            + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, message.Type, message.Text);
+                            + "\n" + BinaryTracePresentation.DescribeMessage(message, Profile) + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, message.Type, message.Text);
                 }).ToArray();
                 var messageGroups = DiagnosticGrouping.Build(rows, _group.IsChecked, consecutive: true).Select(group =>
                 {
@@ -473,6 +475,7 @@ public sealed class MainPage : ContentPage
             cells[4] = _interpret.IsChecked ? meaning : first.Message.Text;
             var complete = entries.Skip(first.First).Take(first.Last - first.First + 1).SelectMany(e => e.Data.ToArray()).ToArray();
             var details = meaning + "\n" + F("Wire.CompleteBlock", entries[first.First].Sequence, entries[last.Last].Sequence, end - index + 1)
+                + "\n" + BinaryTracePresentation.DescribeMessage(first.Message, Profile)
                 + "\n\n" + DiagnosticText.Text("Original") + "\n" + DiagnosticReader.DescribeBytes(complete, _hex.IsChecked);
             groups.Add(new(key, children) { Repetitions = end - index + 1, SummaryRow = new(cells, details, key) });
             cursor = last.Last + 1; index = end + 1;
@@ -654,7 +657,15 @@ public sealed class MainPage : ContentPage
         var envelope = new byte[308]; envelope[0] = 2; envelope[33] = 12; envelope[36] = 2; envelope[37] = 1; envelope[^1] = 3;
         Encoding.ASCII.GetBytes("SYNTHETIC-ID").CopyTo(envelope.AsSpan(1)); Encoding.ASCII.GetBytes("SYN-02").CopyTo(envelope.AsSpan(21));
         System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(envelope.AsSpan(41), 262); notice.AsSpan(3, 262).CopyTo(envelope.AsSpan(45)); notice = envelope;
-        var block = new byte[] { 2, 0, 0, 0, 0, 0, 247, 9, 100, 0, 0, 0, 3 };
+        var block = envelope[..46].Concat(new byte[102]).ToArray(); block[33] = 2; block[^1] = 3;
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(block.AsSpan(41), 102);
+        block[45] = 4;
+        for (var i = 0; i < 7; i++)
+        {
+            var offset = 45 + 18 + i * 12; block[offset] = (byte)(i + 1);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(block.AsSpan(offset + 6), (ushort)(i < 4 ? 1541 + i : 0));
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(block.AsSpan(offset + 8), (uint)(i < 4 ? 90 : 0));
+        }
         _case = DiagnosticReader.Read(notice, DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero);
         _case = _case with { Header = _case.Header with { Properties = new Dictionary<string, string>(_case.Header.Properties!) { ["timingSource"] = "synthetic" } } };
         _case = _case with { Entries = [new(0, TimeSpan.Zero, DateTimeOffset.UnixEpoch, TraceDirection.Received, notice[..100]),
@@ -675,6 +686,10 @@ public sealed class MainPage : ContentPage
             throw new InvalidDataException("ATSM-MAUI-CHRONOLOGICAL-BLOCKS-SELFTEST");
         if (blocks[0].SummaryRow is not { } blockSummary || !blockSummary.Details.Contains(DiagnosticReader.DescribeBytes(notice, _hex.IsChecked), StringComparison.Ordinal)
             || !_summary.Text.Contains("SYNTHETIC-ID", StringComparison.Ordinal)) throw new InvalidDataException("ATSM-MAUI-COMPLETE-BLOCK-DETAIL-SELFTEST");
+        var counterParts = BinaryTracePresentation.DescribeEntries(_case.Entries, _analysis.Messages, Profile);
+        if (_analysis.Messages.Count(m => m.Type == "UF_COUNTERS") != 2 || !counterParts[2].Meaning.Contains("Contador 1: 1541", StringComparison.Ordinal)
+            || counterParts[2].Meaning.Contains("ACK", StringComparison.Ordinal) || !blocks[1].SummaryRow!.Details.Contains("Contador 1: 1541", StringComparison.Ordinal))
+            throw new InvalidDataException("ATSM-MAUI-BINARY-FIELD-CONTEXT-SELFTEST");
         _tab = 7; ShowTable(); _table.VerifyAutomaticLayout();
         _case = DiagnosticReader.Read("RQ02,SYN-0001      01\r\n"u8.ToArray(), DiagnosticInputFormat.Auto, Profile, "synthetic", TimeSpan.Zero); Analyze();
         if (Profile.Id != SysmexUrinalysisPlugin.Uc3500Profile)

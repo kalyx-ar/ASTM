@@ -23,6 +23,7 @@ public static class DiagnosticText
         ["Message.Incomplete"] = "Mensaje incompleto", ["Message.Hl7Unknown"] = "Mensaje HL7 sin interpretación documentada ({0})",
         ["Message.Export"] = "Exportación de resultados", ["Message.Wire"] = "Fragmento {0} bytes", ["Message.Nul"] = "Fragmento {0} bytes - NUL",
         ["Message.BinaryFragment"] = "Fragmento {0} bytes - {1}",
+        ["Binary.FieldRange"] = "{0} [bytes {1}–{2}]",
         ["Message.WithError"] = "{0} - Con error", ["Flag.Unknown"] = "Código sin interpretar: {0}",
         ["Finding.UnsupportedBinary"] = "Protocolo binario sin intérprete documentado; bytes disponibles en Trama.",
         ["Direction.Received"] = "Equipo → anfitrión", ["Direction.Transmitted"] = "Anfitrión → equipo", ["Direction.Event"] = "Evento",

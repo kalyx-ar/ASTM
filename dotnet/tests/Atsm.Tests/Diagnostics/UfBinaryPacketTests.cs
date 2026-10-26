@@ -8,6 +8,65 @@ namespace Atsm.Tests.Diagnostics;
 
 public sealed class UfBinaryPacketTests
 {
+    private static byte[] Counters()
+    {
+        var payload = new byte[102]; payload[0] = 4; payload[2] = 1; payload[14] = 70;
+        for (var i = 0; i < 7; i++)
+        {
+            var offset = 18 + i * 12; payload[offset] = (byte)(i + 1);
+            BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(offset + 6), (ushort)(i < 4 ? 1541 + i : 0));
+            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(offset + 8), (uint)(i < 4 ? 80 + i : 0));
+        }
+        return payload;
+    }
+    [Fact]
+    public void Counters_decode_all_fields_and_every_split_maps_numeric_bytes_without_false_ASCII_commands()
+    {
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.UfBinaryProfile); var packet = Packet(2, Counters());
+        for (var split = 1; split < packet.Length; split++)
+        {
+            var input = new DiagnosticCase(new(Guid.Empty, "synthetic", "synthetic", profile.Id, DateTimeOffset.UnixEpoch),
+                [Entry(1, packet.AsMemory(0, split)), Entry(2, packet.AsMemory(split))]);
+            var result = DiagnosticReader.Analyze(input, profile, new(TimeSpan.Zero, TimeSpan.Zero, TimeZoneInfo.Utc));
+            var message = Assert.Single(result.Messages); Assert.Equal("UF_COUNTERS", message.Type);
+            Assert.Equal("1541", message.Fields["counter.1.value"]); Assert.Equal("80", message.Fields["counter.1.level"]);
+            Assert.Equal("4", message.Fields["status.code"]); Assert.Equal("70", message.Fields["status.level"]);
+            Assert.Equal("0", message.Fields["counter.7.value"]); Assert.Equal(Convert.ToHexString(packet), message.Text);
+            Assert.Equal(Enumerable.Range(0, packet.Length), message.BinaryFields.SelectMany(f => Enumerable.Range(f.Offset, f.Length)));
+            var parts = BinaryTracePresentation.DescribeEntries(input.Entries, result.Messages, profile); Assert.Equal(2, parts.Count);
+            Assert.All(parts.Values, p => { Assert.DoesNotContain("ACK", p.Meaning); Assert.DoesNotContain("EOT", p.Meaning); Assert.DoesNotContain("Fragmento", p.Meaning); });
+            Assert.Contains("Contador 1: 1541", BinaryTracePresentation.DescribeMessage(message, profile));
+            Assert.Contains("1=1541", ProtocolExplainer.MessageContent(message, profile, []));
+            Assert.Empty(result.Observations); Assert.Empty(result.Timings);
+        }
+    }
+    [Fact]
+    public void Single_byte_reads_and_NUL_reads_inherit_the_whole_numeric_field()
+    {
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.UfBinaryProfile); var packet = Packet(2, Counters());
+        var input = new DiagnosticCase(new(Guid.Empty, "synthetic", "synthetic", profile.Id, DateTimeOffset.UnixEpoch),
+            packet.Select((b, i) => Entry(i, new byte[] { b })).ToArray());
+        var result = DiagnosticReader.Analyze(input, profile, new(TimeSpan.Zero, TimeSpan.Zero, TimeZoneInfo.Utc));
+        var fields = BinaryTracePresentation.DescribeEntries(input.Entries, result.Messages, profile);
+        Assert.Equal(6, packet[70]); Assert.Equal("Contador 1: 1541", fields[70].Meaning);
+        Assert.Equal(4, packet[99]); Assert.Equal("Registro del contador 4", fields[99].Meaning);
+        Assert.Equal(0, packet[64]); Assert.Equal("Registro del contador 1", fields[64].Meaning);
+        Assert.Equal(packet.Length, fields.Count);
+    }
+    [Fact]
+    public void Several_packets_in_one_read_preserve_field_offsets_and_unknown_layouts_are_retained()
+    {
+        var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.UfBinaryProfile); var packet = Packet(2, Counters());
+        var unknown = Counters(); unknown[18] = 99; var other = Packet(2, unknown);
+        var input = DiagnosticReader.Read(packet.Concat(other).ToArray(), DiagnosticInputFormat.WireBytes, profile, "synthetic", TimeSpan.Zero);
+        var result = DiagnosticReader.Analyze(input, profile, new(TimeSpan.Zero, TimeSpan.Zero, TimeZoneInfo.Utc));
+        Assert.Equal(new[] { "UF_COUNTERS", "UF_DATA" }, result.Messages.Select(m => m.Type));
+        Assert.Equal(packet.Length, result.Messages[1].FirstByteOffset);
+        Assert.False(result.Messages[1].Fields.ContainsKey("counter.1.value"));
+        Assert.Equal(Convert.ToHexString(other), result.Messages[1].Text);
+        var parts = BinaryTracePresentation.DescribeEntries(input.Entries, result.Messages, profile);
+        Assert.Contains("Contador 1: 1541", Assert.Single(parts).Value.Meaning);
+    }
     private static byte[] Packet(int type, byte[] payload)
     {
         var packet = new byte[46 + payload.Length]; packet[0] = 2; packet[36] = 2; packet[37] = 1; packet[^1] = 3;

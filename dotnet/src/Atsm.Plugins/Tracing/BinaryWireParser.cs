@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Globalization;
 using System.Text;
 
@@ -16,6 +15,15 @@ public readonly record struct BinaryFrameBounds(int PayloadOffset, int PayloadLe
 /// <summary>Neutral byte/hex normalization and declarative framing. Payload semantics belong to the dialect.</summary>
 public static class BinaryWireParser
 {
+    public static bool TryReadUnsigned(ReadOnlySpan<byte> source, int offset, int width, BinaryByteOrder byteOrder, out uint value)
+    {
+        value = 0;
+        if (width is < 1 or > 4 || offset < 0 || offset > source.Length - width) return false;
+        var field = source.Slice(offset, width);
+        for (var i = 0; i < width; i++) value = (value << 8) | field[byteOrder == BinaryByteOrder.BigEndian ? i : width - i - 1];
+        return true;
+    }
+
     public static bool TryReadFrame(ReadOnlySpan<byte> source, BinaryFrameLayout layout, out BinaryFrameBounds frame)
     {
         frame = default;
@@ -24,12 +32,7 @@ public static class BinaryWireParser
         if (source.Length <= layout.PayloadOffset) return false;
         foreach (var pattern in layout.RequiredBytes)
             if (pattern.Offset < 0 || pattern.Offset > source.Length - pattern.Bytes.Length || !source.Slice(pattern.Offset, pattern.Bytes.Length).SequenceEqual(pattern.Bytes)) return false;
-        var field = source.Slice(layout.LengthOffset, layout.LengthBytes);
-        uint length = layout.LengthBytes switch
-        {
-            1 => field[0], 2 => layout.ByteOrder == BinaryByteOrder.LittleEndian ? BinaryPrimitives.ReadUInt16LittleEndian(field) : BinaryPrimitives.ReadUInt16BigEndian(field),
-            _ => layout.ByteOrder == BinaryByteOrder.LittleEndian ? BinaryPrimitives.ReadUInt32LittleEndian(field) : BinaryPrimitives.ReadUInt32BigEndian(field),
-        };
+        if (!TryReadUnsigned(source, layout.LengthOffset, layout.LengthBytes, layout.ByteOrder, out var length)) return false;
         if (length > layout.MaxPayloadBytes || length > source.Length - layout.PayloadOffset - 1 || source[layout.PayloadOffset + (int)length] != layout.EndMarker) return false;
         frame = new(layout.PayloadOffset, (int)length, layout.PayloadOffset + (int)length + 1); return true;
     }
