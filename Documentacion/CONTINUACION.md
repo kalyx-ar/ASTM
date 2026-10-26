@@ -82,7 +82,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
-| P-16 | RemoteUSB como servicio y administración remota fijada por el servidor | Diseño y riesgos decididos en [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md); falta implementar |
+| P-16 | Parcial: RemoteUSB como servicio y administración remota implementados; faltan modo iniciado por el agente, verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 
@@ -158,6 +158,19 @@ Sin manual, el plugin se apoya en trazas. Quedan por confirmar:
 
 Con el manual o un equipo de prueba, actualizar el perfil y quitar las marcas de hipótesis.
 
+### P-16 RemoteUSB: servicio y administración remota — primer incremento entregado
+
+Implementado según [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md) y [spec/admin-v1.md](../spec/admin-v1.md): estado protegido (DPAPI de máquina; 0600 en POSIX) con sólo la configuración vigente, arranque siempre con la última configuración, registro persistente de eventos con rotación, endpoint de administración TLS/plano en el puerto 28240 con certificado autogenerado y fijación por huella, PSK con (EC)DHE, `SetTls` rechazado por canal plano, `ListDevices` con identidad USB (SetupAPI) y eventos de aparición/retiro, semáforo con `maxHoldMs`, solicitud de cesión cooperativa, kill switch, impugnación, cierre por seguridad y reapertura administrativa. Cliente .NET `RemoteUsbAdminClient`, configuración tipada `RemoteUsbConfiguration` y extensiones de `SerialTunnelChannel`. Servicio Windows (`LocalService`, ACL protegida, reinicio ante fallos) y unidad systemd. Se retiró la configuración JSON (`--config`/`--check`).
+
+Pendiente:
+
+- **Modo iniciado por el agente** (rol cliente TLS, P-09): el modelo de configuración lo admite y el agente responde `REMOTEUSB-UNSUPPORTED`.
+- **Verificar `service install` elevado** en Windows (instalación, ACL, arranque automático y recuperación). En esta sesión sólo se comprobaron los caminos sin elevación.
+- **POSIX**: `devices_posix.cpp`, `protect_posix.cpp` y la unidad systemd están escritos sin compilar (igual que P-07).
+- **Windows XP (P-06)**: `std::filesystem` del STL v141 y SetupAPI por sondeo sin probar.
+- **Integración EDC/LIMS Equipos**: inventario de agentes, versiones/historial de configuración y reconocimiento del instrumento por identidad USB y tráfico (Issue propio en EDC).
+- Prueba con adaptadores USB-serie reales del cambio de COM y de la identidad informada.
+
 ### P-12 Robustez del agente
 
 - `dispatch()` envía con `mutex_` tomado: un controlador que no lee puede frenar la arbitración. Conviene pasar los envíos a una cola por conexión.
@@ -189,7 +202,7 @@ Paquetes NuGet versionados con SemVer, seguimiento de API pública (`PublicAPI.S
 ## Deuda conocida
 
 - El commit `a932694` no compila solo (la solución ya referenciaba el plugin, que llegó en el commit siguiente). No afecta a `main`.
-- Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado; el consumible es `agente-tls.json`.
+- Los ejemplos `Documentacion/ejemplos/agente.json` e `instrumento.json` son de la etapa de propuesta y no siguen el esquema implementado. RemoteUSB ya no usa archivos de configuración: se aprovisiona por `spec/admin-v1.md`.
 - `atsm-trace` registra los plugins de forma estática por decisión humana; no es deuda de carga dinámica.
 
 ### Usabilidad y Lang (2026-10-25)

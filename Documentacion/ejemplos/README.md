@@ -14,4 +14,4 @@ Para TCP nativo se sustituye el adaptador por `NativeTcpInstrumentChannel` y se 
 
 ## Configuración consumible del agente
 
-[agente-tls.json](agente-tls.json) sí sigue el esquema implementado (`remoteusb/1`) y se valida con `remoteusb --check agente-tls.json`. Las rutas de certificados son relativas al archivo. Los controladores se identifican por el CN de su certificado o, como `edc-cliente-local`, por la huella SHA-256 configurada (el valor del ejemplo es un marcador). Para texto claro se usa `"tls": "Plain"`, sólo en redes de confianza.
+RemoteUSB no usa archivos de configuración desde P-16: el servidor la instala por el endpoint de administración ([spec/admin-v1.md](../../spec/admin-v1.md)) y el agente guarda sólo la vigente, protegida.

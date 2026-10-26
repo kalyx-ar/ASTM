@@ -127,7 +127,7 @@ RemoteUSB/
 - Un proceso, varios puertos. Cada puerto tiene su máquina de estados Puerto/Propiedad de CONTRATOS.
 - Lectura serial con entrega inmediata de lo disponible (sin esperar trama); latencia acotada por `forwardDelayMs` configurable (0 por defecto).
 - Captura remota RAM/durable: propuesta pendiente. El agente v1 anuncia `traceCapture = 0`; cualquier persistencia sensible exige cifrado y custodia del anfitrión, no sólo hash encadenado.
-- Configuración en JSON validada contra `spec/agent-config.schema.json`; el agente rechaza claves desconocidas.
+- Configuración CBOR instalada por el servidor ([spec/admin-v1.md](../spec/admin-v1.md)); el agente rechaza claves desconocidas y conserva sólo la configuración vigente.
 - Sin intérprete ASTM: el agente no conoce ENQ ni ACK.
 
 ## Canal en el host (.NET)

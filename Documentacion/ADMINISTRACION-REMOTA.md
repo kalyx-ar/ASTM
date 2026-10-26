@@ -152,3 +152,11 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 ## Pruebas requeridas
 
 Solicitud de cesión (cede, mantiene, sin respuesta, límite de pedidos); kill switch rechazado sin TLS o sin permiso, cuarentena sin ventaja para el solicitante, espera entre cortes, impugnación que corta y bloquea al solicitante, cierre por seguridad reabierto sólo por el administrador y registro persistente de eventos; semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
+
+## Estado de implementación (2026-10-26)
+
+Implementado y probado según [spec/admin-v1.md](../spec/admin-v1.md); detalle y pendientes en [CONTINUACION § P-16](CONTINUACION.md). Diferencias respecto del diseño:
+
+- R1: `--server-cert <sha256>` y `--psk <identidad>:<hex>` fijan el servidor al instalar con conexión iniciada por el servidor. La variante iniciada por el agente (`--server host:puerto`) espera el rol cliente de P-09.
+- Kill switch e impugnación exigen TLS con par autenticado: certificado de cliente verificado contra la CA del enlace o PSK.
+- El éxito de un kill switch o una impugnación se confirma al solicitante con `SecurityResult` (0x1E), además del evento difundido.
