@@ -7,7 +7,7 @@
 3. En Windows es un **servicio**, no un driver.
 4. TLS es opcional. El material X.509 puede venir completo desde el servidor.
 5. No hay código de vinculación. El servidor que se conecta establece el modo de operación.
-6. Versiones, historial y vuelta atrás los administra el **servidor**. RemoteUSB no guarda historia.
+6. Versiones, historial y vuelta atrás de la **configuración** los administra el **servidor**; RemoteUSB no guarda versiones de configuración porque son innecesarias. Sí puede guardar historia de eventos (semáforo, seguridad, puertos) para auditoría (aclaración humana del 2026-10-26).
 7. RemoteUSB es **ignorante** de la identidad de los instrumentos: informa lo que ve y el servidor recuerda qué dispositivo corresponde a cada instrumento.
 8. No hay `--import`. La configuración sin red se hace con una UI que consume el puerto de administración en `127.0.0.1`.
 9. **Siempre arranca con la última configuración instalada**, esté o no disponible el servidor. Para cambiarla hay que conectarse y reemplazarla con la autorización vigente. Nunca vuelve al estado "sin configurar" por sí solo: eso permitiría que un servidor desconocido lo reconfigure.
@@ -41,6 +41,9 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 | `SetTls` | servidor → agente | certificado, clave privada y CA de controladores, provistos por el servidor |
 | `DeviceEvent` | agente → servidor | aparición/desaparición de un dispositivo serie, con su identidad física |
 | `RevokePort` | servidor → agente | revoca la tenencia vigente de un puerto (mantenimiento o controlador defectuoso) |
+| `RequestHandover` / `HandoverAnswer` | controlador ↔ agente ↔ dueño | botón de peatón: pedido de cesión y respuesta del dueño |
+| `KillSwitch`, `Contest`, `SecureClose` | servidor → agente | interrupción forzada, impugnación y cierre por seguridad (sólo TLS con autenticación mutua y permiso explícito) |
+| `ReadEvents` | servidor → agente | consulta del registro de eventos |
 | `Restart` | servidor → agente | reinicio controlado |
 
 `GetConfig` devuelve sólo la configuración vigente; para volver atrás el servidor reenvía una configuración completa.
@@ -53,7 +56,8 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 
 ## Qué guarda RemoteUSB
 
-Sólo la configuración vigente: modo, administrador autorizado, material TLS y puertos, protegida (DPAPI de máquina en Windows, `0600` en POSIX). Sin historia; se sobrescribe en cada cambio y se usa en cada arranque.
+- **Configuración vigente:** modo, administrador autorizado, material TLS y puertos, protegida (DPAPI de máquina en Windows, `0600` en POSIX). Sin versiones anteriores; se sobrescribe en cada cambio y se usa en cada arranque.
+- **Registro de eventos:** tomas, liberaciones, pedidos de cesión, kill switch, impugnaciones, cierres por seguridad, aparición/desaparición de dispositivos y cambios de configuración (quién, cuándo, revisión; no su contenido). Persistente, con tamaño acotado y rotación, protegido igual que la configuración. Consultable por el servidor y los observadores autorizados para auditar aunque no estuvieran conectados en el momento del evento.
 
 ## Revisión de riesgos
 
@@ -95,6 +99,41 @@ Lo que agrega la administración remota:
 
 Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; RemoteUSB acota el daño, pero no adivina cuándo terminó una tarea.
 
+## Botón de peatón, kill switch e impugnación
+
+Decisión humana del 2026-10-26. Asegurar el kill switch es indispensable; el kill switch y su impugnación son **opciones de seguridad** que el servidor habilita por puerto para la empresa que quiera tenerlas a mano. Las reglas de cuándo un corte es legítimo (ventana de mantenimiento, failover) son de la empresa y las aplica el servidor u observador, no RemoteUSB.
+
+### Botón de peatón (pedido de cesión)
+
+- Un controlador conectado que observa el semáforo envía `RequestHandover{portId, motivo}`. RemoteUSB lo reenvía al dueño y lo notifica a los observadores.
+- El dueño responde `HandoverAnswer{cede | mantiene}`. Si cede, libera y el puerto pasa por la cola normal (prioridad, luego orden). Si mantiene, el solicitante recibe la negativa.
+- Si el dueño no responde, **mantiene**: ceder por silencio permitiría robar el puerto saturando al dueño. Un dueño caído ya pierde el puerto al vencer su lease.
+- Límite de pedidos por controlador e intervalo, para que no se interrumpa al dueño en cada operación.
+
+### Kill switch (interrupción forzada)
+
+Requisitos mínimos:
+
+1. Sólo por TLS con autenticación de ambos extremos (certificado de cliente o PSK). Un TLS que sólo cifra no identifica a quien corta. Sin TLS no hay kill switch.
+2. Permiso explícito asignado por el servidor administrador; estar en la lista de controladores no alcanza.
+3. **Quien corta no se queda con el puerto:** tras el corte, el puerto queda en cuarentena sin dueño durante un plazo configurable (la ventana de impugnación) y luego vuelve a la cola normal. Así cortar no sirve para tomar el puerto.
+4. Espera mínima entre cortes del mismo solicitante.
+5. Evento `KillSwitch` emitido a todos los controladores y observadores y guardado en el registro: solicitante (identidad TLS y dirección), dueño cortado, puerto, generación, bytes en tránsito o escritura incierta, motivo declarado, hora y plazo de impugnación.
+
+El dueño cortado recibe `Revoked` con código propio; el siguiente dueño recibe la discontinuidad (`PortEvent`) y debe resincronizar la sesión del instrumento.
+
+### Impugnación
+
+- Un observador autorizado (también por TLS y con permiso explícito) envía `Contest{eventId, motivo}` dentro del plazo de impugnación.
+- Efecto: RemoteUSB **corta la conexión del solicitante del kill switch** y lo bloquea por un plazo configurable (o hasta que el administrador lo habilite). No restablece la interfaz por sí misma: el puerto sigue en cuarentena y luego en la cola normal, salvo que el impugnante pida cierre por seguridad.
+- Cierre por seguridad (`SecureClose`): opcional junto con la impugnación, deja el puerto cerrado para todos. Sólo el servidor administrador lo reabre, no quien lo cerró; así el cierre no se convierte en un modo de dejar el equipo fuera de servicio a voluntad.
+- Impugnación y cierre quedan en el registro y se notifican a todos, igual que el kill switch, para que un sistema de seguridad avanzado marque amenazas en su red. Ejemplo: un kill switch fuera de una ventana de mantenimiento o sin failover en curso es altamente impugnable según las reglas de la empresa.
+
+### Alcance de la protección
+
+- Cubre: controlador defectuoso o abusivo que no suelta el puerto, controlador o servidor no autorizado, intruso en la red cuando hay TLS, y el uso del kill switch para robar el puerto (cuarentena, evidencia e impugnación).
+- No cubre por sí solo: un servidor autorizado y comprometido que corta repetidamente; queda limitado por la espera entre cortes y expuesto a la impugnación y al bloqueo. Tampoco a instalaciones que operan sin TLS, donde no hay kill switch.
+
 ## Configuración local
 
 Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:28240` con el mismo protocolo y la misma autorización.
@@ -112,4 +151,4 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 
 ## Pruebas requeridas
 
-Semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
+Botón de peatón (cede, mantiene, sin respuesta, límite de pedidos); kill switch rechazado sin TLS o sin permiso, cuarentena sin ventaja para el solicitante, espera entre cortes, impugnación que corta y bloquea al solicitante, cierre por seguridad reabierto sólo por el administrador y registro persistente de eventos; semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
