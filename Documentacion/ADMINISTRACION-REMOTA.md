@@ -40,6 +40,7 @@ Extensión de RemoteUSB Link v1 (mismo encuadre y CBOR), tipos `0x40–0x4F`, en
 | `SetConfig` | servidor → agente | configuración completa de puertos y tiempos; se valida entera y reemplaza a la vigente de una vez |
 | `SetTls` | servidor → agente | certificado, clave privada y CA de controladores, provistos por el servidor |
 | `DeviceEvent` | agente → servidor | aparición/desaparición de un dispositivo serie, con su identidad física |
+| `RevokePort` | servidor → agente | revoca la tenencia vigente de un puerto (mantenimiento o controlador defectuoso) |
 | `Restart` | servidor → agente | reinicio controlado |
 
 `GetConfig` devuelve sólo la configuración vigente; para volver atrás el servidor reenvía una configuración completa.
@@ -58,18 +59,41 @@ Sólo la configuración vigente: modo, administrador autorizado, material TLS y 
 
 | # | Riesgo | Consecuencia | Mitigación propuesta |
 |---|---|---|---|
-| R1 | **Toma del agente recién instalado.** Entre la instalación y la primera configuración, quien alcance el puerto 28240 puede configurarlo en modo restringido y quedarse con él. | El laboratorio pierde el control del equipo; recuperarlo exige reinstalar con permisos de administrador del sistema. | Permitir fijar el servidor **al instalar** (`service install --server host:puerto [--server-cert sha256]`): RemoteUSB arranca ya restringido e iniciado por el agente, sin ventana abierta y sin código. Sin ese parámetro, la ventana existe; acotarla con el firewall del equipo y configurar inmediatamente después de instalar. |
-| R2 | **Administración en plano.** Sin TLS, el administrador se reconoce por su dirección IP. En la misma red se puede suplantar (ARP spoofing) o interceptar. | Un tercero reconfigura el agente, lee o inyecta datos del instrumento (datos de pacientes, comandos al analizador). | Plano sólo en redes confiables y segmentadas. Recomendación: el canal de administración siempre con TLS, aunque Link vaya en plano; RemoteUSB genera su propio certificado y el servidor fija su huella en el primer contacto (sin intervención humana). |
-| R3 | **Clave privada enviada en plano.** `SetTls` lleva la clave privada del servidor al agente. | Si el canal es plano, la clave queda expuesta en la red y el TLS posterior no protege nada. | Rechazar `SetTls` con clave privada por un canal de administración plano. Compatible con R2. |
-| R4 | **Acceso local por 127.0.0.1.** Cualquier proceso o usuario del equipo llega al puerto local. | Un usuario sin privilegios reconfigura el agente. | En modo restringido, la conexión local exige la misma autorización que la remota; no hay excepción por ser local. Sin configurar, aplica R1. |
+| R1 | **Toma del agente recién instalado.** Entre la instalación y la primera configuración, quien alcance el puerto 28240 puede configurarlo en modo restringido y quedarse con él. | El laboratorio pierde el control del equipo; recuperarlo exige reinstalar con permisos de administrador del sistema. | **Decidido:** opción de fijar el servidor al instalar (`service install --server host:puerto [--server-cert sha256 | --psk …]`): arranca ya restringido e iniciado por el agente. Sin ese parámetro ni firewall, el riesgo lo asume quien opera la instalación. |
+| R2 | **Administración en plano.** Sin TLS, el administrador se reconoce por su dirección IP. En la misma red se puede suplantar (ARP spoofing) o interceptar. | Un tercero reconfigura el agente, lee o inyecta datos del instrumento. | **Decidido:** el plano es una opción legítima (puede haber motivos para no usar TLS). TLS es la recomendación documentada; no usarla es un riesgo que asume el operador. |
+| R3 | **Clave privada enviada en plano.** `SetTls` lleva la clave privada al agente. | Si el canal es plano, la clave queda expuesta y el TLS posterior no protege nada. | **Decidido:** cuando se requiere TLS, su aprovisionamiento viaja por un canal seguro. RemoteUSB rechaza `SetTls` con clave privada por un canal plano. El canal inicial puede ser TLS con el certificado autogenerado del agente (huella fijada por el servidor) o TLS-PSK; ver [Aprovisionamiento seguro](#aprovisionamiento-seguro). |
+| R4 | **Acceso local por 127.0.0.1.** Cualquier proceso del equipo llega al puerto local. | Un usuario sin privilegios usa o reconfigura el agente. | **Decidido:** el acceso local se restringe sólo si el servidor lo restringe. El uso local es legítimo: una instancia local (p. ej. EDC local) puede tomar el puerto por `127.0.0.1` cuando el servidor cae, o como failover por latencia, compitiendo por el mismo semáforo. |
 | R5 | **Servidor suplantado en modo "inicia el agente".** RemoteUSB conecta a una dirección; DNS o IP pueden apuntar a otro equipo. | Un servidor falso le entrega configuración o recibe los datos. | Con TLS, fijar el certificado del servidor. En plano no hay mitigación técnica: sólo red confiable. |
 | R6 | **Servidor perdido.** Si el servidor administrador desaparece (reinstalado, certificado perdido), nadie puede cambiar la configuración. | El equipo sigue funcionando con la última configuración, pero no se puede administrar. | Es el comportamiento buscado (decisión 9). Recuperación: reinstalar el servicio con permisos de administrador del sistema, lo que borra el estado. El servidor debe respaldar su identidad (certificado y clave). |
 | R7 | **Clave privada en reposo.** DPAPI de máquina protege contra otros equipos, no contra un administrador local. | Un administrador del equipo puede extraer la clave TLS. | Aceptado: quien administra el sistema operativo ya controla el puerto serie. Documentarlo. |
 | R8 | **Escritura al instrumento.** Un controlador con el puerto concedido envía bytes crudos al analizador. | Comandos no deseados (borrado, reprocesos) desde un controlador autorizado o comprometido. | Lista de controladores entregada por el servidor; modo restringido por defecto; el compartido se habilita explícitamente. |
 | R9 | **Denegación de servicio.** Muchas conexiones o handshakes TLS (hoy un hilo por conexión). | El agente deja de atender al servidor legítimo. | Límites de conexiones y handshakes y espera entre intentos fallidos de administración (P-12). |
 | R10 | **Actualización del binario.** Fuera de este diseño. | Un ejecutable reemplazado tiene acceso a todo lo anterior. | Firma Authenticode del release y permisos del directorio de instalación; actualización remota queda como pendiente aparte. |
+| R11 | **Dominio del semáforo.** Un controlador que renueva su lease indefinidamente, o un timeout mal configurado, retiene el puerto aunque otros esperan; una conexión semiabierta lo retiene hasta que vence el lease o se detecta la caída. | Los servidores redundantes no pueden tomar el puerto (failover, mantenimiento, observación de calidad). | Ver [Semáforo de uso](#semáforo-de-uso-varios-servidores-y-varios-puertos): lease y heartbeat fijados por el servidor dentro de rangos que valida el agente, tope opcional de tenencia cuando hay espera y revocación administrativa. Los controladores que operan de forma asíncrona deben liberar el puerto al terminar. |
 
-Decisiones a confirmar a partir de esta revisión: R1 (`--server` al instalar), R2/R3 (administración siempre con TLS y `SetTls` sólo por TLS) y R4 (sin excepción local).
+## Aprovisionamiento seguro
+
+Cuando el servidor requiere TLS, el material se entrega por un canal ya cifrado. Dos formas, ambas soportadas por Mbed TLS 4.1 sin dependencias nuevas:
+
+- **TLS con el certificado autogenerado del agente.** RemoteUSB genera su par de claves al instalarse; el servidor fija la huella en el primer contacto y por ese canal entrega certificado, clave y CA. Protege contra quien escucha; no contra un intermediario activo en ese primer contacto, salvo que la huella se verifique o se pase con `--server-cert`.
+- **TLS-PSK.** Sí, sirve: una clave compartida pasada al instalar (`--psk`) autentica a ambos extremos desde el primer contacto, sin certificados. Condiciones: usar el modo PSK con (EC)DHE (TLS 1.3 `psk_dhe_ke` o TLS 1.2 `ECDHE-PSK`) para tener secreto hacia adelante; la PSK debe ser aleatoria de al menos 128 bits, no una contraseña, porque una PSK débil admite ataque de diccionario sobre un handshake capturado; una identidad PSK por agente, y rotación desde el servidor. La PSK puede quedar como autenticación permanente o usarse sólo para entregar los certificados.
+
+## Semáforo de uso: varios servidores y varios puertos
+
+RemoteUSB sirve muchos puertos a un servidor, o varios puertos a varios servidores. Ejemplo: cuatro servidores, tres redundantes y uno de estadística de calidad u observabilidad, conectados a la vez. Por puerto, el árbitro ya implementado:
+
+- concede el puerto a un solo controlador (lease con generación y `transferId`); los demás quedan en cola por prioridad y luego orden de llegada, sin expropiar al dueño;
+- libera el puerto cuando el dueño lo suelta (`Release`), cuando cierra la conexión, cuando pasan tres heartbeats sin tráfico o cuando vence el lease sin `Renew`, y lo concede al siguiente en cola;
+- vence las esperas en cola según el plazo de cada pedido.
+
+Lo que agrega la administración remota:
+
+- `leaseMs`, `heartbeatMs`, tamaño de cola y prioridades los fija el servidor por puerto; el agente valida rangos (mínimo y máximo) para que un error de configuración no deje el puerto tomado por horas ni lo revoque en cada pausa normal.
+- Tope opcional de tenencia `maxHoldMs`: si hay controladores esperando, el dueño no puede renovar más allá de ese tope y recibe `Revoked`. Sin espera, puede seguir renovando.
+- `RevokePort` administrativo para mantenimiento o para destrabar un controlador defectuoso.
+- La lista de controladores y prioridades incluye a la instancia local (`127.0.0.1`) cuando el servidor quiere permitir failover local.
+
+Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; RemoteUSB acota el daño, pero no adivina cuándo terminó una tarea.
 
 ## Configuración local
 
@@ -88,4 +112,4 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 
 ## Pruebas requeridas
 
-Toma de control del agente nuevo y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
+Semáforo: varios controladores conectados, espera y toma tras `Release`, caída de conexión, vencimiento de lease, `maxHoldMs` con y sin espera y `RevokePort`; PSK válida e inválida;  y rechazo de un segundo administrador en modo restringido; arranque con la última configuración sin servidor; modos plano/TLS y servidor/agente; `SetConfig` completo y rechazo de configuraciones inválidas sin cambios parciales; `SetTls` válido, inválido y rechazado por canal plano; `ListDevices`/`DeviceEvent` con dispositivos simulados y cambio de COM; instalación/desinstalación del servicio y reinicio con controladores conectados.
