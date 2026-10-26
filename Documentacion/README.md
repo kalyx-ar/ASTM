@@ -11,7 +11,7 @@ El nombre del repositorio se mantiene `ATSM`; en el texto, el protocolo se llama
 ```mermaid
 flowchart LR
     S[Instrumento RS232] <--> G[Agente C++<br/>puerto, arbitraje, traza]
-    G <-->|ATSM Link v1 sobre TCP/TLS| C
+    G <-->|RemoteUSB Link v1 sobre TCP/TLS| C
     N[Instrumento TCP / HL7] <--> C
     F[Archivos del anfitrión] --> E[Scheduler / ETL<br/>custodia y contenido completo]
     E --> M
@@ -25,7 +25,7 @@ flowchart LR
 
 | Pieza | Documento |
 |---|---|
-| 1. Interfaz de comunicación: canales, agente nativo, protocolo ATSM Link, TLS, formato de traza | [INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md) |
+| 1. Interfaz de comunicación: canales, agente nativo, protocolo RemoteUSB Link, TLS, formato de traza | [INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md) |
 | 2. Motor genérico: capas baja/mensaje/sesión/flujos, perfiles | [MOTOR-GENERICO](MOTOR-GENERICO.md) |
 | 3. Plugins: contrato, nivel declarativo, aislamiento, kit de conformidad, catálogo inicial | [PLUGINS](PLUGINS.md) |
 | Modelo canónico y puerto del anfitrión (LAW/FHIR, LOINC/UCUM) | [MODELO-CANONICO](MODELO-CANONICO.md) |
@@ -62,7 +62,7 @@ flowchart LR
 
 ## Propuestas nuevas de esta revisión
 
-- Protocolo **ATSM Link v1**: cabecera binaria fija + control en CBOR determinista + bytes crudos; esquemas CDDL y vectores compartidos.
+- Protocolo **RemoteUSB Link v1**: cabecera binaria fija + control en CBOR determinista + bytes crudos; esquemas CDDL y vectores compartidos.
 - **Mbed TLS 4.1 LTS** (4.1.1) como backend TLS del agente, aprobado; registro en [DEPENDENCIAS](DEPENDENCIAS.md).
 - **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
 - **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
@@ -76,7 +76,7 @@ flowchart LR
 ATSM/
   README.md  LICENSE  SECURITY.md  CHANGELOG.md
   spec/                  link-v1.cddl, agent-config.schema.json, profile.schema.json, model-v1, trace-v1
-  native/                agente C++17 (core, platform/win32|posix|esp32, tls, tools) — CMake
+  RemoteUSB/                agente C++17 (core, platform/win32|posix|esp32, tls, tools) — CMake
   dotnet/
     src/                 Atsm.Abstractions, Atsm.Channels, Atsm.Protocol.*, Atsm.Runtime, Atsm.Fhir, Atsm.Testing
     plugins/             Atsm.Plugin.Abbott.Architect, Atsm.Plugin.Abbott.CellDynRuby, Atsm.Plugin.Sysmex.Uwam, …

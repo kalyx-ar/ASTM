@@ -11,15 +11,15 @@ dotnet test dotnet/Atsm.slnx
 ```
 
 ```bash
-cmake -S native -B native/build/win-x64 -G "Visual Studio 18 2026" -A x64
+cmake -S RemoteUSB -B RemoteUSB/build/win-x64 -G "Visual Studio 18 2026" -A x64
 ```
 
 ```bash
-cmake --build native/build/win-x64 --config Release
+cmake --build RemoteUSB/build/win-x64 --config Release
 ```
 
 ```bash
-ctest --test-dir native/build/win-x64 -C Release
+ctest --test-dir RemoteUSB/build/win-x64 -C Release
 ```
 
 Al cerrar los campos UF: 391 pruebas .NET (7 contra el agente compilado, 5 por TLS) y 542 verificaciones nativas. Repetir ambas antes de commitear. GUI Windows Release y self-test de ventana/runtime privado/DPAPI por separado; incluye 8 vistas, 14 perfiles, avisos y contadores UF, campos por lectura, bloques cronológicos y tiempos HH:mm:ss.fff. SDK API 2: discriminación por perfil, intervalos de respuesta/operación/proceso separados y campos binarios con rangos. Las pruebas cruzadas se omiten (y lo informan) si el agente no está compilado.
@@ -58,7 +58,7 @@ Los mismos pasos sirven con `legacy.interface-log` (logs `Documentacion/trazas_e
 | Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y legacy de pruebas) |
 | Catálogo compartido y anfitrión de mantenimiento | `dotnet/tools/Atsm.Diagnostics.Core` |
 | GUI MAUI Windows | `dotnet/tools/Atsm.Diagnostics.Maui` (DPAPI del usuario; no depende de EDC) |
-| Agente nativo | `native/core`, `native/platform`, `native/tls`, `native/app` |
+| Agente nativo | `RemoteUSB/core`, `RemoteUSB/platform`, `RemoteUSB/tls`, `RemoteUSB/app` |
 | Protocolo agente ↔ host | `spec/link-v1.md`, `conformance/link-v1/vectors.txt` |
 | Sistema legacy (sólo consulta) | `../LEGACY` (fuera del repositorio; ver [REFERENCIAS-LEGACY](REFERENCIAS-LEGACY.md)) |
 
@@ -82,7 +82,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
-| P-16 | Agente como servicio y administración remota fijada por el servidor | Diseño decidido en [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md); falta implementar |
+| P-16 | RemoteUSB como servicio y administración remota fijada por el servidor | Confirmar R1–R4 de [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md); falta implementar |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 
@@ -126,17 +126,17 @@ Continuación: R24/ED de calibración ARCHITECT (incluido en P-02; puerto de inf
 
 ### P-06 Build Windows XP
 
-- Instalar el componente "C++ Windows XP Support for VS 2017 (v141) tools" y configurar con `-T v141_xp -A Win32 -DATSM_WINDOWS_XP=ON`.
+- Instalar el componente "C++ Windows XP Support for VS 2017 (v141) tools" y configurar con `-T v141_xp -A Win32 -DREMOTEUSB_WINDOWS_XP=ON`.
 - Verificar que compilen Mbed TLS 4.1.1 y el agente. Riesgos: APIs posteriores a XP dentro de Mbed TLS más allá de la entropía, `std::filesystem` en el STL de v141, `getaddrinfo` y `select`.
 - Probar en XP real: puerto serial, TLS 1.2/1.3 contra el host .NET y entropía (`entropy_win32_xp.c`). Documentar exactamente qué se probó.
 
 ### P-07 Build Linux / Raspberry Pi
 
-`native/platform/posix/serial_posix.cpp` está escrito pero nunca se compiló. Compilar con GCC/Clang (`-Werror`), correr `ctest`, probar con un adaptador USB-serial real y generar el binario ARM (Raspberry). En POSIX, `threading_alt.cpp` funciona igual; no hace falta `MBEDTLS_THREADING_PTHREAD`.
+`RemoteUSB/platform/posix/serial_posix.cpp` está escrito pero nunca se compiló. Compilar con GCC/Clang (`-Werror`), correr `ctest`, probar con un adaptador USB-serial real y generar el binario ARM (Raspberry). En POSIX, `threading_alt.cpp` funciona igual; no hace falta `MBEDTLS_THREADING_PTHREAD`.
 
 ### P-08 Firmware ESP32
 
-Crear `native/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae su propia versión de Mbed TLS: verificar compatibilidad con la API 4.x usada en `native/tls` o adaptar, y registrar la versión en DEPENDENCIAS. Hay que dimensionar la memoria (buffers, sesiones TLS simultáneas) y anunciar `traceCapture = 0` o RAM.
+Crear `RemoteUSB/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae su propia versión de Mbed TLS: verificar compatibilidad con la API 4.x usada en `RemoteUSB/tls` o adaptar, y registrar la versión en DEPENDENCIAS. Hay que dimensionar la memoria (buffers, sesiones TLS simultáneas) y anunciar `traceCapture = 0` o RAM.
 
 ### P-09 Agente: lo reservado en Link v1
 

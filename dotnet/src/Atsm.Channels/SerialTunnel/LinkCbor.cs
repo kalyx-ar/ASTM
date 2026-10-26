@@ -4,7 +4,7 @@ using System.Text;
 namespace Atsm.Channels.SerialTunnel;
 
 /// <summary>
-/// Deterministic CBOR subset of ATSM Link v1, mirroring native/core/src/cbor.cpp: unsigned and negative integers,
+/// Deterministic CBOR subset of RemoteUSB Link v1, mirroring RemoteUSB/core/src/cbor.cpp: unsigned and negative integers,
 /// byte and text strings, arrays, maps with unsigned keys in ascending order, booleans and null.
 /// Values are <see cref="ulong"/>, <see cref="long"/> (negative only), <see cref="byte"/>[], <see cref="string"/>,
 /// <see cref="bool"/>, null, <see cref="List{T}"/> of object and <see cref="SortedDictionary{TKey,TValue}"/> keyed by ulong.

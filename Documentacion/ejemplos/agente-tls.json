@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "atsm-agent/1",
+  "schemaVersion": "remoteusb/1",
   "agentId": "bridge-sintetico-01",
   "platformProfile": "windows-desktop",
   "listen": {
