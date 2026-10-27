@@ -87,7 +87,7 @@ Las trazas reales no salen de `Documentacion/trazas_externas/` (ignorada). Resul
 ## Diferencias con la propuesta
 
 - Formato de traza v1: JSON Lines (`atsm-trace/1`). La aplicación orquestante posee la persistencia; cualquier captura durable del agente requiere custodia cifrada y alcance propio.
-- PortGate implementa (2026-10-26, P-09) el rol de conexión invertido, observadores de sólo lectura con derecho explícito y captura sellada AES-256-GCM con clave del anfitrión, borrado por custodia y huecos explícitos; anuncia `traceCapture = 2` sólo en puertos con captura. Falta la custodia en EDC/SQLCipher (P-13).
+- PortGate implementa (2026-10-26, P-09) el rol de conexión invertido, observadores con derecho explícito (tráfico sólo en puertos compartidos; en exclusivos, semáforo y estado; cola por conexión para no afectar al dueño, 2026-10-27) y captura sellada AES-256-GCM con clave del anfitrión, borrado por custodia y huecos explícitos; anuncia `traceCapture = 2` sólo en puertos con captura. Falta la custodia en EDC/SQLCipher (P-13).
 - Los bytes recibidos sin dueño se cuentan y se informan en `Granted`; no se entregan.
 - TLS del agente con Mbed TLS 4.1.1: servidor TLS 1.2/1.3 con certificado de cliente obligatorio por defecto. El rol de cliente TLS del agente (conexión saliente) no está implementado.
 - Catálogo integrado compartido por `atsm-trace` y la GUI; la carga/admisión de DLL en caliente corresponde sólo a EDC (decisión 2026-10-25). CFX se analiza desde GUI/API, no con los comandos ASTM de la CLI.

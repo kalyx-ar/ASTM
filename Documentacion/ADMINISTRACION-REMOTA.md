@@ -97,6 +97,8 @@ Lo que agrega la administración remota:
 - `RevokePort` administrativo para mantenimiento o para destrabar un controlador defectuoso.
 - La lista de controladores y prioridades incluye a la instancia local (`127.0.0.1`) cuando el servidor quiere permitir failover local.
 
+Observadores (decisión humana del 2026-10-27): un controlador con el derecho de observación sólo lee el flujo bidireccional cuando el acceso del puerto es **compartido** (`shared`, por puerto). En un puerto **exclusivo** (predeterminado) el tráfico es sólo del dueño y el observador ve el semáforo y el estado (`PortState`: dispositivo abierto, dueño, generación, cola, cierre por seguridad, cuarentena) y los eventos de seguridad. Ningún observador afecta el rendimiento del controlador que tomó el puerto: cada conexión tiene su cola y su hilo de escritura, y las copias para un observador atrasado se descartan con hueco visible en la secuencia.
+
 Responsabilidad de los controladores: quien opere de forma asíncrona o con varios destinos debe configurar su lease y liberar el puerto al terminar; PortGate acota el daño, pero no adivina cuándo terminó una tarea.
 
 ## Solicitud de cesión, kill switch e impugnación

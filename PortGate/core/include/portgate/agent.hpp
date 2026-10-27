@@ -2,6 +2,8 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -75,7 +77,16 @@ private:
     struct Connection {
         ConnectionId id = 0;
         std::unique_ptr<Transport> transport;
-        std::mutex send_mutex;
+        // Encoded units waiting for the writer thread of the connection: a slow peer never blocks the sender (the port
+        // thread, the arbitration or other connections).
+        std::mutex outbox_mutex;
+        std::condition_variable outbox_changed;
+        std::deque<std::vector<std::uint8_t>> outbox;
+        std::size_t outbox_bytes = 0;
+        bool writing = false;      // the writer is sending a unit taken from the outbox
+        bool closing = false;      // no more units are queued; the writer drains and leaves
+        bool writer_done = false;
+        std::uint64_t dropped_observed = 0;
         std::string controller_id;
         std::string peer;
         bool hello = false;
@@ -112,6 +123,7 @@ private:
         std::uint64_t capture_offset[2] = {0, 0};  // all bytes per direction (0 instrument→agent, 1 agent→instrument)
         std::uint64_t observe_seq = 0;
         std::vector<ConnectionId> observers;
+        std::vector<std::uint8_t> observed_state;  // last PortState sent to the observers (encoded map)
     };
 
     struct KillRecord {
@@ -148,7 +160,16 @@ private:
     /// Sends the arbiter decisions. Must be called with `mutex_` held.
     void dispatch(Port& port, const std::vector<ArbiterEvent>& events);
 
-    void send(const std::shared_ptr<Connection>& connection, const link::Unit& unit);
+    /// Sends PortState to the observers of the port when it changed (or to `only` unconditionally). Called with `mutex_` held.
+    void publish_state(Port& port, const std::shared_ptr<Connection>& only = nullptr);
+
+    /// Queues the unit for the writer thread and returns at once. A droppable unit (observed traffic) is discarded when
+    /// the connection is behind by more than kObserverBacklog; any other unit past kOutboxLimit drops the connection.
+    void send(const std::shared_ptr<Connection>& connection, const link::Unit& unit, bool droppable = false);
+    void start_writer(const std::shared_ptr<Connection>& connection);
+    void writer_loop(std::shared_ptr<Connection> connection);
+    /// Lets the writer flush what is queued (bounded wait) and closes the transport.
+    static void close_writer(Connection& connection, int wait_ms);
     void send_error(const std::shared_ptr<Connection>& connection, const std::string& code, std::uint64_t request_id, const std::string& detail,
                     std::uint16_t channel = 0);
     void send_hello(const std::shared_ptr<Connection>& connection);

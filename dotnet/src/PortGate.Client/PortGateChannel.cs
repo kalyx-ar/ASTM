@@ -52,6 +52,7 @@ public sealed class PortGateChannel : IAsyncDisposable
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Channel<PortGateEvent> _events = Channel.CreateUnbounded<PortGateEvent>();
     private readonly Channel<PortGateAuditEvent> _securityEvents = Channel.CreateUnbounded<PortGateAuditEvent>();
+    private readonly Channel<PortGatePortState> _portStates = Channel.CreateUnbounded<PortGatePortState>();
     private readonly Channel<PortGateObservation> _observations = Channel.CreateUnbounded<PortGateObservation>();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _controlReplies = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _writeReplies = new();
@@ -192,16 +193,25 @@ public sealed class PortGateChannel : IAsyncDisposable
             yield return item;
     }
 
-    /// <summary>Starts or stops the read-only copy of the port traffic (needs the Observe right; announced to everyone on the port).</summary>
-    public async Task<bool> ObserveAsync(bool enable, CancellationToken cancellationToken)
+    /// <summary>Starts or stops observing the port (needs the Observe right; announced to everyone on the port). Every observer
+    /// follows the semaphore and the port state; the traffic is copied only when the port is shared.</summary>
+    public async Task<PortGateObserving> ObserveAsync(bool enable, CancellationToken cancellationToken)
     {
         var map = await ControlRequestAsync(LinkType.Observe, LinkCbor.Map((1, enable)), cancellationToken).ConfigureAwait(false);
         if (map.GetValueOrDefault(2UL) is string code)
             throw new PortGateException(code, "observation refused by the agent");
-        return map.GetValueOrDefault(1UL) is true;
+        return new PortGateObserving(map.GetValueOrDefault(1UL) is true, map.GetValueOrDefault(3UL) is true);
     }
 
-    /// <summary>Observed traffic of the port, both directions, whoever owns it.</summary>
+    /// <summary>Semaphore and state of the port as seen by an observer: sent on start and whenever it changes.</summary>
+    public async IAsyncEnumerable<PortGatePortState> PortStatesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var item in _portStates.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            yield return item;
+    }
+
+    /// <summary>Observed traffic of a shared port, both directions, whoever owns it. Copies the agent had to discard for a
+    /// slow observer show as jumps in <see cref="PortGateObservation.Sequence"/>.</summary>
     public async IAsyncEnumerable<PortGateObservation> ObservationsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var item in _observations.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -302,6 +312,7 @@ public sealed class PortGateChannel : IAsyncDisposable
             Publish(PortGateEventKind.Closed, null, _closeReason ?? "agent connection closed");
             _events.Writer.TryComplete();
             _securityEvents.Writer.TryComplete();
+            _portStates.Writer.TryComplete();
             _observations.Writer.TryComplete();
             foreach (var reply in _controlReplies.Values.Concat(_writeReplies.Values))
                 reply.TrySetException(new IOException(_closeReason ?? "Agent connection closed."));
@@ -358,6 +369,11 @@ public sealed class PortGateChannel : IAsyncDisposable
                 var yield = _options.HandoverDecision?.Invoke(asked) ?? false;
                 _ = SendAsync(LinkUnit.Control(LinkType.HandoverAnswer, _port, LinkCbor.Map((0, asked.HandoverId), (1, yield))), _stop.Token)
                     .ContinueWith(_ => { }, TaskScheduler.Default);
+                break;
+            case LinkType.PortState when unit.Channel == _port:
+                _portStates.Writer.TryWrite(new PortGatePortState(map.GetValueOrDefault(0UL) is true, map.GetValueOrDefault(1UL) as string,
+                    (uint)(map.GetValueOrDefault(2UL) as ulong? ?? 0), (int)(map.GetValueOrDefault(3UL) as ulong? ?? 0), map.GetValueOrDefault(4UL) is true,
+                    map.GetValueOrDefault(5UL) is true, map.GetValueOrDefault(6UL) is true));
                 break;
             case LinkType.SecurityEvent when unit.Channel == _port:
                 _securityEvents.Writer.TryWrite(new PortGateAuditEvent(requestId,
@@ -534,3 +550,9 @@ public sealed class PortGateChannel : IAsyncDisposable
 
 /// <summary>Read-only copy of the port traffic. <paramref name="Direction"/>: 0 instrument→agent, 1 agent→instrument.</summary>
 public sealed record PortGateObservation(ulong Sequence, ulong Offset, uint Generation, int Direction, ReadOnlyMemory<byte> Data);
+
+/// <summary>Answer to <see cref="PortGateChannel.ObserveAsync"/>: observing, and whether the traffic is copied (shared port).</summary>
+public sealed record PortGateObserving(bool Observing, bool Traffic);
+
+/// <summary>Port state for observers: device open, owner, generation, queued requests, secure close, quarantine and access mode.</summary>
+public sealed record PortGatePortState(bool Open, string? Owner, uint Generation, int Queued, bool SecureClosed, bool Quarantined, bool Shared);

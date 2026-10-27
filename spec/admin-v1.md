@@ -65,7 +65,7 @@ Rules:
 | 6 | security {0 killSwitch bool, 1 contest bool, 2 quarantineMs, 3 killCooldownMs, 4 contestBlockMs, 5 handoverIntervalMs, 6 handoverTimeoutMs} |
 | 7 | ports [Port] |
 
-Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest, 4 observe)}], 7 maxWriteBytes, 8 capture {0 enabled bool, 1 maxBytes [65536, 1 GiB] (default 16 MiB), 2 retentionMs [60000, 90 days] (default 7 days)}}.
+Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest, 4 observe)}], 7 maxWriteBytes, 8 capture {0 enabled bool, 1 maxBytes [65536, 1 GiB] (default 16 MiB), 2 retentionMs [60000, 90 days] (default 7 days)}, 9 shared bool (default false: exclusive)}.
 
 Unknown keys and out-of-range values are rejected with the path of the field.
 
@@ -92,7 +92,8 @@ Server side (.NET): `PortGateListener` accepts the agent connections; `PortGateA
 | 0x1D Contest | controller → agent | 0 requestId, 1 killEventId, 2 reason, 3 secureClose bool |
 | 0x1E SecurityResult | agent → requester | 0 requestId, 1 eventId (kill switch or contest accepted; refusals are `Error` with the requestId) |
 | 0x30 Observe | controller → agent | 0 requestId, 1 enable bool (needs right 4, else `PORTGATE-OBSERVE-NOT-ALLOWED`) |
-| 0x31 ObserveResult | agent → requester | 0 requestId, 1 observing bool, 2 code |
+| 0x31 ObserveResult | agent → requester | 0 requestId, 1 observing bool, 2 code, 3 traffic bool (the port is shared) |
+| 0x25 PortState | agent → observer | 0 open bool, 1 owner, 2 generation, 3 queued, 4 secureClosed bool, 5 quarantined bool, 6 shared bool (on Observe and whenever it changes) |
 | 0x23 SecurityEvent | agent → every controller of the port | 0 eventId, 1 kind, 2 portId, 3 actor, 4 target, 5 generation, 6 reason, 7 untilUtcMs, 8 uncertain, 9 timeUtcMs |
 
 Cooperative handover request:
@@ -114,7 +115,9 @@ Contest (optional, `security.contest`):
 
 `maxHoldMs` (per port): while other controllers wait, an owner whose continuous tenure reached the limit gets `Revoked` `PORTGATE-MAX-HOLD` instead of a renewal.
 
-Observers receive a read-only copy of every byte of the port, owned or not, as `ObservedData` (spec/link-v1.md). Observing never grants writing or ownership. `observe-start`/`observe-stop` go as SecurityEvent to the controllers of the port and to the event log: there is no hidden tap.
+Every observer follows the semaphore and the port state (`PortState`, SecurityEvent). Only on a shared port (`shared`) does it also receive a read-only copy of every byte, owned or not, as `ObservedData` (spec/link-v1.md); on an exclusive port the traffic belongs to the owner alone. Observing never grants writing or ownership.
+
+No observer slows the owner: every connection has its own writer thread and outbox, so the port thread, the arbitration and the other connections never wait on a peer. Copies for an observer more than 256 KiB behind are discarded and show as a jump in the ObservedData `seq`; a connection more than 4 MiB behind on any other unit is closed. `observe-start`/`observe-stop` go as SecurityEvent to the controllers of the port and to the event log: there is no hidden tap.
 
 ## Sealed capture
 

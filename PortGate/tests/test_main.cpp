@@ -1020,7 +1020,13 @@ void test_sealed_capture_store() {
     std::filesystem::remove_all(directory, ignored);
 }
 
-void test_observers_and_capture_tap() {
+std::optional<Value> port_state(Client& client, int timeout_ms = 3000) {
+    auto unit = client.next(link::Type::PortState, timeout_ms);
+    if (!unit) return std::nullopt;
+    return link::parse_map(*unit);
+}
+
+void test_observers_and_capture_tap(bool shared) {
     std::string error;
     CHECK(platform::network_startup(error));
     FakeInstrument instrument;
@@ -1028,6 +1034,7 @@ void test_observers_and_capture_tap() {
     auto config = sample_config(instrument.listener.port());
     config.ports[0].controller_rights["server-c"] = RightObserve;
     config.ports[0].capture.enabled = true;
+    config.ports[0].shared = shared;
     std::vector<Value> captured;
     std::mutex captured_mutex;
     Agent agent(config, [](LogLevel, const std::string&) {});
@@ -1050,20 +1057,24 @@ void test_observers_and_capture_tap() {
     CHECK(capabilities && (*link::parse_map(*capabilities)->get(0)->as_array())[0].get(3)->as_uint() == std::optional<std::uint64_t>(2));
     c.send(link::control(link::Type::Observe, 1, Value::map({{0, Value::uint(2)}, {1, Value::boolean(true)}})));
     auto accepted = c.next(link::Type::ObserveResult);
-    CHECK(accepted && *link::parse_map(*accepted)->get(1)->as_bool());
+    CHECK(accepted && *link::parse_map(*accepted)->get(1)->as_bool() && link::parse_map(*accepted)->get(3)->as_bool() == std::optional<bool>(shared));
+    auto idle = port_state(c);  // the observer starts with the state of the semaphore
+    CHECK(idle && !idle->get(1) && idle->get(6)->as_bool() == std::optional<bool>(shared));
 
-    // Bytes of the instrument reach the observer and the capture even with no owner.
+    // Bytes of the instrument reach the capture even with no owner; the observer sees them only on a shared port.
     const std::uint8_t enq[] = {0x05};
     instrument.socket.send_all(enq, sizeof(enq));
-    auto rx = c.next(link::Type::ObservedData);
+    auto rx = c.next(link::Type::ObservedData, shared ? 3000 : 500);
     auto rx_data = rx ? link::parse_observed_data(*rx) : std::nullopt;
-    CHECK(rx_data && rx_data->direction == 0 && rx_data->data.size() == 1 && rx_data->data[0] == 0x05);
+    if (shared) CHECK(rx_data && rx_data->direction == 0 && rx_data->data.size() == 1 && rx_data->data[0] == 0x05);
+    else CHECK(!rx);
 
-    // What the owner writes is observed too; the observer cannot write.
     Client a = hello_client(agent.listen_port(), "controller", "server-a");
     a.send(link::control(link::Type::Acquire, 1, Value::map({{0, Value::uint(3)}, {1, Value::integer(0)}, {2, Value::uint(0)}})));
     auto granted = a.next(link::Type::Granted);
     CHECK(granted.has_value());
+    auto owned = port_state(c);  // every observer follows the semaphore
+    CHECK(owned && owned->get(1) && *owned->get(1)->as_text() == "server-a");
     if (granted) {
         auto grant = *link::parse_map(*granted);
         const auto generation = static_cast<std::uint32_t>(*grant.get(1)->as_uint());
@@ -1073,12 +1084,50 @@ void test_observers_and_capture_tap() {
         ack.generation = generation;
         ack.data = {0x06};
         a.send(link::serial_data(1, ack));
-        auto tx = c.next(link::Type::ObservedData);
+        CHECK(a.next(link::Type::WriteStatus).has_value());
+        auto tx = c.next(link::Type::ObservedData, shared ? 3000 : 500);
         auto tx_data = tx ? link::parse_observed_data(*tx) : std::nullopt;
-        CHECK(tx_data && tx_data->direction == 1 && tx_data->data[0] == 0x06 && tx_data->generation == generation);
-        c.send(link::serial_data(1, ack));
+        if (shared) CHECK(tx_data && tx_data->direction == 1 && tx_data->data[0] == 0x06 && tx_data->generation == generation);
+        else CHECK(!tx);
+        c.send(link::serial_data(1, ack));  // an observer never writes
         auto denied = c.next(link::Type::WriteStatus);
         CHECK(denied && *link::parse_map(*denied)->get(3)->as_uint() == static_cast<std::uint64_t>(link::WriteResult::Rejected));
+
+        if (shared) {
+            // An observer that stops reading never slows the owner: its copies are discarded, the owner gets every byte.
+            constexpr std::size_t kBurst = 8 * 1024 * 1024;
+            std::thread flood([&] {
+                std::vector<std::uint8_t> chunk(4096, 0x41);
+                for (std::size_t sent = 0; sent < kBurst; sent += chunk.size()) instrument.socket.send_all(chunk.data(), chunk.size());
+            });
+            const auto started = platform::monotonic_ms();
+            std::size_t received = 0;
+            while (received < kBurst) {
+                auto unit = a.next(link::Type::SerialData, 5000);
+                if (!unit) break;
+                if (auto data = link::parse_serial_data(*unit)) received += data->data.size();
+                a.pending.erase(std::remove_if(a.pending.begin(), a.pending.end(), [](const link::Unit& u) { return u.type != link::Type::SerialData; }), a.pending.end());
+            }
+            flood.join();
+            CHECK(received == kBurst);
+            CHECK(platform::monotonic_ms() - started < 15000);
+            instrument.socket.send_all(enq, sizeof(enq));  // the next copy after the burst shows any discarded tail
+            // The observer is still connected and learns the gaps from the ObservedData sequence.
+            std::uint64_t last_seq = 0;
+            std::size_t observed = 0, observed_bytes = 0;
+            bool gap = false;
+            while (auto unit = c.next(link::Type::ObservedData, 1000)) {
+                auto data = link::parse_observed_data(*unit);
+                if (!data) break;
+                if (observed > 0 && data->seq != last_seq + 1) gap = true;
+                last_seq = data->seq;
+                ++observed;
+                observed_bytes += data->data.size();
+                c.pending.erase(std::remove_if(c.pending.begin(), c.pending.end(), [](const link::Unit& u) { return u.type != link::Type::ObservedData; }), c.pending.end());
+            }
+            CHECK(observed > 0);
+            CHECK(gap || observed_bytes >= kBurst);
+        }
     }
     auto notice = b.next(link::Type::SecurityEvent);  // everyone on the port learned that server-c observes
     CHECK(notice && *link::parse_map(*notice)->get(1)->as_text() == "observe-start" && *link::parse_map(*notice)->get(3)->as_text() == "server-c");
@@ -1202,7 +1251,8 @@ int main(int argc, char** argv) {
     test_hot_device_reconfiguration();
     test_agent_initiated_connections();
     test_sealed_capture_store();
-    test_observers_and_capture_tap();
+    test_observers_and_capture_tap(false);
+    test_observers_and_capture_tap(true);
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

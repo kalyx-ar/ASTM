@@ -275,7 +275,7 @@ void Supervisor::serve_admin(std::unique_ptr<Transport> transport, const std::st
 void Supervisor::connection_loop(const std::shared_ptr<AdminConnection>& connection, link::Decoder decoder, std::vector<link::Unit> pending) {
     for (const auto& unit : pending) {
         handle(connection, unit);
-        if (!connection->alive) return;
+        if (!connection->alive) break;
     }
     std::vector<std::uint8_t> buffer(16 * 1024);
     std::vector<link::Unit> units;
@@ -289,6 +289,13 @@ void Supervisor::connection_loop(const std::shared_ptr<AdminConnection>& connect
             handle(connection, unit);
             if (!connection->alive) break;
         }
+    }
+    // The agent ended the connection (refusal): read what the server already sent for a moment, so closing with unread
+    // data does not reset the connection and discard the refusal before the server reads it.
+    const auto until = platform::monotonic_ms() + 250;
+    while (!connection->alive && !stopping_ && platform::monotonic_ms() < until) {
+        const int n = connection->transport->receive(buffer.data(), buffer.size(), 50);
+        if (n != -2 && n <= 0) break;
     }
 }
 

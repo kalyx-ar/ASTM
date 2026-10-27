@@ -26,6 +26,7 @@ public enum LinkType : byte
     PortEvent = 0x22,
     SecurityEvent = 0x23,
     ObservedData = 0x24,
+    PortState = 0x25,
     Observe = 0x30,
     ObserveResult = 0x31,
     GetStatus = 0x40,

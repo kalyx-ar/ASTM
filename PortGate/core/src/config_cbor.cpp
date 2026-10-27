@@ -108,7 +108,7 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
 }
 
 bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& port) {
-    const auto* m = r.map(v, path, 8);
+    const auto* m = r.map(v, path, 9);
     if (!m) return false;
     port.port_id = r.text(*m, path, 0, true);
     port.instrument_id = r.text(*m, path, 1, false);
@@ -120,6 +120,7 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
     port.max_hold_ms = static_cast<std::uint32_t>(r.number(*m, path, 5, 0, 0, 86400000));
     if (port.max_hold_ms != 0 && port.max_hold_ms < port.lease_ms) return r.fail(path + "/5", "must be 0 or at least the lease");
     port.max_write_bytes = static_cast<std::size_t>(r.number(*m, path, 7, 16 * 1024, 1, 1024 * 1024));
+    port.shared = r.flag(*m, path, 9, false);
     if (auto capture = m->find(8); capture != m->end() && r.ok()) {
         const auto* cm = r.map(capture->second, path + "/8", 2);
         if (!cm) return false;
@@ -196,7 +197,8 @@ Value encode_config(const AgentConfig& config) {
                                     {5, Value::uint(port.max_hold_ms)},
                                     {6, Value::array(std::move(controllers))},
                                     {7, Value::uint(port.max_write_bytes)},
-                                    {8, Value::map({{0, Value::boolean(port.capture.enabled)}, {1, Value::uint(port.capture.max_bytes)}, {2, Value::uint(port.capture.retention_ms)}})}}));
+                                    {8, Value::map({{0, Value::boolean(port.capture.enabled)}, {1, Value::uint(port.capture.max_bytes)}, {2, Value::uint(port.capture.retention_ms)}})},
+                                    {9, Value::boolean(port.shared)}}));
     }
     std::map<std::uint64_t, Value> mode{{0, Value::uint(config.mode.initiator == ModeConfig::Initiator::Server ? 0 : 1)},
                                         {3, Value::boolean(config.mode.restricted)},

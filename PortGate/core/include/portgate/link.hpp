@@ -45,6 +45,7 @@ enum class Type : std::uint8_t {
     PortEvent = 0x22,
     SecurityEvent = 0x23,
     ObservedData = 0x24,
+    PortState = 0x25,
     Observe = 0x30,
     ObserveResult = 0x31,
     // Administration endpoint (spec/admin-v1.md)

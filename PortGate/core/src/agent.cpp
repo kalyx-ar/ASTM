@@ -12,6 +12,10 @@ using cbor::Value;
 
 constexpr int kPollMs = 100;
 constexpr std::uint64_t kReopenDelayMs = 2000;
+// Backlog per connection: observed traffic is discarded past kObserverBacklog; any other unit past kOutboxLimit means
+// the peer stopped reading and the connection is closed.
+constexpr std::size_t kObserverBacklog = 256 * 1024;
+constexpr std::size_t kOutboxLimit = 4 * 1024 * 1024;
 
 std::uint64_t now_ms() { return platform::monotonic_ms(); }
 
@@ -133,7 +137,7 @@ void Agent::shutdown() {
     }
     for (auto& connection : all) {
         connection->alive = false;
-        connection->transport->shutdown();
+        close_writer(*connection, 0);
     }
     // Connection threads are detached; wait until every one has left its loop.
     while (active_connections_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -272,6 +276,7 @@ void Agent::serve(platform::Socket socket) {
         connection->id = next_connection_++;
         connections_[connection->id] = connection;
     }
+    start_writer(connection);
     log(LogLevel::Info, "connection " + std::to_string(connection->id) + " from " + peer +
                             (connection->transport->authenticated() ? " certificate CN=" + connection->transport->peer_common_name() : std::string()));
     send_hello(connection);
@@ -291,6 +296,7 @@ void Agent::adopt(std::unique_ptr<Transport> transport, std::vector<link::Unit> 
         connection->id = next_connection_++;
         connections_[connection->id] = connection;
     }
+    start_writer(connection);
     log(LogLevel::Info, "outbound connection " + std::to_string(connection->id) + " to " + connection->peer + " serves as controller");
     send_hello(connection);
     connection_loop(connection, std::move(decoder), std::move(pending));
@@ -348,6 +354,13 @@ void Agent::connection_loop(std::shared_ptr<Connection> connection, link::Decode
             handle(connection, unit);
             if (!connection->alive) break;
         }
+    }
+    // Ended by the agent (refusal, error): keep reading for a moment so unread data does not reset the connection and
+    // discard what the writer is still flushing.
+    const auto until = now_ms() + 250;
+    while (!connection->alive && !stopping_ && now_ms() < until) {
+        const int n = connection->transport->receive(buffer.data(), buffer.size(), 50);
+        if (n != -2 && n <= 0) break;
     }
     drop(connection, "connection closed");
 }
@@ -641,6 +654,7 @@ void Agent::observe(const std::shared_ptr<Connection>& connection, Port& port, c
     const bool enable = bool_or(map, 1);
     auto reply = [&](bool observing, const std::string& code) {
         std::map<std::uint64_t, Value> fields{{0, Value::uint(request_id)}, {1, Value::boolean(observing)}};
+        if (observing) fields.emplace(3, Value::boolean(port.config.shared));
         if (!code.empty()) fields.emplace(2, Value::text(code));
         send(connection, link::control(link::Type::ObserveResult, port.index, Value::map(std::move(fields))));
     };
@@ -657,6 +671,7 @@ void Agent::observe(const std::shared_ptr<Connection>& connection, Port& port, c
     event.detail = connection->peer;
     broadcast(port, emit(event));
     reply(enable, {});
+    if (enable) publish_state(port, connection);
 }
 
 void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, std::size_t size) {
@@ -671,8 +686,10 @@ void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, st
         port.capture_offset[direction] += size;
         generation = port.arbiter->generation();
         if (auto id = port.arbiter->owner()) owner = controller_of(*id);
-        for (auto id : port.observers)
-            if (auto observer = connection_by_id(id)) observers.push_back(observer);
+        // Exclusive ports show their observers only the semaphore and the state (PortState), never the traffic.
+        if (port.config.shared)
+            for (auto id : port.observers)
+                if (auto observer = connection_by_id(id)) observers.push_back(observer);
         if (!observers.empty()) {
             copy.seq = port.observe_seq++;
             copy.offset = offset;
@@ -683,7 +700,7 @@ void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, st
     }
     if (!observers.empty()) {
         const auto unit = link::observed_data(port.index, copy);
-        for (auto& observer : observers) send(observer, unit);
+        for (auto& observer : observers) send(observer, unit, true);
     }
     if (port.config.capture.enabled && capture_sink_) {
         std::map<std::uint64_t, Value> record{{0, id_value(epoch_)},
@@ -696,6 +713,26 @@ void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, st
         if (!owner.empty()) record.emplace(7, Value::text(owner));
         capture_sink_(port.config.port_id, Value::map(std::move(record)));
     }
+}
+
+void Agent::publish_state(Port& port, const std::shared_ptr<Connection>& only) {
+    if (port.observers.empty()) return;
+    const auto now = now_ms();
+    std::map<std::uint64_t, Value> fields{{0, Value::boolean(port.open)},
+                                          {2, Value::uint(port.arbiter->generation())},
+                                          {3, Value::uint(port.arbiter->queued())},
+                                          {4, Value::boolean(port.arbiter->closed())},
+                                          {5, Value::boolean(port.arbiter->quarantine_until() > now)},
+                                          {6, Value::boolean(port.config.shared)}};
+    if (auto owner = port.arbiter->owner()) fields.emplace(1, Value::text(controller_of(*owner)));
+    const auto unit = link::control(link::Type::PortState, port.index, Value::map(std::move(fields)));
+    if (unit.payload == port.observed_state) {
+        if (only) send(only, unit);  // a new observer gets the current state even when it did not change
+        return;
+    }
+    port.observed_state = unit.payload;
+    for (auto id : port.observers)
+        if (auto observer = connection_by_id(id)) send(observer, unit);
 }
 
 Event Agent::emit(Event event) {
@@ -901,6 +938,8 @@ void Agent::dispatch(Port& port, const std::vector<ArbiterEvent>& events) {
             }
         }
     }
+    // Releases without waiters, ticks and port changes also reach the observers here (run() dispatches every poll).
+    publish_state(port);
 }
 
 void Agent::drop(const std::shared_ptr<Connection>& connection, const std::string& reason) {
@@ -916,14 +955,93 @@ void Agent::drop(const std::shared_ptr<Connection>& connection, const std::strin
         }
     }
     connection->alive = false;
-    connection->transport->shutdown();
+    close_writer(*connection, 250);
     log(LogLevel::Info, "connection " + std::to_string(connection->id) + " dropped: " + reason);
 }
 
-void Agent::send(const std::shared_ptr<Connection>& connection, const link::Unit& unit) {
-    const auto bytes = link::encode(unit);
-    std::lock_guard<std::mutex> lock(connection->send_mutex);
-    if (connection->alive && !connection->transport->send_all(bytes.data(), bytes.size())) connection->alive = false;
+void Agent::send(const std::shared_ptr<Connection>& connection, const link::Unit& unit, bool droppable) {
+    if (!connection->alive) return;
+    auto bytes = link::encode(unit);
+    bool overflow = false;
+    {
+        std::lock_guard<std::mutex> lock(connection->outbox_mutex);
+        if (connection->closing || connection->writer_done) return;
+        if (connection->outbox_bytes + bytes.size() > (droppable ? kObserverBacklog : kOutboxLimit)) {
+            if (droppable) {
+                ++connection->dropped_observed;  // the observer sees the gap in the ObservedData sequence
+                return;
+            }
+            overflow = true;
+            connection->closing = true;
+            connection->outbox.clear();
+            connection->outbox_bytes = 0;
+        } else {
+            connection->outbox_bytes += bytes.size();
+            connection->outbox.push_back(std::move(bytes));
+        }
+    }
+    connection->outbox_changed.notify_all();
+    if (overflow) {
+        // The peer stopped reading: close it instead of letting the backlog grow.
+        connection->alive = false;
+        connection->transport->shutdown();
+        log(LogLevel::Warning, "connection " + std::to_string(connection->id) + " closed: it does not read what the agent sends");
+    }
+}
+
+void Agent::start_writer(const std::shared_ptr<Connection>& connection) {
+    ++active_connections_;
+    std::thread([this, connection] {
+        writer_loop(connection);
+        --active_connections_;
+    }).detach();
+}
+
+void Agent::writer_loop(std::shared_ptr<Connection> connection) {
+    for (;;) {
+        std::vector<std::uint8_t> bytes;
+        {
+            std::unique_lock<std::mutex> lock(connection->outbox_mutex);
+            connection->outbox_changed.wait(lock, [&] { return !connection->outbox.empty() || connection->closing; });
+            if (connection->outbox.empty()) break;
+            bytes = std::move(connection->outbox.front());
+            connection->outbox.pop_front();
+            connection->outbox_bytes -= bytes.size();
+            connection->writing = true;
+        }
+        const bool sent = connection->transport->send_all(bytes.data(), bytes.size());
+        {
+            std::lock_guard<std::mutex> lock(connection->outbox_mutex);
+            connection->writing = false;
+            if (!sent) {
+                connection->outbox.clear();
+                connection->outbox_bytes = 0;
+                connection->closing = true;
+            }
+        }
+        connection->outbox_changed.notify_all();
+        if (!sent) {
+            connection->alive = false;
+            break;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(connection->outbox_mutex);
+        connection->writer_done = true;
+    }
+    connection->outbox_changed.notify_all();
+}
+
+void Agent::close_writer(Connection& connection, int wait_ms) {
+    {
+        std::unique_lock<std::mutex> lock(connection.outbox_mutex);
+        connection.closing = true;
+        connection.outbox_changed.notify_all();
+        connection.outbox_changed.wait_for(lock, std::chrono::milliseconds(wait_ms),
+                                           [&] { return connection.writer_done || (connection.outbox.empty() && !connection.writing); });
+    }
+    // Unblocks a writer stuck on a peer that does not read.
+    connection.transport->shutdown();
 }
 
 void Agent::send_error(const std::shared_ptr<Connection>& connection, const std::string& code, std::uint64_t request_id, const std::string& detail,

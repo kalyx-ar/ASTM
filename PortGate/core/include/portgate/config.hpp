@@ -53,6 +53,9 @@ struct PortConfig {
     std::map<std::string, std::string> controller_certificates;
     std::map<std::string, std::uint32_t> controller_rights;
     std::size_t max_write_bytes = 16 * 1024;
+    /// Shared access: observers with the right also receive the traffic of the port. Exclusive (default): they only see
+    /// the semaphore and the port state (spec/admin-v1.md § Observers).
+    bool shared = false;
     /// Durable capture of the port traffic, sealed with the key the server provisions (spec/admin-v1.md § Capture).
     struct Capture {
         bool enabled = false;

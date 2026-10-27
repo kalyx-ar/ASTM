@@ -48,6 +48,8 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
     public int MaxWriteBytes { get; init; } = 16 * 1024;
     /// <summary>Durable capture sealed with the key of <see cref="PortGateAdminClient.SetCaptureKeyAsync"/>; null disables it.</summary>
     public PortGateCapture? Capture { get; init; }
+    /// <summary>Shared access: observers also receive the traffic. Exclusive (default): they only see the semaphore and the port state.</summary>
+    public bool Shared { get; init; }
 
     internal SortedDictionary<ulong, object?> ToMap() => LinkCbor.Map(
         (0, PortId), (1, InstrumentId), (2, Device.ToMap()), (3, (ulong)Lease.TotalMilliseconds), (4, (ulong)MaxQueuedRequests),
@@ -62,7 +64,8 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
             return (object?)map;
         }).ToList()),
         (7, (ulong)MaxWriteBytes),
-        (8, Capture is null ? LinkCbor.Map((0, false)) : LinkCbor.Map((0, true), (1, (ulong)Capture.MaxBytes), (2, (ulong)Capture.Retention.TotalMilliseconds))));
+        (8, Capture is null ? LinkCbor.Map((0, false)) : LinkCbor.Map((0, true), (1, (ulong)Capture.MaxBytes), (2, (ulong)Capture.Retention.TotalMilliseconds))),
+        (9, Shared));
 }
 
 public sealed record PortGateSecurity

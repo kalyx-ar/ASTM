@@ -197,14 +197,14 @@ public class PortGateTests
         {
             Ports = [new PortGatePort("architect-port", "architect-01", PortGateDevice.Tcp("127.0.0.1", ((IPEndPoint)instrumentListener.LocalEndpoint).Port),
                 [new PortGateController("edc-test", 10), new PortGateController("edc-quality", 30, Rights: PortGateRights.Observe)])
-                { Capture = new PortGateCapture { MaxBytes = 1024 * 1024 } }],
+                { Capture = new PortGateCapture { MaxBytes = 1024 * 1024 }, Shared = true }],
         };
         await agent.ConfigureAsync(configuration, admin => admin.SetCaptureKeyAsync(1, key), tls: true);
         using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
 
         // A quality server observes without holding the port.
         await using var observer = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-quality", "architect-port"), CancellationToken.None);
-        Assert.True(await observer.ObserveAsync(true, CancellationToken.None).WaitAsync(Timeout));
+        Assert.Equal(new PortGateObserving(true, Traffic: true), await observer.ObserveAsync(true, CancellationToken.None).WaitAsync(Timeout));
         using var watching = new CancellationTokenSource(Timeout);
         var observations = observer.ObservationsAsync(watching.Token).GetAsyncEnumerator(watching.Token);
         await instrument.GetStream().WriteAsync(new byte[] { 0x05 });  // nobody owns the port yet
@@ -229,6 +229,42 @@ public class PortGateTests
         await admin.AckCaptureAsync("architect-port", page.Last);
         Assert.Empty((await admin.ReadCaptureAsync("architect-port", _ => key)).Records);
         Assert.Contains(await admin.ReadEventsAsync(), e => e.Kind == "observe-start" && e.Actor == "edc-quality");
+    }
+
+    [PortGateFact]
+    public async Task On_an_exclusive_port_observers_follow_the_semaphore_but_never_see_the_traffic()
+    {
+        using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
+        instrumentListener.Start();
+        await using var agent = await PortGateProcess.LaunchAsync();
+        var configuration = PortGateProcess.Configuration(((IPEndPoint)instrumentListener.LocalEndpoint).Port) with
+        {
+            Ports = [new PortGatePort("architect-port", "architect-01", PortGateDevice.Tcp("127.0.0.1", ((IPEndPoint)instrumentListener.LocalEndpoint).Port),
+                [new PortGateController("edc-test", 10), new PortGateController("edc-quality", 30, Rights: PortGateRights.Observe)])],
+        };
+        await agent.ConfigureAsync(configuration);
+        using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
+
+        await using var observer = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-quality", "architect-port"), CancellationToken.None);
+        Assert.Equal(new PortGateObserving(true, Traffic: false), await observer.ObserveAsync(true, CancellationToken.None).WaitAsync(Timeout));
+        using var watching = new CancellationTokenSource(Timeout);
+        var states = observer.PortStatesAsync(watching.Token).GetAsyncEnumerator(watching.Token);
+        Assert.True(await states.MoveNextAsync());
+        Assert.Null(states.Current.Owner);
+        Assert.False(states.Current.Shared);
+
+        await using var owner = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await owner.AcquireAsync();
+        do Assert.True(await states.MoveNextAsync());
+        while (states.Current.Owner is null);
+        Assert.Equal("edc-test", states.Current.Owner);
+        await instrument.GetStream().WriteAsync(new byte[] { 0x05 });
+        var reply = new byte[1];
+        Assert.Equal(1, await owner.Stream!.ReadAsync(reply).AsTask().WaitAsync(Timeout));
+
+        using var none = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var observations = observer.ObservationsAsync(none.Token).GetAsyncEnumerator(none.Token);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await observations.MoveNextAsync());
     }
 
     [PortGateFact]

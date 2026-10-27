@@ -145,7 +145,8 @@ Resuelto el 2026-10-26 (`spec/admin-v1.md` § Sealed capture y § Semaphore exte
 - **Rol cliente TLS:** el agente conecta hacia el host, para sitios sin puertos entrantes (P-16).
 - **Captura sellada:** opcional por puerto (`capture`), AES-256-GCM con clave de 32 bytes entregada por el anfitrión sólo por TLS (`SetCaptureKey`) y guardada en el estado sellado de máquina. AAD con agente, puerto, secuencia y clave; el agente nunca descifra ni guarda texto plano. `ReadCapture` entrega registros sellados, `AckCapture` borra tras la custodia; cuota, retención y huecos explícitos (`no-key`, `seal-failed`, `write-failed`, `quota`, `retention`). `Capabilities` anuncia `traceCapture = 2` en esos puertos. Cliente: `PortGateAdminClient.ReadCaptureAsync` descifra con `AesGcm`.
 - **Observadores:** `Observe` con el derecho 4 del controlador; reciben `ObservedData` (copia de lectura y escritura con dirección), sin poder escribir ni tomar el puerto. Inicio y fin se anuncian como SecurityEvent y quedan en el registro. Cliente: `PortGateChannel.ObserveAsync`/`ObservationsAsync`.
-- Pendiente: custodia en EDC/SQLCipher (P-13), rotación de clave con registros pendientes de la clave anterior y cola de envío por observador (hoy un observador lento demora el puerto, P-12).
+- **Decisión humana del 2026-10-27:** un observador sólo lee el flujo bidireccional cuando el acceso del puerto es compartido (`shared`); en un puerto exclusivo (predeterminado) sólo observa el semáforo y el estado (`PortState`). Ningún observador debe afectar el rendimiento de comunicación del controlador que tomó el puerto. Implementado: cola y hilo de escritura por conexión; las copias para un observador con más de 256 KiB de atraso se descartan (salto en `seq`) y una conexión con más de 4 MiB de atraso en otras unidades se cierra. Prueba: ráfaga de 8 MiB con un observador que no lee, recibida completa por el dueño.
+- Pendiente: custodia en EDC/SQLCipher (P-13) y rotación de clave con registros pendientes de la clave anterior. La escritura de la captura sellada sigue en el hilo del puerto (cifrado y disco); si llegara a afectar el rendimiento, moverla a su propia cola.
 
 ### P-10 Canal LocalSerial .NET
 
@@ -175,7 +176,7 @@ Pendiente:
 
 ### P-12 Robustez del agente
 
-- `dispatch()` envía con `mutex_` tomado: un controlador que no lee puede frenar la arbitración. Conviene pasar los envíos a una cola por conexión. Lo mismo vale para `ObservedData`: se envía fuera del mutex pero en el hilo del puerto, de modo que un observador lento demora la lectura.
+- Resuelto el 2026-10-27: los envíos pasan por una cola con hilo de escritura por conexión; ni `dispatch()` ni el hilo del puerto esperan a un par lento. Al cerrar por rechazo, el agente y la administración leen lo pendiente un momento para que el reset TCP no descarte la respuesta (causa de la intermitencia de `Administration_is_restricted_to_the_certificate_that_configured_the_agent`, 2 de 8 corridas antes del cambio y 8 de 8 correctas después).
 - Falta un límite de conexiones simultáneas y de handshakes TLS en curso (un hilo por conexión).
 - `pendingTxBytes` en `Granted` siempre es 0; `uncertainTx` sólo detecta escrituras en curso.
 - Faltan pruebas de estrés: muchos controladores, desconexiones durante escrituras y reinicio del agente con controladores conectados (T05–T09 de IMPLEMENTACION).
