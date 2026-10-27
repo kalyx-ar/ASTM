@@ -11,6 +11,7 @@
     <Description>Import, anonymize, summarize and interpret ATSM traces.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="..\..\..\PortGate\build\win-x64\Release\portgate.exe" Link="portgate.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\..\PortGate\build\win-x64\Release\portgate.exe')" />
     <ProjectReference Include="..\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />

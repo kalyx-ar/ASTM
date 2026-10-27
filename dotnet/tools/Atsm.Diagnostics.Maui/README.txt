@@ -10,8 +10,11 @@ calidad, eventos y catálogo. Seleccionar una fila muestra el detalle.
 
 Los casos .atsmcase mantienen DPAPI CurrentUser y compatibilidad con los casos
 Windows anteriores. No son portables entre usuarios por copiar la carpeta.
-Antes de conectar se prepara el caso protegido. SerialTunnel toma control
-exclusivo; no es un observador de otra sesión. Sin órdenes ni publicación LIMS.
+Antes de conectar se prepara el caso protegido. PortGate toma control
+exclusivo; no es un observador de otra sesión. Las acciones disponibles las
+declara el plugin; el envío requiere una sesión de anfitrión activa.
+Probar PortGate ensaya una traza ASTM con un puerto serie simulado propio,
+sin instalar drivers: orden, respuesta, checksum/reintento y tiempos.
 Los originales no se modifican ni se generan trazas sensibles en texto plano.
 
 MAUI es la presentación vigente. WPF está retirado. Núcleo/plugins neutrales

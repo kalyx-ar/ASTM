@@ -1,6 +1,8 @@
 # Continuación del trabajo
 
-Guía para retomar ATSM desde otra sesión o agente. Estado al 26 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
+Guía para retomar ATSM desde otra sesión o agente. Estado al 27 de octubre de 2026, `main` en `github.com/kalyx-ar/ATSM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
+
+Incremento de transporte/diagnóstico: COM de prueba propio de PortGate, sin driver; escenarios derivados de trazas con orden del plugin → interpretación del instrumento simulado → resultado y verificación de tiempos. GUI: Probar PortGate, COM local y opciones PortGate; catálogo de acciones opcional del plugin. [Uso y límites](PRUEBAS-SERIE.md). API/paquetes 0.2.0 para EDC. No equiparar este ensayo con validación del driver COM o del hardware.
 
 ## Cómo retomar
 

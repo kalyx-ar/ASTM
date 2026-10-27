@@ -24,8 +24,10 @@ public sealed record ArchitectDialectOptions
     public TimeZoneInfo InstrumentTimeZone { get; init; } = TimeZoneInfo.Local;
 }
 
-public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin, IInstrumentHeaderProbe
+public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = null) : IInstrumentPlugin, IInstrumentHeaderProbe, IInstrumentCommandPlugin
 {
+    public IReadOnlyList<InstrumentCommandDescriptor> Commands(string profileId) => AstmOrderCommands.Describe(this, profileId);
+    public IReadOnlyList<Lis02Record> BuildAstmCommand(string profileId, InstrumentCommandRequest request, DialectContext context) => AstmOrderCommands.Build(this, profileId, request, context);
     // 91407-108, §6 examples: sender ASI identifies the interface, not the physical ARCHITECT model.
     public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().Equals("ASI", StringComparison.OrdinalIgnoreCase);
     public const string PluginId = "abbott.architect";

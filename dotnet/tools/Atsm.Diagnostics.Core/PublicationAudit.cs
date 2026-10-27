@@ -26,5 +26,6 @@ public static class PublicationAudit
         if (inspected == 0) issues.Add("ATSM-PUBLISH-NO-OWN-ASSEMBLIES");
         return issues;
     }
-    private static bool Own(string name) => name.StartsWith("Atsm.", StringComparison.OrdinalIgnoreCase) || name.Equals("atsm-diagnostics", StringComparison.OrdinalIgnoreCase);
+    private static bool Own(string name) => name.StartsWith("Atsm.", StringComparison.OrdinalIgnoreCase) || name.Equals("PortGate.Client", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("atsm-diagnostics", StringComparison.OrdinalIgnoreCase);
 }

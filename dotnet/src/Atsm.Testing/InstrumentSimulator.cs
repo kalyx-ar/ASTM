@@ -35,14 +35,18 @@ public sealed class InstrumentSimulator : IAsyncDisposable
     public List<Lis01Notice> Notices { get; } = [];
 
     public Task<Lis01SendCompleted> SendAsync(params string[] records)
+        => SendMessagesAsync(records.Select(r => (ReadOnlyMemory<byte>)_encoding.GetBytes(r.EndsWith('\r') ? r : r + "\r")).ToArray());
+
+    /// <summary>Already framed messages of a profile; supports frame-per-record and frame-per-message without changing their contents.</summary>
+    public Task<Lis01SendCompleted> SendMessagesAsync(IReadOnlyList<ReadOnlyMemory<byte>> payloads)
     {
         var completion = new TaskCompletionSource<Lis01SendCompleted>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var messages = records.Select(r => (ReadOnlyMemory<byte>)_encoding.GetBytes(r.EndsWith('\r') ? r : r + "\r")).ToList();
-        _inputs.Writer.TryWrite((output, now) =>
+        var messages = payloads.Select(p => (ReadOnlyMemory<byte>)p.ToArray()).ToList();
+        if (!_inputs.Writer.TryWrite((output, now) =>
         {
             _pending[_link.Enqueue(messages)] = completion;
             _link.Poll(now, output);
-        });
+        })) completion.TrySetException(new ObjectDisposedException(nameof(InstrumentSimulator)));
         return completion.Task;
     }
 

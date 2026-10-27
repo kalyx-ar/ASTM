@@ -282,6 +282,54 @@ struct Client {
     }
 };
 
+void test_serial_test_device() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    FakeInstrument instrument;
+    CHECK(instrument.start(error));
+    DeviceConfig config;
+    config.path = "test://127.0.0.1:" + std::to_string(instrument.listener.port());
+    config.baud_rate = 300;
+    config.data_bits = 7;
+    config.parity = Parity::Even;
+    config.stop_bits = 2;
+    auto device = platform::make_device(config);
+    CHECK(device->open(error));
+    CHECK(instrument.accept(3000));
+    const std::uint8_t payload[] = {0xff, 0x81, 0x55, 0xaa};
+    const std::vector<std::uint8_t> masked = {0x7f, 0x01, 0x55, 0x2a};
+    auto start = std::chrono::steady_clock::now();
+    CHECK(device->write(payload, sizeof(payload)) == 4);
+    CHECK(std::chrono::steady_clock::now() - start >= std::chrono::nanoseconds(146666666)); // 4 * 11 bits / 300 baud
+    std::uint8_t received[4]{};
+    CHECK(instrument.socket.receive(received, sizeof(received), 1000) == 4);
+    CHECK(std::equal(std::begin(received), std::end(received), masked.begin()));
+    CHECK(instrument.socket.send_all(payload, sizeof(payload)));
+    start = std::chrono::steady_clock::now();
+    CHECK(device->read(received, sizeof(received), 1000) == 4);
+    CHECK(std::chrono::steady_clock::now() - start >= std::chrono::nanoseconds(146666666));
+    CHECK(std::equal(std::begin(received), std::end(received), masked.begin()));
+    device->close();
+
+    config.baud_rate = 50;
+    device = platform::make_device(config);
+    CHECK(device->open(error));
+    CHECK(instrument.accept(3000));
+    std::atomic<bool> writing{false};
+    int result = 0;
+    std::thread writer([&] { writing = true; result = device->write(payload, sizeof(payload)); });
+    while (!writing) std::this_thread::yield();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    device->close(); writer.join();
+    CHECK(result == -1); // close interrupts the paced write instead of delivering a partial command
+    config.flow_control = FlowControl::RtsCts;
+    CHECK(!platform::make_device(config)->open(error));
+    config.flow_control = FlowControl::None;
+    config.path = "test://192.0.2.1:4000";
+    CHECK(!platform::make_device(config)->open(error));
+    platform::network_cleanup();
+}
+
 void test_agent_end_to_end() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -1240,6 +1288,7 @@ int main(int argc, char** argv) {
     test_arbiter();
 
     test_tls_material();
+    test_serial_test_device();
     test_agent_end_to_end();
     test_config_cbor();
     test_state_and_events();

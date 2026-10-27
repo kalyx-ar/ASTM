@@ -4,8 +4,10 @@ using Atsm.Protocol.Lis01;
 namespace Atsm.Plugins;
 
 /// <summary>Plugin for instruments that follow CLSI LIS01-A2 / LIS02-A2 without known deviations.</summary>
-public sealed partial class StandardAstmPlugin : IInstrumentPlugin
+public sealed partial class StandardAstmPlugin : IInstrumentPlugin, IInstrumentCommandPlugin
 {
+    public IReadOnlyList<InstrumentCommandDescriptor> Commands(string profileId) => AstmOrderCommands.Describe(this, profileId);
+    public IReadOnlyList<Atsm.Protocol.Lis02.Lis02Record> BuildAstmCommand(string profileId, InstrumentCommandRequest request, DialectContext context) => AstmOrderCommands.Build(this, profileId, request, context);
     public const string PluginId = "clsi.lis02";
     public const string ProfileId = "clsi.lis01-a2.lis02-a2";
 

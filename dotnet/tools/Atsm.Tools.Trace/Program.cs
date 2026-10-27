@@ -17,6 +17,7 @@ const string Usage = """
     atsm-trace self-test
     atsm-trace inspect-input <file> [--profile <id>]
     atsm-trace verify-publication <directory>
+    atsm-trace test-portgate <trace> [--portgate <executable>] [--profile <id>] [--max <n>] [--baud <n>] [--timeout <seconds>]
     atsm-trace extract <adapter> <log> <out.atsmtrace> [--recorded-by host|instrument] [--filter <text>] [--utc-offset <+hh:mm>]
     atsm-trace from-text <lis02.txt> <out.atsmtrace> [--direction received|transmitted]
     atsm-trace from-binary <capture.bin> <out.atsmtrace> [--direction received|transmitted]
@@ -49,6 +50,7 @@ try
         "self-test" => NativeSelfTest.Run(),
         "inspect-input" when args.Length >= 2 => InspectInput.Run(args[1], Option("--profile")),
         "verify-publication" when args.Length == 2 => VerifyPublication(args[1]),
+        "test-portgate" when args.Length >= 2 => await TestPortGate.RunAsync(args[1], args),
         "extract" when args.Length >= 4 => Extract(args[1], args[2], args[3]),
         "from-text" when args.Length >= 3 => FromText(args[1], args[2]),
         "from-binary" when args.Length >= 3 => FromBinary(args[1], args[2]),

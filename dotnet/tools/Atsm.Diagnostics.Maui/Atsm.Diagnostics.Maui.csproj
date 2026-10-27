@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType><UseMaui>true</UseMaui><SingleProject>true</SingleProject>
     <AssemblyName>atsm-diagnostics</AssemblyName><RootNamespace>Atsm.Diagnostics.Maui</RootNamespace>
     <ApplicationTitle>ATSM Diagnóstico</ApplicationTitle><ApplicationId>com.kalyx.atsm.diagnostics</ApplicationId>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion><ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion><ApplicationVersion>2</ApplicationVersion>
     <WindowsPackageType>None</WindowsPackageType><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained><RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -19,6 +19,7 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);CS8002</WarningsNotAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="..\..\..\PortGate\build\win-x64\Release\portgate.exe" Link="portgate.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\..\PortGate\build\win-x64\Release\portgate.exe')" />
     <ProjectReference Include="..\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" />
     <PackageReference Include="Microsoft.Maui.Controls" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />

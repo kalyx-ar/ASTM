@@ -1,5 +1,7 @@
 # Transporte: ATSM sobre Stream, conocimiento de transporte y PortGate
 
+Pruebas sin hardware ni driver y acciones definidas por los plugins: [Pruebas de comunicación con PortGate](PRUEBAS-SERIE.md).
+
 Decisiones humanas del 2026-10-26:
 
 1. **ATSM es un protocolo de nivel lenguaje.** El anfitrión entrega el transporte final ya abierto como un `Stream` bidireccional; ATSM interpreta y comunica en ambos sentidos sobre él. Quien usa ATSM mantiene la infraestructura (COM, red, TLS, reconexión, archivos).

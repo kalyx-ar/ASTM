@@ -20,7 +20,7 @@ using static Atsm.Diagnostics.Maui.Globals;
 
 namespace Atsm.Diagnostics.Maui;
 
-public sealed class MainPage : ContentPage
+public sealed partial class MainPage : ContentPage
 {
     private static readonly Color Ink = Color.FromArgb("#1E293B"), Muted = Color.FromArgb("#52677E"), Teal = Color.FromArgb("#0F766E");
     private readonly IDiagnosticPlatformServices _platform;
@@ -28,11 +28,15 @@ public sealed class MainPage : ContentPage
     private static readonly JsonSerializerOptions DetailJson = new(TraceJson.Options) { WriteIndented = true };
     private readonly Picker _configurations = Choice(T("Source.Configuration")), _recorder = Choice(T("Source.Recorder")), _profiles = Choice(T("Source.Plugin")), _formats = Choice(T("Source.Format")), _transport = Choice(T("Live.Transport")), _mode = Choice(T("Live.Mode"));
     private readonly Entry _host = Input("127.0.0.1"), _port = Input(""), _agentPort = Input("p1"), _controller = Input(Environment.MachineName);
+    private readonly Entry _serialPort = Input(""), _baud = Input("9600"), _dataBits = Input("8");
+    private readonly Picker _parity = Choice(T("Serial.Parity")), _stopBits = Choice(T("Serial.StopBits")), _flow = Choice(T("Serial.Flow"));
+    private readonly CheckBox _dtr = new() { IsChecked = true }, _rts = new() { IsChecked = true }, _configureSerial = new();
+    private readonly VerticalStackLayout _serialFields = new() { Spacing = 8 }, _networkFields = new() { Spacing = 8 };
     private readonly Entry _query = Input(""), _response = Input(""), _offset = Input("-03:00"), _password = Input("");
     private readonly CheckBox _tls = new() { WidthRequest = 24, HeightRequest = 28 }, _hex = new() { WidthRequest = 24, HeightRequest = 28 },
         _interpret = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 }, _group = new() { IsChecked = true, WidthRequest = 24, HeightRequest = 28 };
     private readonly Label _certificate = Text(T("Live.NoCertificate"), 12), _title = Text(T("View.NoCase"), 21), _summary = Text(T("View.Prompt"), 12), _status = Text(T("View.Ready"), 12);
-    private readonly Button _open, _save, _connect, _stop;
+    private readonly Button _open, _save, _connect, _stop, _testPort;
     private readonly VerticalStackLayout _interface = new() { Spacing = 8 }, _source = new() { Spacing = 8 };
     private readonly DiagnosticTable _table;
     private readonly Editor _detail = new() { IsReadOnly = true, Text = T("View.DetailPrompt"), TextColor = Color.FromArgb("#D7E7EF"), BackgroundColor = Color.FromArgb("#132632"), FontSize = 12, FontFamily = "Consolas" };
@@ -66,12 +70,18 @@ public sealed class MainPage : ContentPage
         _platform = platform; _table = new(platform); BackgroundColor = Color.FromArgb("#F3F6FA");
         _open = Action(T("Source.Open"), async () => await OpenAsync()); _save = Action(T("Source.Save"), async () => await SaveAsync());
         _connect = Action(T("Live.Connect"), async () => await ConnectAsync()); _stop = Action(T("Live.Stop"), async () => await StopCaptureAsync()); _stop.IsEnabled = false;
+        _testPort = Action(T("Scenario.Run"), RunPortGateBenchAsync); _testPort.IsEnabled = false;
         _password.IsPassword = true;
         foreach (var instrument in _catalog.Instruments) _profiles.Items.Add(instrument.DisplayName);
         foreach (var format in _inputFormats) _formats.Items.Add(DiagnosticText.Text("Format." + format)); _formats.SelectedIndex = 0;
         foreach (var key in new[] { "Source.RecorderAuto", "Source.RecorderHost", "Source.RecorderInstrument" }) _recorder.Items.Add(T(key)); _recorder.SelectedIndex = 0;
         _recorder.SelectedIndexChanged += (_, _) => ReopenLog();
-        foreach (var value in new[] { T("Live.TcpClient"), T("Live.TcpServer"), T("Live.Tunnel") }) _transport.Items.Add(value);
+        foreach (var value in new[] { T("Live.TcpClient"), T("Live.TcpServer"), T("Live.Tunnel"), T("Live.Serial") }) _transport.Items.Add(value);
+        foreach (var value in Enum.GetNames<SerialParity>()) _parity.Items.Add(T("Serial.Parity." + value));
+        foreach (var value in Enum.GetNames<SerialStopBits>()) _stopBits.Items.Add(T("Serial.StopBits." + value));
+        foreach (var value in Enum.GetNames<SerialFlowControl>()) _flow.Items.Add(T("Serial.Flow." + value));
+        _parity.SelectedIndex = _stopBits.SelectedIndex = _flow.SelectedIndex = 0;
+        _transport.SelectedIndexChanged += (_, _) => ConfigureTransportFields();
         foreach (var value in new[] { T("Live.Capture"), T("Live.Simulate") }) _mode.Items.Add(value);
         _transport.SelectedIndex = _mode.SelectedIndex = 0;
         _profiles.SelectedIndexChanged += (_, _) => ConfigureInstrument(); _configurations.SelectedIndexChanged += (_, _) => SetProfile(); _profiles.SelectedIndex = 0;
@@ -80,13 +90,21 @@ public sealed class MainPage : ContentPage
         _source.Add(new HorizontalStackLayout { Spacing = 8, Children = { _open, _save } });
         _source.Add(Text(T("Source.Custody"), 12));
         _interface.Add(Text(T("Live.Title"), 12)); _interface.Add(Field(T("Live.Transport"), _transport));
-        _interface.Add(Field(T("Live.Host"), _host));
-        _interface.Add(Field(T("Live.Port"), _port)); _interface.Add(Field(T("Live.AgentPort"), _agentPort));
-        _interface.Add(Field(T("Live.Controller"), _controller)); _interface.Add(Option(T("Live.Tls"), _tls));
-        _interface.Add(Action(T("Live.Certificate"), async () => await ChooseCertificateAsync())); _interface.Add(_certificate); _interface.Add(Field(T("Live.Password"), _password));
+        _networkFields.Add(Field(T("Live.Host"), _host));
+        _networkFields.Add(Field(T("Live.Port"), _port)); _networkFields.Add(Field(T("Live.AgentPort"), _agentPort));
+        _networkFields.Add(Field(T("Live.Controller"), _controller)); _networkFields.Add(Option(T("Live.Tls"), _tls));
+        _networkFields.Add(Action(T("Live.Certificate"), async () => await ChooseCertificateAsync())); _networkFields.Add(_certificate); _networkFields.Add(Field(T("Live.Password"), _password));
+        _interface.Add(_networkFields);
+        _serialFields.Add(Field(T("Serial.Port"), _serialPort));
+        _serialFields.Add(Action(T("Serial.Refresh"), () => { _status.Text = F("Serial.Available", string.Join(", ", LocalSerial.PortNames())); return Task.CompletedTask; }));
+        _serialFields.Add(Option(T("Serial.Configure"), _configureSerial));
+        _serialFields.Add(Field(T("Serial.Baud"), _baud)); _serialFields.Add(Field(T("Serial.DataBits"), _dataBits));
+        _serialFields.Add(Field(T("Serial.Parity"), _parity)); _serialFields.Add(Field(T("Serial.StopBits"), _stopBits)); _serialFields.Add(Field(T("Serial.Flow"), _flow));
+        _serialFields.Add(Option("DTR", _dtr)); _serialFields.Add(Option("RTS", _rts)); _interface.Add(_serialFields);
         _interface.Add(Field(T("Live.Mode"), _mode)); _interface.Add(Text(T("Live.Ownership"), 12));
         _interface.Add(Field(T("Live.QueryBudget"), _query)); _interface.Add(Field(T("Live.ResponseBudget"), _response));
         _interface.Add(new HorizontalStackLayout { Spacing = 8, Children = { _connect, _stop } });
+        InitializeCommandControls();
         _source.Add(Action(T("View.Source"), () => { _settingsVisible = false; LayoutPanels(); return Task.CompletedTask; })); _source.Add(Field(T("Source.Offset"), _offset)); _source.Add(_interface);
         _sourceScroll = new ScrollView { Content = _source, Padding = 16, BackgroundColor = Colors.White };
 
@@ -95,6 +113,7 @@ public sealed class MainPage : ContentPage
         var controls = new FlexLayout { Direction = FlexDirection.Row, Wrap = FlexWrap.Wrap, AlignItems = FlexAlignItems.Center,
             Children = { Action(T("View.Source"), () => { _settingsVisible = !_settingsVisible; LayoutPanels(); return Task.CompletedTask; }),
                 Action(T("View.Demo"), () => { if (!IsCapturing) LoadDemo(); return Task.CompletedTask; }),
+                _testPort,
                 Option(T("View.Interpret"), _interpret),
                 Option(T("View.Group"), _group),
                 Option(T("View.Hex"), _hex) } };
@@ -153,6 +172,8 @@ public sealed class MainPage : ContentPage
         _interface.IsVisible = Profile.CanConnect;
         _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
         _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
+        ConfigureTransportDefaults();
+        ConfigureCommandCatalog();
         if (_case is not null && !IsCapturing) Analyze();
     }
     private void SelectProfile(string id)
@@ -165,6 +186,7 @@ public sealed class MainPage : ContentPage
         _configurations.SelectedIndex = HasAutomaticInterpretation ? 0 : model.Profiles.ToList().FindIndex(p => p.Id == id); _selecting = false;
         _interface.IsVisible = Profile.CanConnect; _connect.IsEnabled = Profile.CanConnect && !IsCapturing;
         _mode.IsEnabled = Profile.CanSimulateHost && !AutomaticInterpretation; if (!_mode.IsEnabled) _mode.SelectedIndex = 0;
+        ConfigureCommandCatalog();
     }
     private RecordedBy? Recorder => _recorder.SelectedIndex switch { 1 => RecordedBy.Host, 2 => RecordedBy.Instrument, _ => null };
     private TimeSpan LogOffset()
@@ -268,15 +290,21 @@ public sealed class MainPage : ContentPage
         ProtectedCaseJournal? journal = null; X509Certificate2? certificate = null;
         try
         {
-            if (!int.TryParse(_port.Text, out var port) || port is < 1 or > 65535) throw new ArgumentException(T("Validation.Port"));
+            var transport = (DiagnosticTransport)_transport.SelectedIndex;
+            var port = 0;
+            if (transport != DiagnosticTransport.LocalSerial && (!int.TryParse(_port.Text, out port) || port is < 1 or > 65535)) throw new ArgumentException(T("Validation.Port"));
             var timing = Timing(live: true); var selected = Profile; var host = (_host.Text ?? "").Trim(); var controller = (_controller.Text ?? "").Trim(); var agentPort = (_agentPort.Text ?? "").Trim();
-            if (host.Length == 0 || controller.Length == 0) throw new ArgumentException(T("Validation.Host"));
-            var transport = _transport.SelectedIndex; var simulate = _mode.SelectedIndex == 1; var tls = _tls.IsChecked;
+            if (transport != DiagnosticTransport.LocalSerial && host.Length == 0) throw new ArgumentException(T("Validation.Host"));
+            var simulate = _mode.SelectedIndex == 1; var tls = transport != DiagnosticTransport.LocalSerial && _tls.IsChecked;
             if (_certificateBytes is not null) certificate = X509CertificateLoader.LoadPkcs12(_certificateBytes, _password.Text, X509KeyStorageFlags.EphemeralKeySet);
-            if (tls && transport == 1 && certificate is null) throw new ArgumentException(T("Validation.Certificate"));
+            if (tls && transport == DiagnosticTransport.TcpServer && certificate is null) throw new ArgumentException(T("Validation.Certificate"));
             var tlsOptions = tls ? new TlsOptions { ClientCertificates = certificate is null ? null : new X509CertificateCollection { certificate }, ServerCertificate = certificate } : null;
+            var serialSettings = transport == DiagnosticTransport.LocalSerial || transport == DiagnosticTransport.PortGate && _configureSerial.IsChecked ? ReadSerialSettings() : new SerialSettings();
+            var connection = new DiagnosticConnection(transport, host, port) { SerialPort = _serialPort.Text ?? "", Serial = serialSettings,
+                ConfigureSerial = _configureSerial.IsChecked, AgentPort = agentPort, Controller = controller, Tls = tlsOptions };
+            var target = connection.Target();
             var destination = await _platform.PickCaseDestinationAsync(); if (destination is null) return;
-            var header = new TraceHeader(Guid.CreateVersion7(), transport == 2 ? "SerialTunnel" : "TCP", "diagnostic", selected.Id, DateTimeOffset.UtcNow,
+            var header = new TraceHeader(Guid.CreateVersion7(), transport.ToString(), "diagnostic", selected.Id, DateTimeOffset.UtcNow,
                 new Dictionary<string, string> { ["protocol"] = selected.Protocol, ["mode"] = simulate ? "diagnostic-host" : "capture-no-responses", ["protection"] = "Windows DPAPI CurrentUser" });
             journal = new(destination.Create(), _platform.CaseProtection, header); _capture = new(header, journal); _case = new(header, []); _lastCount = -1;
             _capture.EnsureReady(); _liveStop = new(); _captureFinished = new(TaskCreationOptions.RunContinuationsAsynchronously); SetBusy(true); _refresh.Start();
@@ -285,16 +313,10 @@ public sealed class MainPage : ContentPage
             {
                 // The same router hands a local endpoint or a port behind PortGate to the session.
                 var router = new TransportRouter([new LocalTransportProvider(), new PortGateTransportProvider()]);
-                TransportTarget target = transport switch
-                {
-                    2 => new PortGateTarget("maintenance", new TcpEndpoint(host, port) { Tls = tlsOptions }, agentPort, controller),
-                    1 => new TcpListenTarget("maintenance", new IPEndPoint(IPAddress.Parse(host), port)) { Tls = tlsOptions },
-                    _ => new TcpClientTarget("maintenance", new TcpEndpoint(host, port) { Tls = tlsOptions }),
-                };
                 var stream = await router.OpenAsync(target, stop);
                 Dispatcher.Dispatch(() => _status.Text = simulate ? T("Live.Simulating") : T("Live.Connected"));
                 return stream;
-            }, simulate, token));
+            }, simulate, token, commands => Dispatcher.Dispatch(() => SetLiveCommands(commands))));
             _status.Text = T("Live.Closed");
         }
         catch (OperationCanceledException) { _status.Text = T("Live.Stopped"); }
@@ -312,6 +334,9 @@ public sealed class MainPage : ContentPage
     {
         _profiles.IsEnabled = _configurations.IsEnabled = _recorder.IsEnabled = _formats.IsEnabled = _open.IsEnabled = _save.IsEnabled = !busy;
         _connect.IsEnabled = !busy && Profile.CanConnect; _stop.IsEnabled = busy;
+        _testPort.IsEnabled = !busy && _case is not null && Profile.AstmProfile is not null;
+        _transport.IsEnabled = _networkFields.IsEnabled = _serialFields.IsEnabled = !busy;
+        _mode.IsEnabled = !busy && Profile.CanSimulateHost && !AutomaticInterpretation;
     }
     private void RefreshCapture(bool force = false)
     {
@@ -330,6 +355,7 @@ public sealed class MainPage : ContentPage
             }
             _case = DiagnosticReader.RevalidateProtocol(_case, Profile);
             _analysis = DiagnosticReader.Analyze(_case, Profile, Timing()); _title.Text = _case.Header.ImportedFrom ?? _case.Header.Source;
+            _testPort.IsEnabled = !IsCapturing && Profile.AstmProfile is not null;
             if (_analysis.Diagnostics.FirstOrDefault(d => d.Code == "ATSM-DIAG-UNSUPPORTED-PROTOCOL") is { } protocolNotice)
                 _status.Text = _protocolNotice = DiagnosticText.Finding(protocolNotice, Profile);
             else if (_status.Text == DiagnosticText.Text("Detection.Unsupported") || _status.Text == DiagnosticText.Text("Finding.UnsupportedBinary")
@@ -647,6 +673,8 @@ public sealed class MainPage : ContentPage
         VerifyQualityPresentation();
         VerifyKnowledgePresentation();
         VerifyControlCommunication();
+        VerifyTransportAndCommandPresentation();
+        await VerifyVirtualSerialBenchAsync();
         await _table.VerifyExpansionKeepsScrollAsync(); ShowTable();
     }
     private void VerifyControlCommunication()

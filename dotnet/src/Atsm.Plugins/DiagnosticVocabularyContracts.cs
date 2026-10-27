@@ -31,6 +31,8 @@ public static class StandardDiagnosticVocabulary
             ("value.Image", "value.Image", "Imagen"), ("state.Normal", "state.Normal", "Normal"),
             ("state.AnalysisError", "state.AnalysisError", "Error de análisis"), ("state.LowReliability", "state.LowReliability", "Baja fiabilidad"),
             ("unit.None", "unit.None", "—"), ("unit.NotReported", "unit.NotReported", "No informada"),
+            ("command.SendOrder", "command.SendOrder", "Enviar orden de análisis"), ("command.Sample", "command.Sample", "Número de muestra"),
+            ("command.Tests", "command.Tests", "Códigos de pruebas, separados por coma"),
             ("Command.ENQ", "Command.ENQ", "Solicitud de inicio de transmisión (ENQ)"),
             ("Command.ACK", "Command.ACK", "Aceptación de la comunicación o trama (ACK)"),
             ("Command.NAK", "Command.NAK", "Rechazo; el emisor debe reintentar (NAK)"),

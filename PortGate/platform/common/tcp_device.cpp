@@ -96,10 +96,12 @@ private:
 };
 
 std::unique_ptr<Device> make_serial_device(const DeviceConfig& config);
+std::unique_ptr<Device> make_test_serial_device(const DeviceConfig& config);
 
 std::unique_ptr<Device> make_device(const DeviceConfig& config) {
     if (config.kind == DeviceConfig::Kind::Tcp) return std::make_unique<TcpDevice>(config);
     if (config.kind == DeviceConfig::Kind::TcpListen) return std::make_unique<TcpListenDevice>(config);
+    if (config.path.rfind("test://", 0) == 0) return make_test_serial_device(config);
     return make_serial_device(config);
 }
 

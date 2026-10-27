@@ -23,6 +23,14 @@ public sealed record PortGateDevice
 
     public static PortGateDevice Serial(string path, SerialSettings? settings = null) => new() { Path = path, Settings = settings ?? new() };
 
+    /// <summary>A driver-free serial line in the bench; the peer is a loopback TCP listener and the agent applies line timing/data width.</summary>
+    public static PortGateDevice TestSerial(int peerPort, SerialSettings? settings = null)
+    {
+        if (peerPort is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(peerPort));
+        if (settings?.FlowControl is not (null or SerialFlowControl.None)) throw new ArgumentException("Test serial supports flow control None.", nameof(settings));
+        return Serial("test://127.0.0.1:" + peerPort, settings);
+    }
+
     public static PortGateDevice Tcp(string host, int port) => new() { Host = host, TcpPort = port };
 
     public static PortGateDevice TcpListen(int port, string host = "0.0.0.0") => new() { Host = host, TcpPort = port, Listen = true };

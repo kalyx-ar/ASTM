@@ -48,7 +48,8 @@ add_library(portgate_core STATIC
     platform/common/files.cpp
     core/src/agent.cpp
     platform/common/net.cpp
-    platform/common/tcp_device.cpp)
+    platform/common/tcp_device.cpp
+    platform/common/test_serial.cpp)
 
 if(PORTGATE_ENABLE_TLS)
     target_sources(portgate_core PRIVATE tls/src/tls_mbedtls.cpp tls/src/threading_alt.cpp)

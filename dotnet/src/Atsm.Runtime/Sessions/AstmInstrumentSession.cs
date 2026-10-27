@@ -130,12 +130,22 @@ public sealed class AstmInstrumentSession
             ? SendRecordsAsync(_dialect.BuildOrders(orders), cancellationToken)
             : throw new InvalidOperationException("This session does not transmit host messages.");
 
+    public Task<Lis01SendCompleted> SendCommandAsync(IInstrumentCommandPlugin plugin, InstrumentCommandRequest request, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_options.TransmitHostMessages) throw new InvalidOperationException("This session does not transmit host messages.");
+        var records = plugin.BuildAstmCommand(_profile.Id, request, new(_instrument, _clock));
+        _trace.Write(TraceDirection.Event, [], "atsm.command.requested", request.Id);
+        return SendRecordsAsync(records, cancellationToken);
+    }
+
     private Task<Lis01SendCompleted> SendRecordsAsync(IReadOnlyList<Lis02Record> records, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_channelEnded) return Task.FromResult(new Lis01SendCompleted(0, Lis01SendResult.Failed, 0, 0, "ATSM-CH-CLOSED"));
         var completion = new TaskCompletionSource<Lis01SendCompleted>(TaskCreationOptions.RunContinuationsAsynchronously);
         var bytes = _profile.Frame(records, _profile.HostFraming);
-        if (!_inputs.Writer.TryWrite(new Input(InputKind.Send, null, -1, bytes, completion)))
+        if (!_inputs.Writer.TryWrite(new Input(InputKind.Send, null, -1, bytes, completion) { Cancellation = cancellationToken }))
             completion.TrySetCanceled(cancellationToken);
         return completion.Task.WaitAsync(cancellationToken);
     }
@@ -160,6 +170,7 @@ public sealed class AstmInstrumentSession
                     _link.Poll(now, actions);
                     break;
                 case InputKind.Send:
+                    if (input.Cancellation.IsCancellationRequested) { input.Completion!.TrySetCanceled(input.Cancellation); break; }
                     try
                     {
                         var id = _link.Enqueue(input.Records!);
@@ -295,6 +306,7 @@ public sealed class AstmInstrumentSession
 
     private sealed record Input(InputKind Kind, byte[]? Data, long Sequence, List<ReadOnlyMemory<byte>>? Records, TaskCompletionSource<Lis01SendCompleted>? Completion)
     {
+        public CancellationToken Cancellation { get; init; }
         public static readonly Input Tick = new(InputKind.Tick, null, -1, null, null);
         public static readonly Input End = new(InputKind.End, null, -1, null, null);
     }

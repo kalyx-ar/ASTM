@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><Description>Independent diagnostic host: bundled catalog, analysis and protected-case contracts.</Description></PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Transport\Atsm.Transport.csproj" />
     <ProjectReference Include="..\..\src\PortGate.Client\PortGate.Client.csproj" />

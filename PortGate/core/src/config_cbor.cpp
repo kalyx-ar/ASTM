@@ -98,6 +98,8 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
         device.dtr = r.flag(*m, path, 9, true);
         device.rts = r.flag(*m, path, 10, true);
         if (r.ok() && device.path.empty()) return r.fail(path + "/1", "required");
+        if (device.path.rfind("test://", 0) == 0 && (device.path.rfind("test://127.0.0.1:", 0) != 0 || device.flow_control != FlowControl::None))
+            return r.fail(path + "/1", "test serial requires loopback and flow control None");
     } else {
         device.kind = kind == 1 ? DeviceConfig::Kind::Tcp : DeviceConfig::Kind::TcpListen;
         device.host = r.text(*m, path, 7, kind == 1, kind == 1 ? std::string() : "0.0.0.0");
