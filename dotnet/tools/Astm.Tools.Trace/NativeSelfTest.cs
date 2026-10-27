@@ -33,7 +33,7 @@ internal static class NativeSelfTest
         if (Encoding.UTF8.GetString(encrypted).Contains(Convert.ToBase64String(data), StringComparison.Ordinal)) throw new InvalidDataException("Unprotected self-test payload.");
         var read = ProtectedCaseJournal.Read(new MemoryStream(encrypted), protection);
         var stored = read.Batches!.Single().Observations.Single();
-        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 14)
+        if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 15)
             throw new InvalidDataException("Native self-test mismatch.");
         using var text = new StringWriter(); TraceFile.Write(text, input.Header, input.Entries);
         if (TraceFile.Read(new StringReader(text.ToString())).Entries.Count != 1) throw new InvalidDataException("Native trace JSON mismatch.");
@@ -96,7 +96,15 @@ internal static class NativeSelfTest
         var image = csResult with { ResultKind = null, Value = new("PNG&SYN&plot.png") };
         if (ProtocolExplainer.ResultValue(image, cs) != "Imagen" || DiagnosticDuration.Format(TimeSpan.FromMilliseconds(30976077)) != "08:36:16.077")
             throw new InvalidDataException("Native image/duration mismatch.");
-        Console.WriteLine("ASTM_NATIVE_SELFTEST_OK catalog=14 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok uf-binary-framing=ok communication-stats=ok duration-format=ok general-images=ok");
+        // Synthetic analyzer, randomized with faults, over an in-memory pair: the whole host side runs in the native image.
+        var (simulatedHost, simulatedInstrument) = DuplexStream.CreatePair();
+        using (var simulationTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+        {
+            var simulation = SyntheticCircuit.RunAsync(simulatedHost, simulatedInstrument, new(SimulationMode.Randomized, 7, 3), simulationTimeout.Token).GetAwaiter().GetResult();
+            if (!simulation.Passed || simulation.Downloaded == 0 || simulation.Queried == 0 || simulation.Unsolicited == 0)
+                throw new InvalidDataException("Native synthetic analyzer mismatch.");
+        }
+        Console.WriteLine("ASTM_NATIVE_SELFTEST_OK catalog=15 cfx=1 qc=2 trace-json=ok encrypted-case=ok astm-host=ok uc3500=ok quality-summary=ok qualitative-count=ok semiquantitative=ok negative-zero-crosses=ok semantic-flags-images-errors=ok manufacturer-tables=ok uf-binary-framing=ok communication-stats=ok duration-format=ok general-images=ok synthetic-analyzer=ok");
         return 0;
     }
     private sealed class SelfTestProtection : IDiagnosticCaseProtection, IDisposable

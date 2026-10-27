@@ -18,6 +18,7 @@ const string Usage = """
     astm-trace inspect-input <file> [--profile <id>]
     astm-trace verify-publication <directory>
     astm-trace test-portgate <trace> [--portgate <executable>] [--profile <id>] [--max <n>] [--baud <n>] [--timeout <seconds>]
+    astm-trace simulate [--mode rigid|random] [--seed <n>] [--specimens <n>] [--baud <n>] [--direct] [--portgate <executable>] [--timeout <seconds>]
     astm-trace extract <adapter> <log> <out.astmtrace> [--recorded-by host|instrument] [--filter <text>] [--utc-offset <+hh:mm>]
     astm-trace from-text <lis02.txt> <out.astmtrace> [--direction received|transmitted]
     astm-trace from-binary <capture.bin> <out.astmtrace> [--direction received|transmitted]
@@ -51,6 +52,7 @@ try
         "inspect-input" when args.Length >= 2 => InspectInput.Run(args[1], Option("--profile")),
         "verify-publication" when args.Length == 2 => VerifyPublication(args[1]),
         "test-portgate" when args.Length >= 2 => await TestPortGate.RunAsync(args[1], args),
+        "simulate" => await Simulate.RunAsync(args),
         "extract" when args.Length >= 4 => Extract(args[1], args[2], args[3]),
         "from-text" when args.Length >= 3 => FromText(args[1], args[2]),
         "from-binary" when args.Length >= 3 => FromBinary(args[1], args[2]),

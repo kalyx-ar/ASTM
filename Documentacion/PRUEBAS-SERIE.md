@@ -59,6 +59,34 @@ Para reproducir una falla basta la semilla que figura en el mensaje del assert.
 
 No certifica ningún equipo real ni su dialecto: verifica el motor, el plugin estándar de campos, PortGate y el anfitrión con datos sintéticos.
 
+### Desde la CLI y Diagnostics
+
+`SyntheticCircuit` (Diagnostics.Core) es el mismo circuito para las pruebas, la CLI y la GUI. Las tres primeras muestras cubren siempre descarga, consulta y resultado no solicitado, en un orden que rota según la semilla; las demás se sortean. `PortGateBench.RunAsync(executable, SimulationOptions, …)` levanta el agente temporal y su COM de prueba, igual que **Probar PortGate**.
+
+```powershell
+astm-trace simulate --mode rigid
+astm-trace simulate --mode random --seed 42 --specimens 20
+astm-trace simulate --mode random --direct
+```
+
+Opciones:
+
+| Opción | Efecto |
+|---|---|
+| `--mode rigid\|random` | Comportamiento del analizador; por defecto `rigid`. |
+| `--seed <n>` | Semilla del modo aleatorizado. Si falta, se sortea una y se imprime para poder repetir la corrida. |
+| `--specimens <n>` | Cantidad de muestras, de 1 a 1000; por defecto 6. |
+| `--baud <n>` | Velocidad del COM de prueba; por defecto 115200, la del perfil sintético. |
+| `--direct` | Usa un par en memoria, sin PortGate. |
+| `--portgate <exe>` | Ejecutable del agente que se levanta. |
+| `--timeout <s>` | Límite global; por defecto 60 segundos. |
+
+`ASTM_SIMULATION` informa política, flujos, resultados enviados y recibidos, diferencias, frames dañados, consultas y duración. `ASTM_SIMULATION_TIMING` informa los tiempos del enlace. Salidas: 0, circuito idéntico; 2, diferencias; 124, tiempo agotado. Con la misma semilla, por PortGate y en directo se obtiene el mismo libro, incluidos los frames dañados.
+
+En Diagnostics, el panel **Analizador simulado** ofrece comportamiento rígido o aleatorizado, semilla (vacía genera una y la muestra) y muestras. **Simular analizador** ejecuta el circuito por PortGate, abre el caso capturado con el perfil sintético en Comunicación y resume el resultado en la barra de estado.
+
+El perfil sintético aparece en el catálogo como `(synthetic) ASTM test analyzer`, con 9 equipos y 15 perfiles. El self-test de la GUI corre ambos modos por PortGate y el de la CLI NativeAOT, el aleatorizado en memoria. No se escriben archivos: la traza queda en memoria hasta que el usuario decida guardarla como caso protegido.
+
 ## Acciones de plugins
 
 `IInstrumentCommandPlugin` aporta catálogo, parámetros, etiquetas traducibles y construcción de registros. `AstmInstrumentSession.SendCommandAsync` utiliza la cola y máquina LIS01 existentes; no agrega otro lector ni escribe por fuera del enlace. La GUI genera sus campos desde ese catálogo y habilita el envío sólo durante una sesión activa.

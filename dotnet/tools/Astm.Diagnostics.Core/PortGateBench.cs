@@ -10,11 +10,21 @@ namespace Astm.Diagnostics;
 /// <summary>Owns a temporary local PortGate and its simulated serial peer. Never installs a service or an OS driver.</summary>
 public static class PortGateBench
 {
-    public static async Task<CommunicationScenarioResult> RunAsync(string executable, CommunicationScenario scenario,
-        DiagnosticProfile profile, CancellationToken token, SerialSettings? serial = null)
+    public static Task<CommunicationScenarioResult> RunAsync(string executable, CommunicationScenario scenario,
+        DiagnosticProfile profile, CancellationToken token, SerialSettings? serial = null) =>
+        RunAsync(executable, serial ?? profile.AstmProfile?.Transport?.Serial?.Default ?? new(),
+            (host, peer, cancel) => scenario.RunAsync(profile, host, peer, true, cancel), token);
+
+    /// <summary>The synthetic analyzer behind the test serial port; the serial settings default to the synthetic profile.</summary>
+    public static Task<SimulationReport> RunAsync(string executable, SimulationOptions options, CancellationToken token, SerialSettings? serial = null) =>
+        RunAsync(executable, serial ?? new Astm.Plugin.Testing.Synthetic.SyntheticAstmPlugin().Profiles[0].Transport!.Serial!.Default,
+            (host, peer, cancel) => SyntheticCircuit.RunAsync(host, peer, options, cancel), token);
+
+    /// <summary>Starts the temporary agent, configures its test serial port and gives <paramref name="body"/> the host Stream
+    /// (through PortGate) and the peer Stream (the simulated serial device). The host Stream belongs to <paramref name="body"/>.</summary>
+    public static async Task<T> RunAsync<T>(string executable, SerialSettings serial, Func<Stream, Stream, CancellationToken, Task<T>> body, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        serial ??= profile.AstmProfile?.Transport?.Serial?.Default ?? new();
         var state = Path.Combine(Path.GetTempPath(), "astm-portgate-bench-" + Guid.NewGuid().ToString("N"));
         var info = new ProcessStartInfo(Path.GetFullPath(executable)) { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
@@ -33,9 +43,10 @@ public static class PortGateBench
                 { ListenHost = "127.0.0.1", PlatformProfile = "test" };
             var linkPort = await admin.SetConfigAsync(1, configuration, token);
             using var peer = await accepting.WaitAsync(token); peer.NoDelay = true;
-            await using var host = await new PortGateTransportProvider().OpenAsync(new PortGateTarget("scenario", new("127.0.0.1", linkPort), "scenario", "scenario")
+            var host = await new PortGateTransportProvider().OpenAsync(new PortGateTarget("scenario", new("127.0.0.1", linkPort), "scenario", "scenario")
                 { Settings = serial }, token);
-            return await scenario.RunAsync(profile, host, peer.GetStream(), true, token);
+            await using (host)
+                return await body(host, peer.GetStream(), token);
         }
         finally
         {

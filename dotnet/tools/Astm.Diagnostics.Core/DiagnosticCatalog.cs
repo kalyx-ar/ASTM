@@ -6,6 +6,7 @@ using Astm.Plugin.Legacy.Testing;
 using Astm.Plugin.Sysmex.Cs2500;
 using Astm.Plugin.Sysmex.Urinalysis;
 using Astm.Plugin.Sysmex.XnL;
+using Astm.Plugin.Testing.Synthetic;
 using Astm.Plugins;
 using Astm.Abstractions.Tracing;
 using Astm.Tracing;
@@ -61,7 +62,7 @@ public sealed class DiagnosticCatalog
     public DiagnosticCatalog()
     {
         var urinalysis = new SysmexUrinalysisPlugin();
-        AstmPlugins = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), urinalysis, new XnLPlugin(), new Cs2500Plugin(), new QwalysPlugin()];
+        AstmPlugins = [new StandardAstmPlugin(), new ArchitectPlugin(), new CellDynRubyPlugin(), urinalysis, new XnLPlugin(), new Cs2500Plugin(), new QwalysPlugin(), new SyntheticAstmPlugin()];
         TracePlugins = [urinalysis];
         var profiles = new List<DiagnosticProfile>();
         foreach (var plugin in TracePlugins)

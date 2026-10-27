@@ -105,6 +105,7 @@ public sealed partial class MainPage : ContentPage
         _interface.Add(Field(T("Live.QueryBudget"), _query)); _interface.Add(Field(T("Live.ResponseBudget"), _response));
         _interface.Add(new HorizontalStackLayout { Spacing = 8, Children = { _connect, _stop } });
         InitializeCommandControls();
+        InitializeSimulationControls();
         _source.Add(Action(T("View.Source"), () => { _settingsVisible = false; LayoutPanels(); return Task.CompletedTask; })); _source.Add(Field(T("Source.Offset"), _offset)); _source.Add(_interface);
         _sourceScroll = new ScrollView { Content = _source, Padding = 16, BackgroundColor = Colors.White };
 
@@ -144,7 +145,7 @@ public sealed partial class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=8, profiles=14, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-binary-framing, chronological-blocks, duration-format, communication-statistics, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=9, profiles=15, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-binary-framing, chronological-blocks, duration-format, communication-statistics, synthetic-analyzer-rigid-and-randomized, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name + (error.Message.StartsWith("ASTM-", StringComparison.Ordinal) ? " " + error.Message : "")); Environment.Exit(1); }
             });
         }
@@ -335,6 +336,7 @@ public sealed partial class MainPage : ContentPage
         _profiles.IsEnabled = _configurations.IsEnabled = _recorder.IsEnabled = _formats.IsEnabled = _open.IsEnabled = _save.IsEnabled = !busy;
         _connect.IsEnabled = !busy && Profile.CanConnect; _stop.IsEnabled = busy;
         _testPort.IsEnabled = !busy && _case is not null && Profile.AstmProfile is not null;
+        if (_simulate is not null) _simulate.IsEnabled = _simulationMode.IsEnabled = !busy;
         _transport.IsEnabled = _networkFields.IsEnabled = _serialFields.IsEnabled = !busy;
         _mode.IsEnabled = !busy && Profile.CanSimulateHost && !AutomaticInterpretation;
     }
@@ -610,7 +612,7 @@ public sealed partial class MainPage : ContentPage
         {
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
-            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 8 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 14 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ASTM-MAUI-SELFTEST");
+            if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 9 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 15 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ASTM-MAUI-SELFTEST");
             var quality = QualitySeriesBuilder.Build(analyzed.Observations);
             if (quality.Sum(s => s.NumericCount) != 2 || quality.Sum(s => s.MeasurementCount) != 3 || QualityGroups().Any(g => g.SummaryRow is null)) throw new InvalidDataException("ASTM-MAUI-QUALITY-SELFTEST");
             var unknownCq = QualityGroups().Single(g => g.Children.Any(r => r.Cells[5] == "Undetermined"));
@@ -675,6 +677,7 @@ public sealed partial class MainPage : ContentPage
         VerifyControlCommunication();
         VerifyTransportAndCommandPresentation();
         await VerifyVirtualSerialBenchAsync();
+        await VerifySimulationAsync();
         await _table.VerifyExpansionKeepsScrollAsync(); ShowTable();
     }
     private void VerifyControlCommunication()

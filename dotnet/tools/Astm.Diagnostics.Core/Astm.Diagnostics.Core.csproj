@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\plugins\Astm.Plugin.BioRad.Cfx\Astm.Plugin.BioRad.Cfx.csproj" />
     <ProjectReference Include="..\..\plugins\Astm.Plugin.Diagast.Qwalys\Astm.Plugin.Diagast.Qwalys.csproj" />
     <ProjectReference Include="..\..\plugins\Astm.Plugin.Legacy.Testing\Astm.Plugin.Legacy.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Testing.Synthetic\Astm.Plugin.Testing.Synthetic.csproj" />
   </ItemGroup>
   <Import Project="..\..\KalyxLang.props" />
 </Project>
