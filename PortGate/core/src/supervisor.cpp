@@ -178,7 +178,7 @@ bool Supervisor::apply(const AgentConfig& config, const TlsMaterial& link_tls, s
     stop_agent();
     auto agent = std::make_shared<Agent>(config, logger_, link_tls, [this](Event event) { return record(std::move(event)); });
     capture_.configure(config.agent_id, config.ports);
-    agent->set_capture_sink([this](const std::string& port_id, const Value& captured) { capture_.append(port_id, captured); });
+    agent->set_capture_sink([this](const std::string& port_id, const Value& captured) { capture_.submit(port_id, captured); });
     if (!agent->start(error)) {
         link_error_ = error;
         return false;

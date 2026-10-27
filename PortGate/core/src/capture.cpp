@@ -1,6 +1,7 @@
 #include "portgate/capture.hpp"
 
 #include <algorithm>
+#include <chrono>
 
 #include "portgate/platform.hpp"
 #include "portgate/transport.hpp"
@@ -10,6 +11,13 @@ namespace portgate {
 namespace {
 
 using cbor::Value;
+
+// Best effort: clears a buffer that held clear traffic so the freed memory does not keep it.
+void wipe(std::vector<std::uint8_t>& bytes) {
+    volatile std::uint8_t* p = bytes.data();
+    for (std::size_t i = 0; i < bytes.size(); ++i) p[i] = 0;
+    bytes.clear();
+}
 
 std::string hex(const std::string& text) {
     static const char* digits = "0123456789abcdef";
@@ -146,17 +154,87 @@ void CaptureStore::enforce(Port& p) {
     rewrite(p);
 }
 
+CaptureStore::~CaptureStore() {
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        stopping_ = true;
+    }
+    queue_changed_.notify_all();
+    if (writer_.joinable()) writer_.join();
+}
+
+void CaptureStore::submit(const std::string& port_id, const Value& record) {
+    auto plain = cbor::encode(record);
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        if (stopping_) return;
+        if (!writer_.joinable()) writer_ = std::thread([this] { writer_loop(); });
+        if (queue_bytes_ + plain.size() > kQueueLimit) {
+            wipe(plain);
+            if (!queue_.empty() && queue_.back().skipped > 0 && queue_.back().port_id == port_id) ++queue_.back().skipped;
+            else queue_.push_back({port_id, {}, 1});
+        } else {
+            queue_bytes_ += plain.size();
+            queue_.push_back({port_id, std::move(plain), 0});
+        }
+    }
+    queue_changed_.notify_all();
+}
+
+void CaptureStore::flush(int wait_ms) {
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+    queue_changed_.wait_for(lock, std::chrono::milliseconds(wait_ms), [&] { return queue_.empty() && !busy_; });
+}
+
+void CaptureStore::writer_loop() {
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+    for (;;) {
+        queue_changed_.wait(lock, [&] { return !queue_.empty() || stopping_; });
+        if (queue_.empty()) return;  // stopping, and everything queued was written
+        auto item = std::move(queue_.front());
+        queue_.pop_front();
+        queue_bytes_ -= item.plain.size();
+        busy_ = true;
+        lock.unlock();
+        if (item.skipped > 0) {
+            std::lock_guard<std::mutex> store(mutex_);
+            auto& p = port(item.port_id);
+            if (p.limits.enabled) {
+                const auto from = p.next_seq;
+                p.next_seq += item.skipped;
+                add_gap(p, from, p.next_seq - 1, "backlog");
+                rewrite(p);
+            }
+        } else {
+            append_encoded(item.port_id, item.plain);
+        }
+        lock.lock();
+        busy_ = false;
+        queue_changed_.notify_all();
+    }
+}
+
 void CaptureStore::append(const std::string& port_id, const Value& record) {
+    auto plain = cbor::encode(record);
+    append_encoded(port_id, plain);
+}
+
+void CaptureStore::append_encoded(const std::string& port_id, std::vector<std::uint8_t>& plain) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto& p = port(port_id);
-    if (!p.limits.enabled) return;
+    if (!p.limits.enabled) {
+        wipe(plain);
+        return;
+    }
     const auto seq = p.next_seq++;
     CaptureRecord r;
     r.seq = seq;
     r.key_id = key_id_;
     r.time_ms = platform::utc_ms();
     std::string error;
-    if (key_.empty() || !tls::seal(key_, aad(agent_id_, port_id, seq, key_id_), cbor::encode(record), r.nonce, r.sealed, error)) {
+    const bool sealed = !key_.empty() && tls::seal(key_, aad(agent_id_, port_id, seq, key_id_), plain, r.nonce, r.sealed, error);
+    wipe(plain);  // the clear copy does not outlive the sealing
+    if (!sealed) {
         add_gap(p, seq, seq, key_.empty() ? "no-key" : "seal-failed");
         rewrite(p);
         return;
@@ -173,6 +251,7 @@ void CaptureStore::append(const std::string& port_id, const Value& record) {
 }
 
 CapturePage CaptureStore::read(const std::string& port_id, std::uint64_t after, std::size_t max) {
+    flush(1000);  // include what the port thread already submitted
     std::lock_guard<std::mutex> lock(mutex_);
     auto& p = port(port_id);
     CapturePage page;

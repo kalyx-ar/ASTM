@@ -1064,6 +1064,36 @@ void test_sealed_capture_store() {
         CHECK(std::any_of(page.gaps.begin(), page.gaps.end(), [](const CaptureGap& g) { return g.reason == "quota"; }));
         CHECK(platform::file_size(platform::join_path(directory, "capture-7031.bin")) <= port.capture.max_bytes);
     }
+    {
+        // The port thread only queues: sealing and disk run on the writer. A burst beyond the queue is never silent:
+        // every sequence is either a sealed record or inside a `backlog` gap.
+        PortConfig burst;
+        burst.port_id = "p2";
+        burst.capture.enabled = true;
+        burst.capture.max_bytes = 1024ull * 1024 * 1024;
+        CaptureStore store(directory);
+        store.configure("agent-1", {burst});
+        store.set_key(7, key);
+        constexpr std::uint64_t kRecords = 4000;
+        std::vector<std::uint8_t> chunk(4096, 0x41);
+        for (std::uint64_t i = 0; i < kRecords; ++i) store.submit("p2", Value::map({{6, Value::bytes(chunk)}}));
+        std::vector<bool> seen(kRecords + 1, false);
+        std::uint64_t after = 0;
+        CapturePage page;
+        do {
+            page = store.read("p2", after, 1000);
+            for (const auto& r : page.records) {
+                if (r.seq <= kRecords) seen[r.seq] = true;
+                after = r.seq;
+            }
+            for (const auto& g : page.gaps) {
+                CHECK(g.reason == "backlog");
+                for (auto s = g.from; s <= g.to && s <= kRecords; ++s) seen[s] = true;
+            }
+        } while (!page.records.empty());
+        CHECK(page.last == kRecords);
+        CHECK(std::all_of(seen.begin() + 1, seen.end(), [](bool b) { return b; }));
+    }
     std::error_code ignored;
     std::filesystem::remove_all(directory, ignored);
 }

@@ -125,7 +125,8 @@ Per port and optional (`capture.enabled`). The agent seals each read and each su
 
 1. `SetConfig` enabling capture without a key is refused with `PORTGATE-CAPTURE-KEY-MISSING`.
 2. The agent never decrypts and keeps no plaintext on disk. `ReadCapture` returns sealed records; the host opens them and deduplicates by (agentId, portId, seq).
-3. Records are deleted only by `AckCapture` (event `capture-ack`), by retention or by quota (keeping the newest within three quarters of `maxBytes`). Every loss is an explicit gap with reason `no-key`, `seal-failed`, `write-failed`, `quota` or `retention`.
+3. Records are deleted only by `AckCapture` (event `capture-ack`), by retention or by quota (keeping the newest within three quarters of `maxBytes`). Every loss is an explicit gap with reason `no-key`, `seal-failed`, `write-failed`, `quota`, `retention` or `backlog`.
+5. The port thread only queues the record (at most 4 MiB in clear, in memory); a writer thread seals and stores it, and wipes the clear copy once sealed. Records beyond the queue are not kept and become a `backlog` gap. Neither sealing, the disk nor `ReadCapture`/`AckCapture` delay the owner. `ReadCapture` first waits (up to 1 s) for what is queued.
 4. Capture is evidence for diagnosis and reconciliation; the agent stays transparent and never answers the instrument.
 
 ## Events
