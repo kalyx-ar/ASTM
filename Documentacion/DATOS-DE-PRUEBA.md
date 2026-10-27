@@ -8,14 +8,14 @@ Las trazas de `trazas_externas/` son capturas reales de producción. Contienen *
 
 Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de Sysmex XN-L está marcado *Classified as Internal*.
 
-**Ninguno de los dos se publica en el repositorio ATSM.** Ambas carpetas están excluidas en `.gitignore` y se tratan como material local de referencia.
+**Ninguno de los dos se publica en el repositorio ASTM.** Ambas carpetas están excluidas en `.gitignore` y se tratan como material local de referencia.
 
 ## Inventario local
 
 | Carpeta | Archivos | Origen | Uso |
 |---|---|---|---|
 | `trazas_externas/legacy/Logs/*.log` | 3 | Host legacy: C4000, CELL-DYN Ruby, I1000 | Conversación LIS01 con controles, reintentos y errores (`Parsing Error`, cola borrada por reintentos) |
-| `trazas_externas/legacy/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan mensajes completos del anfitrión y el plugin Architect; no un watcher ATSM |
+| `trazas_externas/legacy/Logs/Importar/` | 151 + 129 NDF + 30 transformados + 2 logs | Exportación por archivo de ARCHITECT i1000SR | Mensajes LIS02 completos; validan mensajes completos del anfitrión y el plugin Architect; no un watcher ASTM |
 | `trazas_externas/legacy/Pedidos/`, `Resultados/` | 6 + 6 | Intercambio por archivo con formato propio (`H|DeltaLab…`, `H|<legacy>…`) | Candidato a plugin de archivo; a confirmar |
 | `trazas_externas/Sysmex/` | 8 | Sysmex OnlineInterface/U-WAM: UF-5000, UC-3500, AMS | Host query (`Q`), respuesta con `P/C/O`, resultados de orina |
 | `manuales/` | 11 | Fabricantes | Ver [ESTANDARES § Evidencia](ESTANDARES.md) |
@@ -24,13 +24,13 @@ Los manuales de `manuales/` tienen derechos de autor de sus fabricantes; el de S
 
 ```mermaid
 flowchart LR
-    R[Traza real local] --> I[atsm-trace extract / from-text → .atsmtrace]
-    I --> A[atsm-trace anonymize]
+    R[Traza real local] --> I[astm-trace extract / from-text → .astmtrace]
+    I --> A[astm-trace anonymize]
     A --> V[Revisión humana]
     V --> C[conformance/corpus del plugin]
 ```
 
-Las trazas se obtienen con `atsm-trace extract <adaptador>` (log de un fabricante o sistema), `from-text` o `from-binary`. `atsm-trace anonymize` trabaja **con el codec**, no con expresiones regulares sobre texto, para saber qué campo es qué:
+Las trazas se obtienen con `astm-trace extract <adaptador>` (log de un fabricante o sistema), `from-text` o `from-binary`. `astm-trace anonymize` trabaja **con el codec**, no con expresiones regulares sobre texto, para saber qué campo es qué:
 
 - Reemplaza campos de paciente (P: id, nombres, nacimiento, sexo, dirección, médico) por valores sintéticos consistentes dentro de la traza.
 - Seudonimiza identificadores de muestra/orden con un mapa estable por corpus (misma muestra → mismo seudónimo), de modo que la correlación O ↔ R se conserve.

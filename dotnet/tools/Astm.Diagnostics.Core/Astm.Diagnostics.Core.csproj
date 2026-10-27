@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Independent diagnostic host: bundled catalog, analysis and protected-case contracts.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Astm.Testing\Astm.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Tracing\Astm.Tracing.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Transport\Astm.Transport.csproj" />
+    <ProjectReference Include="..\..\src\PortGate.Client\PortGate.Client.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.Architect\Astm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.CellDynRuby\Astm.Plugin.Abbott.CellDynRuby.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.Urinalysis\Astm.Plugin.Sysmex.Urinalysis.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.XnL\Astm.Plugin.Sysmex.XnL.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.Cs2500\Astm.Plugin.Sysmex.Cs2500.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.BioRad.Cfx\Astm.Plugin.BioRad.Cfx.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Diagast.Qwalys\Astm.Plugin.Diagast.Qwalys.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Legacy.Testing\Astm.Plugin.Legacy.Testing.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\KalyxLang.props" />
+</Project>

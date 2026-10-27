@@ -1,10 +1,10 @@
-# ATSM: integración de instrumentos de laboratorio
+# ASTM: integración de instrumentos de laboratorio
 
 Fecha: 24 de octubre de 2026. Estado: **propuesta en implementación**: núcleo .NET, plugin Architect, herramientas de traza y agente nativo Windows x64 implementados y probados; ver [ESTADO](ESTADO.md).
 
-ATSM es un proyecto **neutral**: un agente de comunicación, un motor genérico de los protocolos de laboratorio (CLSI LIS01-A2 / LIS02-A2, conocidos como ASTM E1381 / E1394, y HL7 v2.5.1 / IHE LAW) y plugins por fabricante. No depende de ningún LIS/LIMS; cada sistema anfitrión implementa un único puerto. El primer anfitrión será EDC ([INTEGRACION-EDC](INTEGRACION-EDC.md)).
+ASTM es un proyecto **neutral**: un agente de comunicación, un motor genérico de los protocolos de laboratorio (CLSI LIS01-A2 / LIS02-A2, conocidos como ASTM E1381 / E1394, y HL7 v2.5.1 / IHE LAW) y plugins por fabricante. No depende de ningún LIS/LIMS; cada sistema anfitrión implementa un único puerto. El primer anfitrión será EDC ([INTEGRACION-EDC](INTEGRACION-EDC.md)).
 
-El nombre del repositorio se mantiene `ATSM`; en el texto, el protocolo se llama por su nombre normativo.
+El nombre del repositorio se mantiene `ASTM`; en el texto, el protocolo se llama por su nombre normativo.
 
 ## Las tres piezas
 
@@ -67,20 +67,20 @@ flowchart LR
 - **HL7 v2.5.1 / IHE LAW** como segundo protocolo del motor; el manual HL7 del ARCHITECT ya está disponible.
 - **Modelo canónico** alineado con LAW y proyectable a FHIR, con doble codificación (fabricante + LOINC/UCUM vía LIVD).
 - **Host query sincrónico con plazo** y **resultados durables idempotentes**: dos caminos distintos hacia el anfitrión.
-- Mensajes completos del anfitrión (P-01 resuelto, sin gestión de archivos en ATSM) y canal `Replay`; **importadores** de logs del sistema legacy y Sysmex al formato de traza ATSM.
+- Mensajes completos del anfitrión (P-01 resuelto, sin gestión de archivos en ASTM) y canal `Replay`; **importadores** de logs del sistema legacy y Sysmex al formato de traza ASTM.
 - **Kit de conformidad por plugin** ejecutado con `dotnet test` sobre corpus anonimizado.
 
 ## Estructura propuesta del repositorio
 
 ```text
-ATSM/
+ASTM/
   README.md  LICENSE  SECURITY.md  CHANGELOG.md
   spec/                  link-v1.cddl, agent-config.schema.json, profile.schema.json, model-v1, trace-v1
   PortGate/                agente C++17 (core, platform/win32|posix|esp32, tls, tools) — CMake
   dotnet/
-    src/                 Atsm.Abstractions, Atsm.Protocol.*, Atsm.Runtime, Atsm.Transport (opcional), PortGate.Client, Atsm.Testing
-    plugins/             Atsm.Plugin.Abbott.Architect, Atsm.Plugin.Abbott.CellDynRuby, Atsm.Plugin.Sysmex.Uwam, …
-    tools/               atsm-trace (importar, anonimizar, ver, comparar), atsm-sim (simulador de instrumento)
+    src/                 Astm.Abstractions, Astm.Protocol.*, Astm.Runtime, Astm.Transport (opcional), PortGate.Client, Astm.Testing
+    plugins/             Astm.Plugin.Abbott.Architect, Astm.Plugin.Abbott.CellDynRuby, Astm.Plugin.Sysmex.Uwam, …
+    tools/               astm-trace (importar, anonimizar, ver, comparar), astm-sim (simulador de instrumento)
     tests/
   conformance/           vectores de Link v1 y corpus anonimizado compartido
   Documentacion/         esta carpeta
@@ -88,9 +88,9 @@ ATSM/
 
 ## Orden de trabajo sugerido
 
-1. `spec/` + `Atsm.Abstractions` + `Atsm.Testing` (canal simulado, reloj virtual).
-2. `Atsm.Protocol.Lis01` y `Lis02` con casos E01–E05 sintéticos.
-3. `atsm-trace import/anonymize` sobre las trazas Architect → primer corpus.
+1. `spec/` + `Astm.Abstractions` + `Astm.Testing` (canal simulado, reloj virtual).
+2. `Astm.Protocol.Lis01` y `Lis02` con casos E01–E05 sintéticos.
+3. `astm-trace import/anonymize` sobre las trazas Architect → primer corpus.
 4. Plugin Architect sobre `Replay` y `LocalSerial`; luego Ruby y U-WAM.
 5. Agente nativo (Windows x64 → XP → Linux → ESP32) y canal `SerialTunnel`.
 6. Arbitraje y failover; HL7/LAW.
@@ -100,7 +100,7 @@ En paralelo, en EDC: Issue de decisión y adaptador `ILabWorkflowHost` contra el
 ## Pendiente de decidir
 
 - Licencia: decidido, libre uso. Firma: Strong Name con la SNK de EDC y Authenticode en el release (ver [ESTADO](ESTADO.md#decisiones-registradas)).
-- Publicación de paquetes NuGet de ATSM para EDC (Mbed TLS ya aprobado).
+- Publicación de paquetes NuGet de ASTM para EDC (Mbed TLS ya aprobado).
 - DeltaLab por archivo: resuelto por decisión humana, conector EDC/ETL, fuera del motor instrumental.
 - Primer instrumento para pruebas de banco y acceso a un equipo de prueba.
 

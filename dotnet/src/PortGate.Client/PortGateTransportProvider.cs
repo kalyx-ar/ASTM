@@ -1,5 +1,5 @@
-using Atsm.Abstractions.Transport;
-using Atsm.Transport;
+using Astm.Abstractions.Transport;
+using Astm.Transport;
 
 namespace PortGate.Client;
 
@@ -51,7 +51,7 @@ public static class PortGateDevices
 }
 
 /// <summary>
-/// Opens a port behind PortGate as the final transport of an ATSM session. Required serial settings are compared with
+/// Opens a port behind PortGate as the final transport of an ASTM session. Required serial settings are compared with
 /// the ones the agent announces; when they differ and an administrator is available, they are applied behind the tunnel
 /// with <c>SetConfig</c> (the agent restarts its Link endpoint). Otherwise opening fails rather than using other settings.
 /// </summary>

@@ -24,7 +24,7 @@ Se evita un CV universal: su interpretación requiere una escala de razón y una
 
 ## Conocimiento y selección Sysmex
 
-Una entrada principal **Sysmex · U-WAM (UF-5000, UC-3500, UD-10)**, dentro del ensamblado Atsm.Plugin.Sysmex.Urinalysis. La configuración predeterminada es Interpretación automática; las configuraciones concretas quedan como elección manual. El perfil aplicado se resuelve por contenido también al reanalizar el caso, no por su extensión o nombre.
+Una entrada principal **Sysmex · U-WAM (UF-5000, UC-3500, UD-10)**, dentro del ensamblado Astm.Plugin.Sysmex.Urinalysis. La configuración predeterminada es Interpretación automática; las configuraciones concretas quedan como elección manual. El perfil aplicado se resuelve por contenido también al reanalizar el caso, no por su extensión o nombre.
 
 IInstrumentKnowledge consulta hechos por perfil/protocolo, registro, campo y código. ER04 en una respuesta de orden tiene una interpretación; el mismo texto en otro campo no hereda esa interpretación. Los códigos sin coincidencia documentada conservan el original. Se reutiliza la base de conocimiento, manteniendo decodificadores de encuadre separados. Identificar un formato compatible no acredita la identidad física de un modelo.
 

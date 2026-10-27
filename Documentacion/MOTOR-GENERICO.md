@@ -1,6 +1,6 @@
-# Motor ATSM genérico
+# Motor ASTM genérico
 
-> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Atsm.Channels` se retiraron. ATSM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Atsm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
+> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Astm.Channels` se retiraron. ASTM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Astm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
 
 Estado: propuesta. El motor implementa los estándares de [ESTANDARES](ESTANDARES.md) como capas independientes y deja al plugin sólo lo que es propio del instrumento.
 
@@ -102,19 +102,19 @@ El motor informa evidencia (estado de capa baja, último frame confirmado, progr
 
 ```text
 dotnet/src/
-  Atsm.Abstractions     canal, eventos, capacidades, modelo canónico, contratos de plugin y host
-  Atsm.Protocol.Lis01   capa baja LIS01-A2
-  Atsm.Protocol.Lis02   codec LIS02-A2
-  Atsm.Protocol.Mllp    capa baja MLLP
-  Atsm.Protocol.Hl7v2   codec HL7 v2 y flujos LAW
-  Atsm.Runtime          host de instrumentos: carga de plugins, sesiones, perfiles, traza, métricas
-  Atsm.Testing          reloj virtual, canal simulado, simulador de instrumento, runner de conformidad
+  Astm.Abstractions     canal, eventos, capacidades, modelo canónico, contratos de plugin y host
+  Astm.Protocol.Lis01   capa baja LIS01-A2
+  Astm.Protocol.Lis02   codec LIS02-A2
+  Astm.Protocol.Mllp    capa baja MLLP
+  Astm.Protocol.Hl7v2   codec HL7 v2 y flujos LAW
+  Astm.Runtime          host de instrumentos: carga de plugins, sesiones, perfiles, traza, métricas
+  Astm.Testing          reloj virtual, canal simulado, simulador de instrumento, runner de conformidad
 ```
 
 - `net10.0` (LTS). Sin dependencias fuera de la BCL y paquetes oficiales de Microsoft en el núcleo.
 - `Nullable` y analizadores habilitados; API pública con revisión de compatibilidad (`PublicAPI.Shipped.txt`).
-- Ensamblados firmados con Strong Name del proyecto ATSM, para que hosts que exigen firma (como EDC) puedan cargarlos.
-- Mensajes de diagnóstico como **códigos estables** (`ATSM-L01-TIMEOUT-ESTABLISH`) con texto invariante; la traducción la hace el host.
+- Ensamblados firmados con Strong Name del proyecto ASTM, para que hosts que exigen firma (como EDC) puedan cargarlos.
+- Mensajes de diagnóstico como **códigos estables** (`ASTM-L01-TIMEOUT-ESTABLISH`) con texto invariante; la traducción la hace el host.
 
 ## Criterios de aceptación del motor
 

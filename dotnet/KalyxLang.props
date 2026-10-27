@@ -1,6 +1,6 @@
 <Project>
   <!-- Explicit opt-in for hosts that supply Kalyx.Globalization and an already-open connection.
-       Standalone ATSM stays independent and uses the same Spanish seed without a database. -->
+       Standalone ASTM stays independent and uses the same Spanish seed without a database. -->
   <PropertyGroup Condition="'$(EnableKalyxLang)' == 'true'">
     <DefineConstants>$(DefineConstants);KALYX_LANG</DefineConstants>
   </PropertyGroup>

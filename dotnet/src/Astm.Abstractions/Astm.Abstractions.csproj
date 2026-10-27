@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Astm.Abstractions</RootNamespace>
+    <Description>Channel, canonical model, host and trace contracts shared by every ASTM component.</Description>
+  </PropertyGroup>
+</Project>

@@ -1,6 +1,6 @@
 # PortGate Link v1
 
-Normative wire format between the PortGate agent and a controller (host). Implemented by `PortGate/core` (C++) and `dotnet/src/Atsm.Channels/SerialTunnel` (.NET). Shared test vectors: `conformance/link-v1/vectors.txt`.
+Normative wire format between the PortGate agent and a controller (host). Implemented by `PortGate/core` (C++) and `dotnet/src/Astm.Channels/SerialTunnel` (.NET). Shared test vectors: `conformance/link-v1/vectors.txt`.
 
 ## Unit
 

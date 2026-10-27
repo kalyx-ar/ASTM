@@ -4,15 +4,15 @@ Entrega del 2026-10-24, trazada en [kalyx-ar/EDC#205](https://github.com/kalyx-a
 
 ## Aplicación Windows
 
-`dotnet/tools/Atsm.Diagnostics.Maui` es la presentación MAUI vigente desde el 2026-10-25, alineada con EDC; WPF está retirado. Núcleo/catálogo en `Atsm.Diagnostics.Core`, sin dependencia de EDC. Trece perfiles compilados, sin carga en caliente.
+`dotnet/tools/Astm.Diagnostics.Maui` es la presentación MAUI vigente desde el 2026-10-25, alineada con EDC; WPF está retirado. Núcleo/catálogo en `Astm.Diagnostics.Core`, sin dependencia de EDC. Trece perfiles compilados, sin carga en caliente.
 
-Compilar con dotnet publish dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release -p:AtsmRequireStrongName=true. Ejecutable: dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe. Conservar sus dependencias de la misma carpeta; incluye .NET y Windows App SDK. No se generan ZIP ni se usa un publicador PowerShell. MAUI Windows .NET 10 es self-contained/ReadyToRun; NativeAOT corresponde a la CLI.
+Compilar con dotnet publish dotnet/tools/Astm.Diagnostics.Maui/Astm.Diagnostics.Maui.csproj -c Release -p:AstmRequireStrongName=true. Ejecutable: dotnet/tools/Astm.Diagnostics.Maui/bin/Release/astm-diagnostics.exe. Conservar sus dependencias de la misma carpeta; incluye .NET y Windows App SDK. No se generan ZIP ni se usa un publicador PowerShell. MAUI Windows .NET 10 es self-contained/ReadyToRun; NativeAOT corresponde a la CLI.
 
 Uso:
 
-1. Elegir el perfil del instrumento y el tipo de entrada; abrir una exportación, mensaje completo, bytes de cable, log Sysmex/legacy o traza ATSM. `Ejemplo CFX` permite probar con datos sintéticos (`--demo` también).
+1. Elegir el perfil del instrumento y el tipo de entrada; abrir una exportación, mensaje completo, bytes de cable, log Sysmex/legacy o traza ASTM. `Ejemplo CFX` permite probar con datos sintéticos (`--demo` también).
 2. Inspeccionar trama, mensajes, observaciones, hallazgos y eventos. Seleccionar una fila muestra su detalle. El catálogo indica evidencia y alcance; un perfil genérico no acredita compatibilidad de todos los equipos ASTM.
-3. Guardar un caso `.atsmcase` si se necesita conservar la captura. Los originales permanecen intactos; abrir un archivo no activa una interfaz ni publica resultados.
+3. Guardar un caso `.astmcase` si se necesita conservar la captura. Los originales permanecen intactos; abrir un archivo no activa una interfaz ni publica resultados.
 4. Para captura en vivo, seleccionar TCP cliente/servidor o SerialTunnel, endpoint, identidad y TLS según la configuración real. El servidor escucha en una IP local literal. Un servidor TLS exige PFX; mTLS cliente puede utilizar PFX, con clave efímera y contraseña sólo en memoria. La validación TLS usa la plataforma, sin bypass ni degradación automática.
 5. Elegir el archivo de caso antes de conectar. `Capturar sin responder` es el modo predeterminado. `Simular host: ACK, sin órdenes` activa la sesión ASTM/HL7; la aplicación toma custodia durable de lotes de diagnóstico, responde consultas soportadas sin órdenes y nunca envía pedidos a un LIMS.
 6. Detener para cerrar y sellar el caso. Se puede reabrir con el mismo usuario Windows. El cierre durante una captura solicita cancelación y espera su finalización.
@@ -61,9 +61,9 @@ Los manuales/corpus locales no se copian al repositorio ni al ejecutable. Las pr
 
 ## Archivos, integración EDC y siguientes pasos
 
-CFX usa exportaciones y QWALYS contempla intercambio por archivos **append**: son ejemplos reales de interfaces basadas en ficheros. El Scheduler de EDC detecta novedades; el ETL toma custodia, verifica que la escritura terminó, conserva identidad/orden y entrega contenido completo al plugin/procesador. Ordenar sólo por creación no asegura integridad ni idempotencia ante cambios manuales, copias o escrituras todavía abiertas. En append hace falta cursor/checkpoint por archivo y mensajes completos; un evento no equivale necesariamente a un fichero nuevo ni a un único mensaje. ATSM no añade un filedrop.
+CFX usa exportaciones y QWALYS contempla intercambio por archivos **append**: son ejemplos reales de interfaces basadas en ficheros. El Scheduler de EDC detecta novedades; el ETL toma custodia, verifica que la escritura terminó, conserva identidad/orden y entrega contenido completo al plugin/procesador. Ordenar sólo por creación no asegura integridad ni idempotencia ante cambios manuales, copias o escrituras todavía abiertas. En append hace falta cursor/checkpoint por archivo y mensajes completos; un evento no equivale necesariamente a un fichero nuevo ni a un único mensaje. ASTM no añade un filedrop.
 
-La GUI es un anfitrión de mantenimiento. Sigue pendiente integrar ATSM en EDC (P-13: `ILabWorkflowHost`, Scheduler/ETL, SQLCipher, permisos/UI), completar LAW (P-02), outbox durable (P-04), la custodia EDC de la captura del agente (P-13), LocalSerial (P-10) y distribución firmada/CI (P-14). El journal de diagnóstico no resuelve la outbox ni habilita reenvío de escrituras inciertas. Mantener SerialTunnel sin spool de disco; ver [la decisión de recuperación](MENSAJES-TRAZAS-HL7.md).
+La GUI es un anfitrión de mantenimiento. Sigue pendiente integrar ASTM en EDC (P-13: `ILabWorkflowHost`, Scheduler/ETL, SQLCipher, permisos/UI), completar LAW (P-02), outbox durable (P-04), la custodia EDC de la captura del agente (P-13), LocalSerial (P-10) y distribución firmada/CI (P-14). El journal de diagnóstico no resuelve la outbox ni habilita reenvío de escrituras inciertas. Mantener SerialTunnel sin spool de disco; ver [la decisión de recuperación](MENSAJES-TRAZAS-HL7.md).
 
 Validación de esta entrega: suite .NET con casos CSV/RDML, posiciones/estados de fabricantes, custodia antes de aceptación, simulación ASTM completa, reapertura/reanálisis, corrupción, reordenamiento y cortes del journal; pruebas nativas de regresión; build MAUI, prueba de ventana/handler/runtime privado y DPAPI del usuario. Los conteos finales y commits se registran en ESTADO y en un changelog nuevo.
 
@@ -75,7 +75,7 @@ La lista contiene 8 equipos/familias, con 14 perfiles técnicos en el selector d
 UC-3500 directo: intérprete serial propio y captura sin respuestas; simulación activa deshabilitada para ese perfil. No confundirlo con U-WAM ASTM. Las etiquetas y celdas MAUI permiten seleccionar/copiar texto. Véanse códigos ER, resultados y límites en [UC3500-PROTOCOLO](UC3500-PROTOCOLO.md).
 
 
-Seleccionar U-WAM y abrir/analizar resuelve el enlace por contenido dentro de Atsm.Plugin.Sysmex.Urinalysis, sin entrada UC-3500 separada. Interpretación manual disponible en configuración. Vista Calidad enfocada en mediana, DE, extremos, n y señales; material/lote literal y registros reales desplegables: [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).
+Seleccionar U-WAM y abrir/analizar resuelve el enlace por contenido dentro de Astm.Plugin.Sysmex.Urinalysis, sin entrada UC-3500 separada. Interpretación manual disponible en configuración. Vista Calidad enfocada en mediana, DE, extremos, n y señales; material/lote literal y registros reales desplegables: [CALIDAD-DIAGNOSTICA](CALIDAD-DIAGNOSTICA.md).
 
 ## Revisión de detección y modelos (2026-10-25)
 

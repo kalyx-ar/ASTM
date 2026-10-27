@@ -1,5 +1,5 @@
 <Project>
-  <!-- ATSM is a standalone repository: this file (and Directory.Build.targets) stop MSBuild
+  <!-- ASTM is a standalone repository: this file (and Directory.Build.targets) stop MSBuild
        from importing the props/targets of any repository that happens to contain this checkout. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -9,9 +9,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Version>0.2.0</Version>
-    <Product>ATSM</Product>
-    <Description>ATSM: neutral clinical laboratory instrument integration.</Description>
+    <Version>0.3.0</Version>
+    <Product>ASTM</Product>
+    <Description>ASTM: neutral clinical laboratory instrument integration.</Description>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 </Project>

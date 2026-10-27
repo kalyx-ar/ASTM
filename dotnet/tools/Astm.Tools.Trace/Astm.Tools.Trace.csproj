@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>astm-trace</AssemblyName>
+    <RootNamespace>Astm.Tools.Trace</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>astm-trace</ToolCommandName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Description>Import, anonymize, summarize and interpret ASTM traces.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\..\PortGate\build\win-x64\Release\portgate.exe" Link="portgate.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\..\PortGate\build\win-x64\Release\portgate.exe')" />
+    <ProjectReference Include="..\Astm.Diagnostics.Core\Astm.Diagnostics.Core.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Tracing\Astm.Tracing.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Testing\Astm.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.Architect\Astm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.Urinalysis\Astm.Plugin.Sysmex.Urinalysis.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Legacy.Testing\Astm.Plugin.Legacy.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.CellDynRuby\Astm.Plugin.Abbott.CellDynRuby.csproj" />
+  </ItemGroup>
+</Project>

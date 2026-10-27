@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>ATSM runtime: instrument sessions, traces and plugin hosting.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Atsm.Plugins\Atsm.Plugins.csproj" />
-    <ProjectReference Include="..\Atsm.Protocol.Mllp\Atsm.Protocol.Mllp.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Neutral tracing: reconstruction of real and theoretical traces from pure content, layered event stack, metrics and codec-aware anonymization.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astm.Runtime\Astm.Runtime.csproj" />
+  </ItemGroup>
+</Project>

@@ -37,7 +37,7 @@
 # Ver Documentacion/DATOS-DE-PRUEBA.md. Sólo se publica corpus anonimizado bajo conformance/.
 Documentacion/trazas_externas/
 Documentacion/manuales/
-*.atsmtrace.local
+*.astmtrace.local
 
 # .NET
 /artifacts/

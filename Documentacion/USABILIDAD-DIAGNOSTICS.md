@@ -8,7 +8,7 @@ Decisiones humanas del 2026-10-25, [EDC#205](https://github.com/kalyx-ar/EDC/iss
 
 `IInstrumentDiagnosticVocabulary` permite que cada plugin aporte claves, fallback español y referencia documental. La descripción de un registro S de U-WAM, por ejemplo, corresponde a datos de control y objetivos/límites (R315168); no se extrapola ese significado al ASTM genérico. Lo desconocido se identifica como **sin interpretación documentada**. Estado del instrumento no equivale a validación clínica; no se presenta F/P de XN-L como final/preliminar clínico.
 
-Los originales, códigos, posiciones y datos del fabricante permanecen en el caso y en el detalle. La traducción afecta la presentación; no altera `AtsmDiagnostic.Message`, bytes, hallazgos persistidos ni el contrato del motor. En vista técnica se conservan mensajes originales aunque estén en inglés.
+Los originales, códigos, posiciones y datos del fabricante permanecen en el caso y en el detalle. La traducción afecta la presentación; no altera `AstmDiagnostic.Message`, bytes, hallazgos persistidos ni el contrato del motor. En vista técnica se conservan mensajes originales aunque estén en inglés.
 
 ## Grupos, contenido y columnas
 
@@ -24,7 +24,7 @@ Encabezados con fondo claro, regla inferior y agarre de redimensionado discreto 
 
 La lista presenta **8 equipos/familias**, que conservan **14 perfiles técnicos**. CFX agrupa CSV/RDML/curva; ARCHITECT agrupa ASTM/HL7. U-WAM aparece una vez, con las variantes en **Configuración de la interfaz**:
 
-| Configuración | Límite de consulta según R315168 §5.2.5 | Presupuesto del anfitrión ATSM |
+| Configuración | Límite de consulta según R315168 §5.2.5 | Presupuesto del anfitrión ASTM |
 |---|---|---|
 | Con analizador químico | 8 s | 6 s |
 | Sin analizador químico | 18 s | 15 s |
@@ -37,7 +37,7 @@ Si la cabecera permite sugerir U-WAM y todavía estaba seleccionado otro equipo,
 
 ## Detección por contenido
 
-**Detectar automáticamente** es el formato predeterminado. Se reconocen firmas de los adaptadores Sysmex/legacy, cabecera JSON de traza ATSM, magic de caso protegido, cabeceras CSV CFX, raíz RDML (también en ZIP acotado), mensajes ASTM y HL7/MLLP. La extensión por sí sola no elige el parser. Si no se reconoce el contenido o coincide con varios formatos, se informa en español y se conserva la selección manual.
+**Detectar automáticamente** es el formato predeterminado. Se reconocen firmas de los adaptadores Sysmex/legacy, cabecera JSON de traza ASTM, magic de caso protegido, cabeceras CSV CFX, raíz RDML (también en ZIP acotado), mensajes ASTM y HL7/MLLP. La extensión por sí sola no elige el parser. Si no se reconoce el contenido o coincide con varios formatos, se informa en español y se conserva la selección manual.
 
 En Sysmex se infiere quién registró la comunicación a partir de registros R/Q que origina el instrumento. Esto corrige el sentido instrumento→anfitrión entre un monitor del puerto LIS de U-WAM y un monitor donde el software actúa como anfitrión del analizador. La inferencia puede reemplazarse en **Quién registró el log**. Una captura sin evidencia suficiente muestra una advertencia; no se infiere la dirección por ACK o solicitudes O solamente.
 
@@ -50,18 +50,18 @@ Regresión local, sólo agregados y sin publicar los archivos:
 | Log UF-5000 mostrado por el usuario | 7.089 entradas, 425 mensajes, 5.006 observaciones; registrador inferido: anfitrión. Antes la GUI invertía su sentido y mostraba cero observaciones. |
 | Log UC-3500 mostrado por el usuario | 2.006 entradas, 501 mensajes del protocolo propio y 2.251 observaciones; 501 BCC correctos. RQ02/CM00/ER y resultados interpretados sin pasar por ASTM. Ver UC3500-PROTOCOLO. |
 
-`atsm-trace inspect-input <archivo> [--profile <id>]` utiliza el mismo detector/lector y emite únicamente cantidades y perfil; no imprime nombres de archivo, muestras, pacientes ni resultados. No abre casos DPAPI sin su lector específico. No crea archivos de intercambio ni vigila directorios.
+`astm-trace inspect-input <archivo> [--profile <id>]` utiliza el mismo detector/lector y emite únicamente cantidades y perfil; no imprime nombres de archivo, muestras, pacientes ni resultados. No abre casos DPAPI sin su lector específico. No crea archivos de intercambio ni vigila directorios.
 
 ## Idiomas publicados y Lang
 
 `WindowsLanguages.targets` filtra MUI nativos de WinUI en los elementos de MSBuild y satélites administrados. Se conservan español y fallback `en-US`, sin borrar DLL/PRI ni carpetas arbitrarias después de publicar. Paquete comprobado: carpetas de idioma `es`, `es-ES` y `en-us`, 4 MUI nativos. `Microsoft.UI.Xaml` y `NpuDetect` son carpetas funcionales, no idiomas.
 
-La distribución independiente usa seeds de **español neutral**. UI en `Atsm.Diagnostics.Maui/Lang.cs`; diagnósticos/composición en `Atsm.Diagnostics.Core/DiagnosticText.cs`; vocabulario de cada plugin en su ensamblado. Claves estables, placeholders y `source = AssemblyName`, `target = es-AR` conforme la [guía de Kalyx.Globalization](../../../Documentacion/Bibliotecas/Globalization/Lang-para-agentes.md) del checkout EDC.
+La distribución independiente usa seeds de **español neutral**. UI en `Astm.Diagnostics.Maui/Lang.cs`; diagnósticos/composición en `Astm.Diagnostics.Core/DiagnosticText.cs`; vocabulario de cada plugin en su ensamblado. Claves estables, placeholders y `source = AssemblyName`, `target = es-AR` conforme la [guía de Kalyx.Globalization](../../../Documentacion/Bibliotecas/Globalization/Lang-para-agentes.md) del checkout EDC.
 
 El anfitrión puede habilitar la referencia compilada a la biblioteca propia existente:
 
 ```powershell
-dotnet build dotnet/tools/Atsm.Diagnostics.Maui/Atsm.Diagnostics.Maui.csproj -c Release `
+dotnet build dotnet/tools/Astm.Diagnostics.Maui/Astm.Diagnostics.Maui.csproj -c Release `
   -p:EnableKalyxLang=true `
   -p:KalyxGlobalizationProject=H:/Github/EDC/Kalyx.Globalization/Kalyx.Globalization.csproj
 ```
@@ -80,7 +80,7 @@ Se inspeccionó una ventana del primer candidato con accesibilidad y captura. El
 
 ## Destino único y retiro de compatibilidad
 
-Decisión humana posterior: sólo se mantiene legacy por traspaso activo o fuerza mayor (ejemplo Windows XP). La salida única es dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe. Se eliminaron el alias Windows, salidas anteriores, los comprimidos de entrega y tools/Publish-Diagnostics.ps1. Se compila directamente con .NET y se verifica el ejecutable resultante; sin mover, duplicar ni comprimir salidas. No se eliminan datos de usuario ni se reescribe el historial de changelogs.
+Decisión humana posterior: sólo se mantiene legacy por traspaso activo o fuerza mayor (ejemplo Windows XP). La salida única es dotnet/tools/Astm.Diagnostics.Maui/bin/Release/astm-diagnostics.exe. Se eliminaron el alias Windows, salidas anteriores, los comprimidos de entrega y tools/Publish-Diagnostics.ps1. Se compila directamente con .NET y se verifica el ejecutable resultante; sin mover, duplicar ni comprimir salidas. No se eliminan datos de usuario ni se reescribe el historial de changelogs.
 
 La detección preserva también HL7/MLLP dentro de un log: infiere el lado del registrador por OUL/QBP cuando hay evidencia, conserva el perfil HL7 seleccionado y nunca lo reemplaza por U-WAM por encontrar un nombre de equipo. Reconocer MSH no elige una marca: sin configuración HL7 compatible del equipo se solicita seleccionarla, en vez de interpretar con otro fabricante. La prueba adicional cubre ambas direcciones y el rechazo de esa suposición.
 

@@ -1,6 +1,8 @@
-# ATSM
+# ASTM
 
-Neutral integration of clinical laboratory instruments: PortGate (a protocol-agnostic serial ↔ TCP agent, administered by ATSM), a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
+Nombre vigente en Alpha: ASTM, paquetes `Astm.*` 0.3.0. [Rutas, formatos y alcance del renombrado](Documentacion/RENOMBRADO-ASTM.md).
+
+Neutral integration of clinical laboratory instruments: PortGate (a protocol-agnostic serial ↔ TCP agent, administered by ASTM), a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
 
 Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](Documentacion/CONTINUACION.md) · documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
 
@@ -18,7 +20,7 @@ conformance/ vectors shared by the C++ and .NET implementations
 ## Build and test
 
 ```bash
-dotnet test dotnet/Atsm.slnx
+dotnet test dotnet/Astm.slnx
 ```
 
 ```bash
@@ -37,8 +39,8 @@ The first CMake configure downloads Mbed TLS 4.1.1 and checks its SHA-256 (offli
 
 ## Data
 
-Instrument traces may contain patient data. Real traces and vendor manuals are kept out of version control (`Documentacion/trazas_externas/`, `Documentacion/manuales/`); only anonymized corpora are published. Use `atsm-trace anonymize` and review its report before sharing a trace.
+Instrument traces may contain patient data. Real traces and vendor manuals are kept out of version control (`Documentacion/trazas_externas/`, `Documentacion/manuales/`); only anonymized corpora are published. Use `astm-trace anonymize` and review its report before sharing a trace.
 
-Distribución verificada: la herramienta estándar .NET; ejecutable `dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe`. [MAUI y NativeAOT](Documentacion/MAUI-Y-NATIVEAOT.md): WPF retirado, CLI NativeAOT y catálogo compilado; carga en caliente sólo en EDC.
+Distribución verificada: la herramienta estándar .NET; ejecutable `dotnet/tools/Astm.Diagnostics.Maui/bin/Release/astm-diagnostics.exe`. [MAUI y NativeAOT](Documentacion/MAUI-Y-NATIVEAOT.md): WPF retirado, CLI NativeAOT y catálogo compilado; carga en caliente sólo en EDC.
 
 Mejoras de Diagnostics: interpretación por defecto, grupos completos, detección de logs, columnas automáticas/redimensionables, equipos con configuraciones internas y Lang opcional. Ver [usabilidad](Documentacion/USABILIDAD-DIAGNOSTICS.md).

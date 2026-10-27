@@ -40,7 +40,7 @@ Serie C identifica material de control; lote, nivel y vencimiento no se infieren
 
 ## Integración y uso
 
-`IInstrumentTracePlugin` es un puerto neutral en Atsm.Plugins para detección, reconstrucción e interpretación pasiva. El fabricante implementa `Atsm.Plugin.Sysmex.Urinalysis`; devuelve mensajes, eventos, observaciones y diagnósticos. No abre conexiones ni administra archivos. Core compone el catálogo; MAUI y la CLI usan el mismo intérprete. Vocabulario y diagnósticos tienen seed español por ensamblado y adaptación Lang opcional.
+`IInstrumentTracePlugin` es un puerto neutral en Astm.Plugins para detección, reconstrucción e interpretación pasiva. El fabricante implementa `Astm.Plugin.Sysmex.Urinalysis`; devuelve mensajes, eventos, observaciones y diagnósticos. No abre conexiones ni administra archivos. Core compone el catálogo; MAUI y la CLI usan el mismo intérprete. Vocabulario y diagnósticos tienen seed español por ensamblado y adaptación Lang opcional.
 
 Abrir el archivo con formato **Automático** resuelve el perfil UC dentro de U-WAM y el lado del registrador cuando hay evidencia. También se puede elegir U-WAM con interpretación automática para reanalizar un caso previamente marcado incompatible. La vista Mensajes explica los registros, Hallazgos agrupa códigos y el detalle conserva correlación, tiras y originales. Las etiquetas y celdas MAUI permiten seleccionar texto y copiarlo; los controles editables y el detalle mantienen su copia nativa.
 

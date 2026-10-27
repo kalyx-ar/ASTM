@@ -1,12 +1,12 @@
 # Datos analíticos para control interno y calibración
 
-Investigación e implementación del 2026-10-24, [EDC#205](https://github.com/kalyx-ar/EDC/issues/205), alcance previo [registrado aquí](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6391823820). Se refiere al proyecto ATSM y a las interfaces ASTM/HL7/exportaciones específicas de sus plugins; compartir un protocolo no garantiza que todos los modelos transmitan los mismos datos.
+Investigación e implementación del 2026-10-24, [EDC#205](https://github.com/kalyx-ar/EDC/issues/205), alcance previo [registrado aquí](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6391823820). Se refiere al proyecto ASTM y a las interfaces ASTM/HL7/exportaciones específicas de sus plugins; compartir un protocolo no garantiza que todos los modelos transmitan los mismos datos.
 
 ## Hallazgo y separación de responsabilidades
 
 Hay tres clases distintas de información aprovechable: **mediciones individuales** sobre controles/calibradores (incluidas señales previas a conversión), **estadísticas reportadas por el software del fabricante** y **valores asignados/metadatos** del material, reactivo y calibración. Un rango de control no identifica por sí solo una media objetivo ni un desvío estándar. Un resultado con estado final tampoco acredita aceptación QC o validación clínica.
 
-ATSM conserva datos y procedencia, interpreta el dialecto y expone puertos de lectura. El anfitrión custodia, autoriza y proporciona historia, catálogos y políticas del laboratorio. No se agregan comandos de calibración, descarga universal de históricos, aceptación automática de controles ni reglas clínicas universales. Una captura puede ser parcial: no se infiere que contenga todas las mediciones realizadas por el instrumento.
+ASTM conserva datos y procedencia, interpreta el dialecto y expone puertos de lectura. El anfitrión custodia, autoriza y proporciona historia, catálogos y políticas del laboratorio. No se agregan comandos de calibración, descarga universal de históricos, aceptación automática de controles ni reglas clínicas universales. Una captura puede ser parcial: no se infiere que contenga todas las mediciones realizadas por el instrumento.
 
 ## Matriz de evidencia por interfaz
 
@@ -28,7 +28,7 @@ Manuales locales bajo `manuales/` ignorado: no se distribuyen ni se copian sus e
 
 Disponibilidad del dato: en ARCHITECT ASI (§2-3/4) la transmisión QC depende de liberación, opciones de envío y conexión habilitada; las excepciones también tienen condiciones de liberación. En XN-L (§5) puede habilitarse una, ambas o ninguna salida QC, con riesgo de recibir dos representaciones de una misma medición. Registrar esta configuración y el período cubierto antes de interpretar tendencias, faltantes o recuentos; el lector no transforma la captura en un histórico completo.
 
-`Atsm.Abstractions.Model.AnalyticalQualityContext`, opcional en `InstrumentObservation.Quality`, conserva:
+`Astm.Abstractions.Model.AnalyticalQualityContext`, opcional en `InstrumentObservation.Quality`, conserva:
 
 - `QualityMaterial`: tipo explícito, identificador, lote, nivel y vencimiento **crudo** si se transmiten. Un estándar qPCR tiene tipo `Standard`; no se etiqueta como calibrador instrumental por inferencia.
 - Módulo, corrida y método cuando hay evidencia de su significado. El nombre de middleware no sustituye al serial del analizador que midió.
@@ -36,7 +36,7 @@ Disponibilidad del dato: en ARCHITECT ASI (§2-3/4) la transmisión QC depende d
 - `ReportedStatistic`: valor original y valor decimal opcional, tipo, ámbito y campo fuente. Se trata de salida del software instrumental, no de un cálculo del anfitrión. No se inventan unidades, n, valores asignados ni grupo de réplicas desconocido.
 - `SourceFields`: campos adicionales necesarios para inspección y futura reinterpretación. `TraceRef`, ObservationId, BatchId, flags, tipo de resultado, rango, reactivos y tiempo existentes siguen viajando.
 
-`InstrumentObservationBatch.QualityResources` contiene referencias externas tipadas. `AstmMessageProcessor` asigna identidades estables por recepción y custodia estas referencias mediante **el mismo `ILabWorkflowHost.IngestAsync`** que las observaciones; un lote puede contener sólo recursos. El anfitrión debe almacenar el lote completo antes de `Accepted`. Aceptar una referencia no acredita que el archivo externo exista, esté completo o haya sido adquirido. No se crea una segunda escritura no atómica ni un almacén propio de ATSM.
+`InstrumentObservationBatch.QualityResources` contiene referencias externas tipadas. `AstmMessageProcessor` asigna identidades estables por recepción y custodia estas referencias mediante **el mismo `ILabWorkflowHost.IngestAsync`** que las observaciones; un lote puede contener sólo recursos. El anfitrión debe almacenar el lote completo antes de `Accepted`. Aceptar una referencia no acredita que el archivo externo exista, esté completo o haya sido adquirido. No se crea una segunda escritura no atómica ni un almacén propio de ASTM.
 
 Los perfiles modificados ASTM/HL7/CFX pasan a versión 1.1.0; el nuevo perfil `biorad.cfx.maestro.standard-curve-csv` empieza en 1.0.0. Los constructores canónicos existentes siguen siendo válidos (propiedades opcionales inicializadas); los consumidores deben actualizarse para custodiar el contexto y los lotes que sólo contienen referencias. La clave de deduplicación del anfitrión continúa siendo la identidad de recepción/lote, no la igualdad del valor numérico.
 
@@ -49,7 +49,7 @@ IAsyncEnumerable<QualityDatum> ReadAsync(QualityDataQuery query, CancellationTok
 IAsyncEnumerable<QualityResourceReference> ReadResourcesAsync(QualityResourceQuery query, CancellationToken token);
 ```
 
-`ObservationQualityDataSource` es el adaptador implementado en `Atsm.Runtime.Quality`. Recibe una función que lee los lotes custodiados por el anfitrión; no conecta al equipo ni guarda copias. Ejemplo de composición (el lector durable pertenece al anfitrión):
+`ObservationQualityDataSource` es el adaptador implementado en `Astm.Runtime.Quality`. Recibe una función que lee los lotes custodiados por el anfitrión; no conecta al equipo ni guarda copias. Ejemplo de composición (el lector durable pertenece al anfitrión):
 
 ```csharp
 IQualityDataSource source = new ObservationQualityDataSource(
@@ -71,7 +71,7 @@ La selección usa igualdad exacta de instrumento, **código y sistema** del ensa
 
 Se conservan repeticiones, correcciones, flags, resultados no numéricos y excluidos: el lector no los filtra silenciosamente ni fusiona filas. Un `Unknown` no se vuelve paciente ni control por el nombre de muestra. Un filtro no certifica que los datos formen una serie estadística comparable. En producción el anfitrión debe filtrar/paginar desde su almacén; el adaptador genérico recorre los lotes que se le suministran.
 
-`IQualityResourceContent.OpenReadAsync(reference, token)` define el puerto opcional que implementa **el anfitrión/ETL**, retornando un Stream que el consumidor debe cerrar. No tiene implementación de red/disco en ATSM ni se invoca automáticamente. Debe autorizar el localizador no confiable contra recursos configurados, comprobar formato/límites, identificar la versión/hash y tomar custodia del contenido. El localizador de S.7 se preserva crudo; no es permiso para abrir una ruta UNC o URL arbitraria. El importador tipado de CSV U-WAM y su asociación de lote/objetivos/límites siguen pendientes; Scheduler/ETL puede resolver la referencia sin incorporar filedrop al motor.
+`IQualityResourceContent.OpenReadAsync(reference, token)` define el puerto opcional que implementa **el anfitrión/ETL**, retornando un Stream que el consumidor debe cerrar. No tiene implementación de red/disco en ASTM ni se invoca automáticamente. Debe autorizar el localizador no confiable contra recursos configurados, comprobar formato/límites, identificar la versión/hash y tomar custodia del contenido. El localizador de S.7 se preserva crudo; no es permiso para abrir una ruta UNC o URL arbitraria. El importador tipado de CSV U-WAM y su asociación de lote/objetivos/límites siguen pendientes; Scheduler/ETL puede resolver la referencia sin incorporar filedrop al motor.
 
 ## CFX y mantenimiento
 

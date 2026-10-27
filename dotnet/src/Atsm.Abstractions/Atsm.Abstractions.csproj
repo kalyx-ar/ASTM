@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>Atsm.Abstractions</RootNamespace>
-    <Description>Channel, canonical model, host and trace contracts shared by every ATSM component.</Description>
-  </PropertyGroup>
-</Project>

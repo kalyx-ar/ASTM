@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>CLSI LIS02-A2 (ASTM E1394) record codec.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astm.Abstractions\Astm.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

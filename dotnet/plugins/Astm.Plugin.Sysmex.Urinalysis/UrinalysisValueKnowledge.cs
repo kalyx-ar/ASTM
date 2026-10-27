@@ -1,0 +1,69 @@
+using Astm.Abstractions.Model;
+using Astm.Plugins;
+
+namespace Astm.Plugin.Sysmex.Urinalysis;
+
+internal static class UrinalysisValueKnowledge
+{
+    internal static ProtocolText? Unit(InstrumentObservation observation, IReadOnlyDictionary<string, ProtocolText> vocabulary)
+    {
+        if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
+            return observation.ResultKind?.Split('/')[0] is "IF" or "RC" || UwamIndicators.IsResearch(observation) ? vocabulary["unit.NonMeasurement"] : null;
+        if (observation.Test.Vendor.System != CodeSystems.Vendor(Uc3500Interpreter.PluginId)) return null;
+        return vocabulary[observation.ResultKind switch
+        {
+            "REFLECTANCE1" or "REFLECTANCE2" => "unit.Percent",
+            _ when observation.Test.Vendor.Code is "pH" or "SG.strip" or "SG.refractometer" => "unit.Dimensionless",
+            "QUALITATIVE" or "TURBIDITY" or "COLOR" or "COLOR-RANK" => "unit.None",
+            _ => "unit.NotTransmitted",
+        }];
+    }
+    // UC table 6-18, and table 6-17 for turbidity. An index expresses order only.
+    // Unknown levels are not assigned a rank or converted to a concentration.
+    private static readonly Dictionary<string, string[]> CrossScales = new(StringComparer.Ordinal)
+    {
+        ["URO"] = ["normal", "1+", "2+", "3+", "4+"],
+        ["BLD"] = ["-", "+", "1+", "2+", "3+"],
+        ["BIL"] = ["-", "1+", "2+", "3+"], ["KET"] = ["-", "1+", "2+", "3+"],
+        ["GLU"] = ["-", "+", "1+", "2+", "3+", "4+"], ["PRO"] = ["-", "+", "1+", "2+", "3+", "4+"],
+        ["NIT"] = ["-", "+"], ["LEU"] = ["-", "1+", "2+", "3+"],
+        ["P/C"] = ["normal", "1+", "2+"], ["A/C"] = ["normal", "1+", "2+"], ["TURBIDITY"] = ["-", "1+", "2+"],
+    };
+    public static InstrumentValueMeaning? Describe(InstrumentObservation observation, IReadOnlyDictionary<string, ProtocolText> vocabulary)
+    {
+        if (observation.Test.Vendor.System == CodeSystems.Vendor(UwamInterpreter.PluginId))
+        {
+            var kind = observation.ResultKind?.Split('/')[0];
+            if (UwamIndicators.IsResearch(observation)) return new(vocabulary["value.ResearchIndicator"], "research:" + observation.Test.Vendor.Code, false)
+            { DisplayText = vocabulary.GetValueOrDefault("research." + observation.Test.Vendor.Code + "." + observation.Value.RawText.Trim()), IsStructuredContent = true };
+            if (UwamIndicators.IsReview(observation)) return new(vocabulary["resultKind.RC"], "reported:RC", false)
+            { DisplayText = vocabulary["review." + observation.Test.Vendor.Code], IsStructuredContent = true };
+            if (kind == "IF") return new(vocabulary["value.Image"], "image", false) { DisplayValue = vocabulary["value.Image"].Fallback, IsStructuredContent = true };
+            if (kind is "RC" or "RP") return new(vocabulary["resultKind." + kind], "reported:" + kind, false);
+        }
+        if (observation.Test.Vendor.System != CodeSystems.Vendor(Uc3500Interpreter.PluginId)) return null;
+        var text = observation.Value.RawText.Trim();
+        if ((observation.ResultKind == "QUALITATIVE" || observation.ResultKind == "TURBIDITY")
+            && CrossScales.TryGetValue(observation.Test.Vendor.Code, out var levels))
+        {
+            string? comparison = null;
+            foreach (var prefix in new[] { ">=", "<=", ">", "<" })
+                if (text.StartsWith(prefix, StringComparison.Ordinal)) { comparison = prefix; text = text[prefix.Length..].TrimStart(); break; }
+            // A numeric threshold in this field keeps its own numeric scale, not a cross rank.
+            if (InstrumentNumericValue.Parse(observation.Value.RawText) is { Numeric: not null, Comparator: not null })
+                return new(vocabulary["value.SemiQuantitative"], "numeric:" + observation.Test.Vendor.Code, false);
+            var index = Array.IndexOf(levels, text);
+            return new(vocabulary[observation.Test.Vendor.Code == "NIT" ? "value.BinaryCrosses" : "value.Crosses"],
+                "crosses:" + observation.Test.Vendor.Code, true, index < 0 ? null : index, comparison)
+            {
+                // Tables 6-7/6-17 distinguish a negative qualitative value from state 1 (not analyzed).
+                // Zero here means no positive crosses, not zero concentration or a missing analysis.
+                DisplayValue = index == 0 && text == "-" && comparison is null
+                    && observation.InstrumentStatusMeaning != InstrumentStatusMeaning.NotPerformed ? "0" : null,
+            };
+        }
+        var parsed = InstrumentNumericValue.Parse(observation.Value.RawText);
+        return parsed is { Numeric: not null, Comparator: not null }
+            ? new(vocabulary["value.SemiQuantitative"], "numeric:" + observation.Test.Vendor.Code, false) : null;
+    }
+}

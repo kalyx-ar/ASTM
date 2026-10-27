@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup>
+    <SatelliteResourceLanguages>es;es-AR;es-ES;en;en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <!-- Native WinUI MUI payloads bypass SatelliteResourceLanguages. Keep Spanish and the en-US fallback;
+       do not delete core DLLs/PRI or arbitrary directories after publishing. -->
+  <Target Name="FilterAstmWinUiLanguages" AfterTargets="AddMicrosoftWindowsAppSDKPayloadFiles;ResolveReferences" BeforeTargets="_CopyFilesMarkedCopyLocal;ComputeFilesToPublish">
+    <ItemGroup>
+      <_AstmUnusedWinUiMui Include="@(MicrosoftWindowsAppSDKFiles)"
+        Condition="'%(Extension)' == '.mui' and ('%(Filename)' == 'Microsoft.UI.Xaml.dll' or '%(Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(RecursiveDir)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <None Remove="@(_AstmUnusedWinUiMui)" />
+      <MicrosoftWindowsAppSDKFiles Remove="@(_AstmUnusedWinUiMui)" />
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.mui' and ('%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(ReferenceCopyLocalPaths.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(ReferenceCopyLocalPaths.DestinationSubDirectory)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+    </ItemGroup>
+  </Target>
+  <Target Name="FilterAstmPublishedWinUiLanguages" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.mui' and ('%(ResolvedFileToPublish.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(ResolvedFileToPublish.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+    </ItemGroup>
+  </Target>
+  <!-- Unpackaged WinAppSDK also stages its MUI under obj/MsixContent as ordinary copy items.
+       Filter that build path too: PublishDir and OutputPath intentionally share bin/Release. -->
+  <Target Name="FilterAstmStagedWinUiLanguages" BeforeTargets="_CopyOutOfDateSourceItemsToOutputDirectory;_CopyOutOfDateSourceItemsToOutputDirectoryAlways;_CopyOutOfDateSourceItemsToOutputDirectoryIfDifferent">
+    <ItemGroup>
+      <_SourceItemsToCopyToOutputDirectory Remove="@(_SourceItemsToCopyToOutputDirectory)"
+        Condition="'%(_SourceItemsToCopyToOutputDirectory.Extension)' == '.mui' and ('%(_SourceItemsToCopyToOutputDirectory.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(_SourceItemsToCopyToOutputDirectory.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(_SourceItemsToCopyToOutputDirectory.TargetPath)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <_SourceItemsToCopyToOutputDirectoryAlways Remove="@(_SourceItemsToCopyToOutputDirectoryAlways)"
+        Condition="'%(_SourceItemsToCopyToOutputDirectoryAlways.Extension)' == '.mui' and ('%(_SourceItemsToCopyToOutputDirectoryAlways.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(_SourceItemsToCopyToOutputDirectoryAlways.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(_SourceItemsToCopyToOutputDirectoryAlways.TargetPath)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+      <_SourceItemsToCopyToOutputDirectoryIfDifferent Remove="@(_SourceItemsToCopyToOutputDirectoryIfDifferent)"
+        Condition="'%(_SourceItemsToCopyToOutputDirectoryIfDifferent.Extension)' == '.mui' and ('%(_SourceItemsToCopyToOutputDirectoryIfDifferent.Filename)' == 'Microsoft.UI.Xaml.dll' or '%(_SourceItemsToCopyToOutputDirectoryIfDifferent.Filename)' == 'Microsoft.UI.Xaml.Phone.dll') and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(_SourceItemsToCopyToOutputDirectoryIfDifferent.TargetPath)', '^(es(-AR|-ES)?|en-US)[/\\]', System.Text.RegularExpressions.RegexOptions.IgnoreCase))" />
+    </ItemGroup>
+  </Target>
+</Project>

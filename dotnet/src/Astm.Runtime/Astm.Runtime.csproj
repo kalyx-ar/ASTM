@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>ASTM runtime: instrument sessions, traces and plugin hosting.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astm.Plugins\Astm.Plugins.csproj" />
+    <ProjectReference Include="..\Astm.Protocol.Mllp\Astm.Protocol.Mllp.csproj" />
+  </ItemGroup>
+</Project>

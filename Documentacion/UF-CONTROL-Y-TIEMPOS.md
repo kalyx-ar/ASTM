@@ -1,12 +1,12 @@
 # UF binario y tiempos de comunicación
 
-Incremento del 26 de octubre de 2026, kalyx-ar/EDC#205. `Atsm.Plugin.Sysmex.Urinalysis` interpreta resultados ASTM, UC-3500 y el formato binario UF dentro de la misma familia. El perfil binario es `sysmex.uf.binary`. Los dos archivos UF aportados corresponden al mismo equipo; su nombre no participa en la detección ni se usa como modelo.
+Incremento del 26 de octubre de 2026, kalyx-ar/EDC#205. `Astm.Plugin.Sysmex.Urinalysis` interpreta resultados ASTM, UC-3500 y el formato binario UF dentro de la misma familia. El perfil binario es `sysmex.uf.binary`. Los dos archivos UF aportados corresponden al mismo equipo; su nombre no participa en la detección ni se usa como modelo.
 
 ## Reconstrucción del stream
 
 La normalización reside en el SDK neutral: `BinaryWireParser` convierte hexadecimal/prefijos/notación de controles a los mismos bytes y `BinaryFrameLayout` describe encuadres por longitud, orden de bytes y patrones. El plugin UF declara su layout y la interpretación del payload; no contiene otro parser genérico de encuadres. El formato HexBytes de Diagnostics utiliza ese puerto antes del codec ASTM o del perfil binario correspondiente. No se transforma un protocolo propietario en ASTM por cambiar su representación: se normalizan los datos al mismo modelo canónico.
 
-Los nombres ASTM comunes y sus traducciones pertenecen a `StandardDiagnosticVocabulary.Shared`, source `Atsm.Plugins`. Se retiraron reformulaciones redundantes por marca para H/P/O/R/Q/C/M/L; Imagen, Normal y otros conceptos generales se reutilizan. La disposición de registros/campos y los códigos con significado específico siguen en el plugin.
+Los nombres ASTM comunes y sus traducciones pertenecen a `StandardDiagnosticVocabulary.Shared`, source `Astm.Plugins`. Se retiraron reformulaciones redundantes por marca para H/P/O/R/Q/C/M/L; Imagen, Normal y otros conceptos generales se reutilizan. La disposición de registros/campos y los códigos con significado específico siguen en el plugin.
 
 La primera aproximación encontraba dos avisos y bloques de 13 bytes dentro de las lecturas. Era insuficiente: confundía cortes del monitor con límites de mensaje. La revisión reconstruye las envolturas por longitud, por dirección y conservando las entradas de origen. Una división arbitraria en lecturas no cambia el resultado; un evento de captura separa los buffers.
 

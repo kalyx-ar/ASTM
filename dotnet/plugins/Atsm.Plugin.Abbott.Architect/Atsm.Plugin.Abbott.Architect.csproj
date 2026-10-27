@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>Abbott ARCHITECT (ASI RS-232, LIS1-A / LIS2-A2) dialect for ATSM.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Plugin SDK: dialect contracts that vendor plugins implement on top of the generic engine.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Astm.Abstractions\Astm.Abstractions.csproj" />
+    <ProjectReference Include="..\Astm.Protocol.Lis01\Astm.Protocol.Lis01.csproj" />
+    <ProjectReference Include="..\Astm.Protocol.Lis02\Astm.Protocol.Lis02.csproj" />
+    <ProjectReference Include="..\Astm.Protocol.Hl7v2\Astm.Protocol.Hl7v2.csproj" />
+  </ItemGroup>
+</Project>

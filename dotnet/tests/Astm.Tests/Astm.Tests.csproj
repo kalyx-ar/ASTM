@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(EnableKalyxLang)' == 'true'"><DefineConstants>$(DefineConstants);KALYX_LANG</DefineConstants></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\tools\Astm.Diagnostics.Core\Astm.Diagnostics.Core.csproj" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Astm.Protocol.Lis01\Astm.Protocol.Lis01.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Protocol.Lis02\Astm.Protocol.Lis02.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Protocol.Mllp\Astm.Protocol.Mllp.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.Architect\Astm.Plugin.Abbott.Architect.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Runtime\Astm.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Testing\Astm.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Transport\Astm.Transport.csproj" />
+    <ProjectReference Include="..\..\src\PortGate.Client\PortGate.Client.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Tracing\Astm.Tracing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.Urinalysis\Astm.Plugin.Sysmex.Urinalysis.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Legacy.Testing\Astm.Plugin.Legacy.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.CellDynRuby\Astm.Plugin.Abbott.CellDynRuby.csproj" />
+  </ItemGroup>
+</Project>

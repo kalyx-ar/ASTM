@@ -1,6 +1,6 @@
 # Interfaz de comunicación
 
-> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Atsm.Channels` se retiraron. ATSM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Atsm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
+> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Astm.Channels` se retiraron. ASTM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Astm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
 
 Estado: propuesta. Concreta la capa de transporte descrita en [ARQUITECTURA](ARQUITECTURA.md) y la semántica de arbitraje de [CONTRATOS](CONTRATOS.md). Aquí se fija **qué canales existen, cómo se ve el canal desde el motor y cómo viaja todo por la red**.
 
@@ -11,7 +11,7 @@ El motor genérico recibe siempre el mismo objeto: un flujo binario ordenado en 
 ```mermaid
 flowchart LR
     subgraph Canales
-      A[SerialTunnel<br/>agente ATSM Link]
+      A[SerialTunnel<br/>agente ASTM Link]
       B[TcpNative<br/>cliente o servidor]
       C[LocalSerial<br/>COM / tty del host]
       D[Mensajes completos<br/>fuente del anfitrión]
@@ -36,7 +36,7 @@ La decisión humana del 2026-10-24 retira el FileDrop propio: EDC usa Scheduler 
 ## Contrato del canal en .NET
 
 ```csharp
-namespace Atsm.Abstractions.Channels;
+namespace Astm.Abstractions.Channels;
 
 public interface IInstrumentChannel : IAsyncDisposable
 {
@@ -136,23 +136,23 @@ PortGate/
 ## Canal en el host (.NET)
 
 ```text
-dotnet/src/Atsm.Channels/
+dotnet/src/Astm.Channels/
   SerialTunnel/   cliente Link v1 (System.IO.Pipelines), TLS con SslStream
   TcpNative/      cliente/servidor TCP, TLS opcional
   LocalSerial/    System.IO.Ports
   # Sin FileDrop: el anfitrión entrega contenido y posee los archivos
-  Replay/         lectura de traza ATSM
+  Replay/         lectura de traza ASTM
 ```
 
 `System.IO.Ports` y `System.IO.Pipelines` son paquetes oficiales de Microsoft.
 
 ## Formato de traza
 
-Una traza ATSM es independiente del canal y del fabricante:
+Una traza ASTM es independiente del canal y del fabricante:
 
-- Archivo `*.atsmtrace` (v1, `atsm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Es intercambio explícito, no persistencia operativa EDC: Application hospeda SQLCipher antes de conectar; no hay fallback plano. Ver [custodia y buffer](MENSAJES-TRAZAS-HL7.md).
-- `atsm-trace dump` muestra una traza con los caracteres de control visibles para revisión humana.
-- Los logs externos se convierten en segmentos puros mediante **adaptadores de log que aportan los plugins** de cada serie de equipos; ATSM genérico reconstruye con ellos la traza real y la teórica ([TRAZAS-Y-RECUPERACION § Reconstrucción](TRAZAS-Y-RECUPERACION.md#reconstrucción-de-trazas-reales-y-teóricas)). Cada adaptador declara qué se pierde.
+- Archivo `*.astmtrace` (v1, `astm-trace/1`): JSON Lines; la primera línea es la cabecera (origen, instrumento, perfil, limitaciones) y cada línea siguiente un registro `{seq, ms, utc, dir, data(base64), code, detail}`. Es intercambio explícito, no persistencia operativa EDC: Application hospeda SQLCipher antes de conectar; no hay fallback plano. Ver [custodia y buffer](MENSAJES-TRAZAS-HL7.md).
+- `astm-trace dump` muestra una traza con los caracteres de control visibles para revisión humana.
+- Los logs externos se convierten en segmentos puros mediante **adaptadores de log que aportan los plugins** de cada serie de equipos; ASTM genérico reconstruye con ellos la traza real y la teórica ([TRAZAS-Y-RECUPERACION § Reconstrucción](TRAZAS-Y-RECUPERACION.md#reconstrucción-de-trazas-reales-y-teóricas)). Cada adaptador declara qué se pierde.
 
 ## Cuestiones abiertas
 

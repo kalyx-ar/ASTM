@@ -1,20 +1,20 @@
 <Project>
   <!--
-    Strong Name. ATSM ships signed with the key of the distribution that hosts it; for EDC that is the existing
-    Kalyx.EDC.snk. The key never lives in this repository: it is found next to an EDC checkout that contains ATSM
-    (EDC/LIMS/ATSM) or given with -p:AtsmStrongNameKeyFile=<path>. Without a key the build is unsigned, unless
-    AtsmRequireStrongName=true (release builds), which fails instead. Authenticode is applied at release time.
+    Strong Name. ASTM ships signed with the key of the distribution that hosts it; for EDC that is the existing
+    Kalyx.EDC.snk. The key never lives in this repository: it is found next to an EDC checkout that contains ASTM
+    (EDC/LIMS/ASTM) or given with -p:AstmStrongNameKeyFile=<path>. Without a key the build is unsigned, unless
+    AstmRequireStrongName=true (release builds), which fails instead. Authenticode is applied at release time.
     Also stops MSBuild from importing the targets of a containing repository.
   -->
   <PropertyGroup>
-    <_AtsmEdcKey>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', '..', 'EDC', 'Build', 'Signing', 'Kalyx.EDC.snk'))</_AtsmEdcKey>
-    <AtsmStrongNameKeyFile Condition="'$(AtsmStrongNameKeyFile)' == '' and Exists('$(_AtsmEdcKey)')">$(_AtsmEdcKey)</AtsmStrongNameKeyFile>
+    <_AstmEdcKey>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', '..', 'EDC', 'Build', 'Signing', 'Kalyx.EDC.snk'))</_AstmEdcKey>
+    <AstmStrongNameKeyFile Condition="'$(AstmStrongNameKeyFile)' == '' and Exists('$(_AstmEdcKey)')">$(_AstmEdcKey)</AstmStrongNameKeyFile>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(AtsmStrongNameKeyFile)' != '' and '$(IsTestProject)' != 'true'">
+  <PropertyGroup Condition="'$(AstmStrongNameKeyFile)' != '' and '$(IsTestProject)' != 'true'">
     <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(AtsmStrongNameKeyFile)</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>$(AstmStrongNameKeyFile)</AssemblyOriginatorKeyFile>
   </PropertyGroup>
-  <Target Name="AtsmRequireStrongName" BeforeTargets="CoreCompile" Condition="'$(AtsmRequireStrongName)' == 'true' and '$(IsTestProject)' != 'true'">
-    <Error Condition="'$(SignAssembly)' != 'true' or !Exists('$(AssemblyOriginatorKeyFile)')" Text="ATSM release builds must be strong-named: provide the existing distribution key with -p:AtsmStrongNameKeyFile=&lt;path&gt;. Do not generate a new key." />
+  <Target Name="AstmRequireStrongName" BeforeTargets="CoreCompile" Condition="'$(AstmRequireStrongName)' == 'true' and '$(IsTestProject)' != 'true'">
+    <Error Condition="'$(SignAssembly)' != 'true' or !Exists('$(AssemblyOriginatorKeyFile)')" Text="ASTM release builds must be strong-named: provide the existing distribution key with -p:AstmStrongNameKeyFile=&lt;path&gt;. Do not generate a new key." />
   </Target>
 </Project>

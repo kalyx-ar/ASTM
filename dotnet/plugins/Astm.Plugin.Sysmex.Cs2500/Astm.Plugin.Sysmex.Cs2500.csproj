@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="..\..\src\Astm.Plugins\Astm.Plugins.csproj" /></ItemGroup></Project>

@@ -2,7 +2,7 @@
 
 **Decisiones humanas del 2026-10-26:**
 
-1. El agente se llama **PortGate** (decisión humana 2026-10-26; antes `atsm-agent` en `native/` y, brevemente, RemoteUSB). Es una puerta de puertos serie y Ethernet hacia TCP, agnóstica del protocolo del instrumento, con semáforo, kill switch y administración remota: lo usa ATSM neutral y la parte específica la aporta el plugin.
+1. El agente se llama **PortGate** (decisión humana 2026-10-26; antes `astm-agent` en `native/` y, brevemente, RemoteUSB). Es una puerta de puertos serie y Ethernet hacia TCP, agnóstica del protocolo del instrumento, con semáforo, kill switch y administración remota: lo usa ASTM neutral y la parte específica la aporta el plugin.
 2. Se administra de forma remota y centralizada; el archivo JSON deja de ser la vía de aprovisionamiento.
 3. En Windows es un **servicio**, no un driver.
 4. TLS es opcional. El material X.509 puede venir completo desde el servidor.
@@ -143,7 +143,7 @@ Una UI de configuración (Diagnostics, o la de EDC) se conecta a `127.0.0.1:2824
 ## Neutralidad y reparto
 
 - PortGate: agente C++ en `PortGate/`, especificación `spec/link-v1.md` y su extensión de administración, vectores de conformidad.
-- ATSM neutral: biblioteca .NET cliente (canal `SerialTunnel` y administración), sin dependencia de un LIS. El plugin aporta lo específico del instrumento.
+- ASTM neutral: biblioteca .NET cliente (canal `SerialTunnel` y administración), sin dependencia de un LIS. El plugin aporta lo específico del instrumento.
 - Diagnostics: UI local/remota sobre esa biblioteca.
 - EDC/LIMS Equipos: aprovisionamiento central (inventario, modos, asignación de instrumentos, versiones/historial, certificados), con su propio Issue en EDC.
 

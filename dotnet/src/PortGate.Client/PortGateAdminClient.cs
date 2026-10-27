@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Channels;
-using Atsm.Transport;
+using Astm.Transport;
 
 namespace PortGate.Client;
 

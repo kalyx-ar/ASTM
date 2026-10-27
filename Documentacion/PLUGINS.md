@@ -1,14 +1,14 @@
 # Plugins específicos
 
-Estado: contratos de motor implementados; kits formales de conformidad pendientes; catálogo compilado por decisión humana del 2026-10-25. Los ejemplos declarativos siguientes siguen siendo propuesta (contratos reales en `dotnet/src/Atsm.Plugins`). Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico. Repertorio vigente y aplicación Windows: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
+Estado: contratos de motor implementados; kits formales de conformidad pendientes; catálogo compilado por decisión humana del 2026-10-25. Los ejemplos declarativos siguientes siguen siendo propuesta (contratos reales en `dotnet/src/Astm.Plugins`). Un plugin encapsula **un dialecto de un fabricante/familia** sobre el motor genérico. No conoce el LIS/LIMS que lo aloja ni el canal físico. Repertorio vigente y aplicación Windows: [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md).
 
 ## Qué hace y qué no hace
 
 SDK vigente: `PluginApi.Version = 2`. `IInstrumentTracePlugin.Recognizes(profile, segments)` e `InferRecorder(profile, segments)` reciben el perfil concreto. UC-3500, ASTM y UF binario conviven en el mismo plugin de familia; el nombre de un log no es un modelo. Los consumidores se recompilan sin firmas anteriores. `TraceInterpretation.Timings` separa respuesta, duración total y proceso; `InstrumentContent.IsImageReference` ofrece clasificación común de referencias, sin abrirlas. Véase [UF binario y tiempos](UF-CONTROL-Y-TIEMPOS.md).
 
-Normalización neutral: `Atsm.Plugins.Tracing.BinaryWireParser` acepta hexadecimal separado/compacto, prefijos 0x/\\x y notación de controles; conserva NUL y rechaza entradas inválidas. `BinaryFrameLayout` declara encuadre por longitud, orden de bytes, patrones y terminador, sin fabricantes dentro del parser. UF declara su disposición y aporta la semántica del payload; su entrada binaria/hex produce el mismo modelo. El detector/lector también entrega ASTM normalizado al codec existente, sin un intérprete ASTM por marca.
+Normalización neutral: `Astm.Plugins.Tracing.BinaryWireParser` acepta hexadecimal separado/compacto, prefijos 0x/\\x y notación de controles; conserva NUL y rechaza entradas inválidas. `BinaryFrameLayout` declara encuadre por longitud, orden de bytes, patrones y terminador, sin fabricantes dentro del parser. UF declara su disposición y aporta la semántica del payload; su entrada binaria/hex produce el mismo modelo. El detector/lector también entrega ASTM normalizado al codec existente, sin un intérprete ASTM por marca.
 
-`StandardDiagnosticVocabulary.Shared` contiene los nombres ASTM H/P/O/R/Q/C/M/L, controles de enlace y conceptos comunes como Imagen/Normal. Los plugins reutilizan esos objetos y no los vuelven a traducir en cada ensamblado. `ProtocolText.SourceAssembly` fija el propietario del seed común (`Atsm.Plugins`); los textos específicos mantienen el ensamblado del plugin. S de U-WAM y códigos cuya semántica depende de su contexto siguen siendo extensiones específicas. No se fuerza el significado de una bandera de un fabricante sobre otro.
+`StandardDiagnosticVocabulary.Shared` contiene los nombres ASTM H/P/O/R/Q/C/M/L, controles de enlace y conceptos comunes como Imagen/Normal. Los plugins reutilizan esos objetos y no los vuelven a traducir en cada ensamblado. `ProtocolText.SourceAssembly` fija el propietario del seed común (`Astm.Plugins`); los textos específicos mantienen el ensamblado del plugin. S de U-WAM y códigos cuya semántica depende de su contexto siguen siendo extensiones específicas. No se fuerza el significado de una bandera de un fabricante sobre otro.
 
 | El plugin hace | El plugin no hace |
 |---|---|
@@ -45,7 +45,7 @@ El ejemplo es ilustrativo: las posiciones reales de U-WAM salen de su manual y d
 ## Contrato de código
 
 ```csharp
-namespace Atsm.Plugins;
+namespace Astm.Plugins;
 
 public interface IInstrumentPlugin
 {
@@ -74,8 +74,8 @@ public interface IDialect
 
 ## Empaquetado y aislamiento
 
-- Paquete NuGet `Atsm.Plugin.<Fabricante>.<Familia>` con manifiesto `atsm-plugin.json` (id, versión SemVer, `engineApi` compatible, hash de perfiles, licencia).
-- Decisión humana 2026-10-25: ATSM/Diagnostics componen los plugins en compilación y no usan AssemblyLoadContext. La carga/admisión en caliente corresponde al anfitrión EDC; la propuesta previa de loader propio queda retirada.
+- Paquete NuGet `Astm.Plugin.<Fabricante>.<Familia>` con manifiesto `astm-plugin.json` (id, versión SemVer, `engineApi` compatible, hash de perfiles, licencia).
+- Decisión humana 2026-10-25: ASTM/Diagnostics componen los plugins en compilación y no usan AssemblyLoadContext. La carga/admisión en caliente corresponde al anfitrión EDC; la propuesta previa de loader propio queda retirada.
 - Firma: el host puede exigir Strong Name y/o Authenticode y una lista de editores admitidos.
 - Versionado: cambiar la interpretación de un campo incrementa la versión del plugin; la traza registra qué versión interpretó cada mensaje para reprocesar si hace falta.
 
@@ -85,13 +85,13 @@ Cada plugin incluye:
 
 ```text
 conformance/
-  corpus/          trazas *.atsmtrace sintéticas o anonimizadas
+  corpus/          trazas *.astmtrace sintéticas o anonimizadas
   expected/        salida canónica esperada (JSON) por traza
   scenarios.json   casos E/P/R: host query, orden, repetición, corte a mitad de frame…
   CONFORMANCE.md   declaración: qué perfiles, qué flujos, qué quedó sin probar
 ```
 
-`dotnet test` ejecuta `Atsm.Testing.ConformanceRunner` sobre el corpus con el canal `Replay` y compara contra `expected/`. Un plugin no se publica sin pasar su kit.
+`dotnet test` ejecuta `Astm.Testing.ConformanceRunner` sobre el corpus con el canal `Replay` y compara contra `expected/`. Un plugin no se publica sin pasar su kit.
 
 ## Catálogo inicial propuesto
 
@@ -108,13 +108,13 @@ Ordenado por evidencia disponible (manual + traza + plugin legacy):
 | `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | Sintéticas | — | Recepción implementada, pendiente de equipo |
 | `Sysmex.Suit` | Middleware SUIT | E1381/E1394-91 + extensiones | v8.0 | — | — | Pendiente de equipo |
 | `Diagast.Qwalys` | QWALYS 3 | E1381-95 / ASTM ASCII | Connection Manual | Sintéticas | — | Recepción implementada, pendiente de equipo |
-| DeltaLab (fuera de ATSM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | Host de interfaces legacy | No es un plugin instrumental |
+| DeltaLab (fuera de ASTM) | Intercambio con laboratorio cliente | Conector EDC/ETL, decisión 2026-10-24 | — | Referencia local | Host de interfaces legacy | No es un plugin instrumental |
 
 Architect primero: es el único con manual, trazas abundantes y plugin productivo. Ruby segundo: confirma que el motor generaliza (terminador vacío, comparadores, `FLAG`). U-WAM tercero: aporta TCP nativo y host query real.
 
 ## Migración desde el sistema legacy, por plugin
 
-1. Convertir las trazas del equipo al formato ATSM con el adaptador de log del plugin (`atsm-trace extract`) o como contenido puro (`from-text`, `from-binary`).
+1. Convertir las trazas del equipo al formato ASTM con el adaptador de log del plugin (`astm-trace extract`) o como contenido puro (`from-text`, `from-binary`).
 2. Ejecutar el plugin legacy (o leer su código decompilado) para obtener la salida de referencia por mensaje.
 3. Escribir el perfil/mapa; contrastar contra la referencia y documentar cada diferencia como **conservar / corregir / retirar** con su evidencia ([IMPLEMENTACION § Registro por regla](IMPLEMENTACION.md)).
 4. Anonimizar el corpus resultante y fijarlo como `expected/`.
@@ -133,4 +133,4 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 | `abbott.celldyn-ruby` | Implementado desde trazas: cada mensaje en un frame, `^ALL`, alarmas `FLAG`; pendiente de confirmar con el manual |
 | `biorad.cfx` | `IInstrumentContentPlugin`: cuantificación CSV/RDML 1.0/1.1; recibe contenido, sin archivos/control directo ni clasificación clínica |
 | `sysmex.xnl`, `sysmex.cs2500`, `diagast.qwalys3` | Recepción según manual con pruebas sintéticas; sin consultas/órdenes, hardware o corpus real verificado |
-| `Atsm.Plugin.Legacy.Testing` | Sólo pruebas: adaptador `legacy.interface-log` para los logs del LIMS legacy. Un plugin de integración con el sistema legacy (pedidos desde su interfaz o su log) sería un trabajo aparte |
+| `Astm.Plugin.Legacy.Testing` | Sólo pruebas: adaptador `legacy.interface-log` para los logs del LIMS legacy. Un plugin de integración con el sistema legacy (pedidos desde su interfaz o su log) sería un trabajo aparte |

@@ -9,7 +9,7 @@ Registro de cada dependencia externa: origen, versión, licencia, consumidores, 
 | Uso | Transporte TLS del agente nativo (`PortGate/tls`), modo `Tls` de PortGate Link v1 |
 | Versión | 4.1.1, rama 4.1 LTS: correcciones de errores y de seguridad hasta al menos marzo de 2029 |
 | Mantenedor | Proyecto Mbed TLS bajo TrustedFirmware.org (Linaro), patrocinado por Arm |
-| Licencia | Apache-2.0 o GPL-2.0-or-later, a elección; ATSM la usa bajo Apache-2.0 |
+| Licencia | Apache-2.0 o GPL-2.0-or-later, a elección; ASTM la usa bajo Apache-2.0 |
 | Origen | `https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-4.1.1/mbedtls-4.1.1.tar.bz2` |
 | Integridad | SHA-256 `3359a349e23db3d5536fcee032ae7b2ecbfc08972fab643089b5cbf2a375c98c`, igual al `mbedtls-4.1.1-sha256sum.txt` y al digest del release; fijado en `PortGate/CMakeLists.txt` (`URL_HASH`) |
 | Firma | El release no publica firma de código; la verificación es por hash del archivo oficial |
@@ -22,11 +22,11 @@ Registro de cada dependencia externa: origen, versión, licencia, consumidores, 
 
 ESP32: ESP-IDF trae su propia versión de Mbed TLS. El firmware del agente usará la de ESP-IDF; su versión se registrará cuando exista ese build.
 
-## System.IO.Ports 10.0.13 (Atsm.Transport)
+## System.IO.Ports 10.0.13 (Astm.Transport)
 
 | Campo | Valor |
 |---|---|
-| Uso | COM local de `Atsm.Transport` (`LocalSerial`): la biblioteca opcional con la que el anfitrión abre el puerto y entrega el `Stream` a ATSM. El núcleo (`Abstractions`, `Protocol.*`, `Runtime`, `Plugins`) no lo referencia |
+| Uso | COM local de `Astm.Transport` (`LocalSerial`): la biblioteca opcional con la que el anfitrión abre el puerto y entrega el `Stream` a ASTM. El núcleo (`Abstractions`, `Protocol.*`, `Runtime`, `Plugins`) no lo referencia |
 | Versión | 10.0.13 (publicada el 13 de octubre de 2026; se descartó 10.0.14, publicada el día anterior al registro) |
 | Mantenedor / origen | Microsoft, paquete oficial `System.IO.Ports` de nuget.org; fuente en [dotnet/dotnet](https://github.com/dotnet/dotnet) |
 | Licencia | MIT |
@@ -43,7 +43,7 @@ Las bibliotecas de ejecución .NET usan sólo la BCL de .NET 10: `System.Net.Sec
 
 ### Antecedente WPF retirado (2026-10-24; sustituido por MAUI el 2026-10-25)
 
-La GUI solicitada incorpora WPF y `System.Security.Cryptography.ProtectedData` desde **Microsoft.WindowsDesktop.App 10.0.13**, instalado con el SDK oficial 10.0.402 en `C:\Program Files\dotnet`. Es una referencia de framework (`UseWPF`), no un paquete NuGet adicional ni una DLL tomada de terceros. Consumidor: `Atsm.Diagnostics.Windows`; `Atsm.Diagnostics.Core` y el motor siguen en `net10.0` sin dependencia de Windows. Las referencias entre proyectos son internas a ATSM.
+La GUI solicitada incorpora WPF y `System.Security.Cryptography.ProtectedData` desde **Microsoft.WindowsDesktop.App 10.0.13**, instalado con el SDK oficial 10.0.402 en `C:\Program Files\dotnet`. Es una referencia de framework (`UseWPF`), no un paquete NuGet adicional ni una DLL tomada de terceros. Consumidor: `Astm.Diagnostics.Windows`; `Astm.Diagnostics.Core` y el motor siguen en `net10.0` sin dependencia de Windows. Las referencias entre proyectos son internas a ASTM.
 
 Origen: instalación oficial Microsoft .NET, runtime bajo `shared/Microsoft.WindowsDesktop.App/10.0.13`; código fuente oficial en [dotnet/wpf](https://github.com/dotnet/wpf) y [dotnet/runtime](https://github.com/dotnet/runtime), con licencia MIT del código fuente. La instalación binaria conserva sus términos **MICROSOFT .NET LIBRARY**, `C:\Program Files\dotnet\LICENSE.txt`. El paquete publicado depende del framework instalado: no redistribuye un runtime ni agrega transitivas NuGet de producción. Aprobación implícita de librería oficial dentro de la GUI Windows elegida por el usuario; alcance registrado antes de editar en [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6390140976), con esta evidencia de distribución complementaria.
 

@@ -1,6 +1,6 @@
 # Estándares de referencia
 
-Estado: propuesta, 24 de octubre de 2026. ATSM es neutral respecto del LIS/LIMS que lo aloja. Los estándares fijan el vocabulario común; los manuales de cada fabricante fijan el dialecto efectivo.
+Estado: propuesta, 24 de octubre de 2026. ASTM es neutral respecto del LIS/LIMS que lo aloja. Los estándares fijan el vocabulario común; los manuales de cada fabricante fijan el dialecto efectivo.
 
 ## Posición
 
@@ -11,10 +11,10 @@ Estado: propuesta, 24 de octubre de 2026. ATSM es neutral respecto del LIS/LIMS 
 
 ## Capa por capa
 
-| Capa ATSM | Estándar vigente | Ediciones/variantes aceptadas | Uso |
+| Capa ASTM | Estándar vigente | Ediciones/variantes aceptadas | Uso |
 |---|---|---|---|
 | Enlace seguro | TLS 1.3 (RFC 8446), BCP 195 (RFC 9325) | TLS 1.2 como mínimo | Agente ↔ host y TCP nativo cuando el extremo lo soporte |
-| Contrato agente–host | ATSM Link v1 (propio), con control en CBOR (RFC 8949, codificación determinista §4.2) | — | Ver [INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md) |
+| Contrato agente–host | ASTM Link v1 (propio), con control en CBOR (RFC 8949, codificación determinista §4.2) | — | Ver [INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md) |
 | Capa baja serial/TCP | CLSI LIS01-A2 | ASTM E1381-91/95/02, CLSI LIS1-A | ENQ/STX/ETB/ETX/EOT, frames 0–7, checksum, timers, contención |
 | Capa baja HL7 | MLLP (HL7 v2, `0x0B … 0x1C 0x0D`) | MLLP sobre TLS | Instrumentos y middleware HL7 |
 | Mensajes ASTM | CLSI LIS02-A2 | ASTM E1394-91/97, LIS2-A | Registros H, P, O, R, C, Q, M, S, L y delimitadores declarados en H |
@@ -45,9 +45,9 @@ Los nombres de mensaje HL7 de la tabla son los de LAW. El primer perfil de fabri
 
 Las trazas confirman lo mismo en campo: CELL-DYN Ruby declara `LIS2-A` en H; UF-5000 declara `E1394-97`; ARCHITECT i1000SR envía `H|\^&|||ARCHITECT^9.45^…^H1P1O1R1C1Q1L1`.
 
-Los manuales tienen derechos de sus fabricantes y uno está marcado *Classified as Internal*. Se usan como referencia local y **no se publican** en el repositorio ATSM; ver [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md).
+Los manuales tienen derechos de sus fabricantes y uno está marcado *Classified as Internal*. Se usan como referencia local y **no se publican** en el repositorio ASTM; ver [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md).
 
-## Lo que ATSM no promete
+## Lo que ASTM no promete
 
 - Certificación o conformidad formal frente a CLSI, IHE o HL7. Se publica una **declaración de conformidad por perfil** con los casos realmente probados.
 - Validez clínica de una interpretación. El estado del instrumento (`F`, `R`, `C`, `W`…) se entrega tal cual con su significado según el dialecto; la validación clínica es del host.

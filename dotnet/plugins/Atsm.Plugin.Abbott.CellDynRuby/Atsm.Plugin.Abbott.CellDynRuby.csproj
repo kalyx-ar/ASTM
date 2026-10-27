@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>Abbott CELL-DYN Ruby hematology analyzer (LIS2-A) dialect for ATSM.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,4 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><Description>Bio-Rad CFX Maestro quantification exports: CSV and RDML.</Description></PropertyGroup>
-  <ItemGroup><ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" /></ItemGroup>
-</Project>

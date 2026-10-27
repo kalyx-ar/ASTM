@@ -1,6 +1,6 @@
 # Pruebas de comunicación con PortGate
 
-Decisión humana de [EDC#205](https://github.com/kalyx-ar/EDC/issues/205), 2026-10-27: basta un COM de prueba para comprobar lectura y escritura de PortGate, con un instrumento simulado que interprete las instrucciones de ATSM y responda. No requiere un COM registrado en Windows ni instalar controladores.
+Decisión humana de [EDC#205](https://github.com/kalyx-ar/EDC/issues/205), 2026-10-27: basta un COM de prueba para comprobar lectura y escritura de PortGate, con un instrumento simulado que interprete las instrucciones de ASTM y responda. No requiere un COM registrado en Windows ni instalar controladores.
 
 ## Circuito ejecutado
 
@@ -24,13 +24,13 @@ Compilar primero el agente nativo y después la GUI/CLI; ambas copian `portgate.
 
 ```powershell
 cmake --build PortGate/build/win-x64 --config Release
-dotnet publish dotnet/tools/Atsm.Diagnostics.Maui -c Release -p:AtsmRequireStrongName=true
+dotnet publish dotnet/tools/Astm.Diagnostics.Maui -c Release -p:AstmRequireStrongName=true
 ```
 
 En Diagnostics, abrir una traza ASTM y pulsar **Probar PortGate**. Ejecuta hasta cinco mensajes, muestra el ensayo y selecciona Comunicación. El límite global suma 60 segundos al tiempo mínimo de serialización de los payloads; los timeouts del protocolo permanecen sin cambios. **Detener** cancela la prueba. El self-test de la GUI realiza un intercambio sintético por este puerto.
 
 ```powershell
-atsm-trace test-portgate <traza> --max 3
+astm-trace test-portgate <traza> --max 3
 ```
 
 Opciones: `--portgate <exe>`, `--profile <id>`, `--baud <n>` y `--timeout <segundos>` (60 por defecto; salida 124 al expirar). Primero informa bytes del payload y tiempo mínimo de serialización para dimensionar el ensayo. El COM de prueba usa los parámetros del perfil si existen; en perfiles TCP usa 9600/8N1 como condición del ensayo, sin atribuir esos parámetros al equipo. `--baud` cambia únicamente esa condición de prueba. Salida 0: presupuestos cumplidos y al menos una orden interpretada/respondida; salida 2: recorrido parcial sin esa cobertura. Los perfiles pasivos o propietarios sin acciones documentadas no se convierten en emisores activos por este ensayo.

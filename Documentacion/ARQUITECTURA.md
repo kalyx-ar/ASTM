@@ -1,6 +1,6 @@
 # Arquitectura de integración de instrumentos
 
-> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Atsm.Channels` se retiraron. ATSM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Atsm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
+> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Astm.Channels` se retiraron. ASTM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Astm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
 
 ## Componentes y responsabilidades
 
@@ -10,7 +10,7 @@
 | Canal común del host | Adaptar agente remoto, TCP nativo, serial local, carpeta o traza a lectura/escritura y eventos; retirar la envoltura de transporte antes de entregar los bytes al motor ([INTERFAZ-COMUNICACION](INTERFAZ-COMUNICACION.md)) |
 | Motor genérico C# | Framing incremental, checksum, numeración, estados de conversación, temporizadores y mecanismos genéricos de intercambio ([MOTOR-GENERICO](MOTOR-GENERICO.md)) |
 | Plugin del instrumento | Perfil y extensiones del dialecto, registros propietarios, interpretación de órdenes/resultados, correlación y política de recuperación del proceso ([PLUGINS](PLUGINS.md)) |
-| Runtime ATSM | Alojar motor/plugins, resolver dependencias, coordinar ingestión/órdenes y entregar hechos canónicos al anfitrión |
+| Runtime ASTM | Alojar motor/plugins, resolver dependencias, coordinar ingestión/órdenes y entregar hechos canónicos al anfitrión |
 | Anfitrión (LIS/LIMS, p. ej. EDC) | OT, muestra, analitos, equivalencias, validación, persistencia, permisos e historial de negocio |
 
 El agente no inspecciona registros ASTM ni genera confirmaciones ASTM. Las confirmaciones que emita sobre una escritura describen etapas técnicas, como aceptación del buffer o escritura al driver. El motor y el plugin interpretan las respuestas del instrumento.
@@ -30,9 +30,9 @@ Si el failover exige exclusión efectiva para TCP nativo y el instrumento no la 
 
 ## Empaquetado neutral
 
-El agente, el motor, los plugins y las herramientas viven en el repositorio ATSM y no referencian ningún LIS/LIMS, UI ni base de datos. El anfitrión implementa `ILabWorkflowHost` ([MODELO-CANONICO](MODELO-CANONICO.md)); la estructura de proyectos está en el [README](README.md#estructura-propuesta-del-repositorio).
+El agente, el motor, los plugins y las herramientas viven en el repositorio ASTM y no referencian ningún LIS/LIMS, UI ni base de datos. El anfitrión implementa `ILabWorkflowHost` ([MODELO-CANONICO](MODELO-CANONICO.md)); la estructura de proyectos está en el [README](README.md#estructura-propuesta-del-repositorio).
 
-En un anfitrión por capas, ATSM pertenece a Infrastructure: Domain y Application no dependen de COM, sockets, framing ni tipos ATSM, y ATSM no constituye una capa de negocio adicional. El encaje concreto en EDC está en [INTEGRACION-EDC](INTEGRACION-EDC.md).
+En un anfitrión por capas, ASTM pertenece a Infrastructure: Domain y Application no dependen de COM, sockets, framing ni tipos ASTM, y ASTM no constituye una capa de negocio adicional. El encaje concreto en EDC está en [INTEGRACION-EDC](INTEGRACION-EDC.md).
 
 ## Motor genérico y plugin
 

@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/Astm.Plugin.Sysmex.Urinalysis/Astm.Plugin.Sysmex.Urinalysis.csproj" />
+    <Project Path="plugins/Astm.Plugin.BioRad.Cfx/Astm.Plugin.BioRad.Cfx.csproj" />
+    <Project Path="plugins/Astm.Plugin.Sysmex.XnL/Astm.Plugin.Sysmex.XnL.csproj" />
+    <Project Path="plugins/Astm.Plugin.Sysmex.Cs2500/Astm.Plugin.Sysmex.Cs2500.csproj" />
+    <Project Path="plugins/Astm.Plugin.Diagast.Qwalys/Astm.Plugin.Diagast.Qwalys.csproj" />
+    <Project Path="plugins/Astm.Plugin.Abbott.Architect/Astm.Plugin.Abbott.Architect.csproj" />
+    <Project Path="plugins/Astm.Plugin.Abbott.CellDynRuby/Astm.Plugin.Abbott.CellDynRuby.csproj" />
+    <Project Path="plugins/Astm.Plugin.Legacy.Testing/Astm.Plugin.Legacy.Testing.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Astm.Abstractions/Astm.Abstractions.csproj" />
+    <Project Path="src/Astm.Plugins/Astm.Plugins.csproj" />
+    <Project Path="src/Astm.Protocol.Lis01/Astm.Protocol.Lis01.csproj" />
+    <Project Path="src/Astm.Protocol.Lis02/Astm.Protocol.Lis02.csproj" />
+    <Project Path="src/Astm.Protocol.Mllp/Astm.Protocol.Mllp.csproj" />
+    <Project Path="src/Astm.Protocol.Hl7v2/Astm.Protocol.Hl7v2.csproj" />
+    <Project Path="src/Astm.Runtime/Astm.Runtime.csproj" />
+    <Project Path="src/Astm.Testing/Astm.Testing.csproj" />
+    <Project Path="src/Astm.Tracing/Astm.Tracing.csproj" />
+    <Project Path="src/Astm.Transport/Astm.Transport.csproj" />
+    <Project Path="src/PortGate.Client/PortGate.Client.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Astm.Tests/Astm.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Astm.Diagnostics.Core/Astm.Diagnostics.Core.csproj" />
+    <Project Path="tools/Astm.Tools.Trace/Astm.Tools.Trace.csproj" />
+  </Folder>
+</Solution>

@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>Test-only plugin: reads the interface logs of the legacy LIMS as pure ATSM trace segments. Not part of the neutral engine.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Atsm.Plugins\Atsm.Plugins.csproj" />
-  </ItemGroup>
-</Project>

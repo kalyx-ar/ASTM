@@ -1,8 +1,8 @@
 # Modelo canónico y contrato con el host
 
-Extensión implementada 2026-10-24: `InstrumentObservation.Quality` conserva material/lote, módulo/corrida/método, referencia de calibración y estadísticas reportadas con ámbito/campo original. `InstrumentObservationBatch.QualityResources` conserva recursos externos, incluso en lotes sin observaciones. Puertos opcionales `IQualityDataSource` (adaptador de lectura implementado) e `IQualityResourceContent` (lo implementa el anfitrión/ETL); el único puerto obligatorio de flujo sigue siendo `ILabWorkflowHost`. Contratos reales, mapeos y límites en [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md); los ejemplos indicativos históricos siguientes no sustituyen a las clases de `dotnet/src/Atsm.Abstractions`.
+Extensión implementada 2026-10-24: `InstrumentObservation.Quality` conserva material/lote, módulo/corrida/método, referencia de calibración y estadísticas reportadas con ámbito/campo original. `InstrumentObservationBatch.QualityResources` conserva recursos externos, incluso en lotes sin observaciones. Puertos opcionales `IQualityDataSource` (adaptador de lectura implementado) e `IQualityResourceContent` (lo implementa el anfitrión/ETL); el único puerto obligatorio de flujo sigue siendo `ILabWorkflowHost`. Contratos reales, mapeos y límites en [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md); los ejemplos indicativos históricos siguientes no sustituyen a las clases de `dotnet/src/Astm.Abstractions`.
 
-Estado: propuesta. Es la frontera que hace a ATSM neutral: los plugins producen y consumen este modelo; cada LIS/LIMS (EDC u otro) implementa un único adaptador.
+Estado: propuesta. Es la frontera que hace a ASTM neutral: los plugins producen y consumen este modelo; cada LIS/LIMS (EDC u otro) implementa un único adaptador.
 
 ## Principios
 
@@ -15,12 +15,12 @@ Estado: propuesta. Es la frontera que hace a ATSM neutral: los plugins producen 
 ## Tipos principales
 
 ```csharp
-namespace Atsm.Abstractions.Model;
+namespace Astm.Abstractions.Model;
 
 public sealed record InstrumentRef(string InstrumentId, string? Manufacturer, string? Model,
     string? SerialNumber, string? SoftwareVersion, string? Udi);
 
-public sealed record CodedValue(string Code, string? Display, string System);   // system: "urn:atsm:vendor:abbott.architect", "http://loinc.org", "http://unitsofmeasure.org", …
+public sealed record CodedValue(string Code, string? Display, string System);   // system: "urn:astm:vendor:abbott.architect", "http://loinc.org", "http://unitsofmeasure.org", …
 public sealed record CodeSet(CodedValue Vendor, IReadOnlyList<CodedValue> Mapped); // Mapped puede estar vacío
 
 public sealed record SpecimenRef(string SpecimenId, string? ContainerId, string? Type,
@@ -64,7 +64,7 @@ public sealed record PatientContext(string? Id, string? FamilyName, string? Give
 ## Puertos que implementa el host
 
 ```csharp
-namespace Atsm.Abstractions.Hosting;
+namespace Astm.Abstractions.Hosting;
 
 public interface ILabWorkflowHost
 {
@@ -94,11 +94,11 @@ public interface ILabWorkflowHost
 
 ## Proyección FHIR (opcional)
 
-`Atsm.Fhir` proyecta `InstrumentObservation` → `Observation` (con `device`, `specimen`, `code` con ambos sistemas, `valueQuantity` o `valueString`, `interpretation`, `status` derivado del significado), y `WorkOrder` ↔ `ServiceRequest`. Útil para hosts FHIR; no es requisito de EDC.
+`Astm.Fhir` proyecta `InstrumentObservation` → `Observation` (con `device`, `specimen`, `code` con ambos sistemas, `valueQuantity` o `valueString`, `interpretation`, `status` derivado del significado), y `WorkOrder` ↔ `ServiceRequest`. Útil para hosts FHIR; no es requisito de EDC.
 
 ## Equivalencia con LAW
 
-| LAW (HL7 v2.5.1) | Modelo ATSM |
+| LAW (HL7 v2.5.1) | Modelo ASTM |
 |---|---|
 | OML^O33 (Analyzer → Order) | `WorkOrder` saliente |
 | QBP^Q11 / RSP^K11 | `OrderQuery` / `OrderQueryAnswer` |

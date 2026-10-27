@@ -1,4 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><Description>Neutral HL7 v2 message codec and acknowledgement contracts.</Description></PropertyGroup>
-  <ItemGroup><ProjectReference Include="..\Atsm.Abstractions\Atsm.Abstractions.csproj" /></ItemGroup>
-</Project>

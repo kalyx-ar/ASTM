@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using Atsm.Abstractions.Transport;
-using Atsm.Transport;
+using Astm.Abstractions.Transport;
+using Astm.Transport;
 
 namespace PortGate.Client;
 
@@ -41,7 +41,7 @@ public sealed record PortGatePortInfo(string PortId, string? InstrumentId, int M
 
 /// <summary>
 /// Connection to one port of a PortGate agent (spec/link-v1.md, spec/admin-v1.md). Acquiring the port yields a
-/// <see cref="Stream"/> for that tenure: an ATSM session runs on it, and it ends when the tenure ends (release,
+/// <see cref="Stream"/> for that tenure: an ASTM session runs on it, and it ends when the tenure ends (release,
 /// revocation, kill switch, connection loss). The lease is renewed automatically while held.
 /// </summary>
 public sealed class PortGateChannel : IAsyncDisposable
@@ -147,6 +147,8 @@ public sealed class PortGateChannel : IAsyncDisposable
             Publish(PortGateEventKind.Discontinuity, "PORTGATE-CH-TRANSFER-STATE", $"uncertainTx={lease.UncertainTx}, unownedRxBytes={lease.UnownedRxBytes}");
         Publish(PortGateEventKind.Granted, null, $"generation {lease.Generation}");
         await SendAsync(LinkUnit.Control(LinkType.ConfirmTransfer, _port, LinkCbor.Map((1, (ulong)lease.Generation), (2, tenure.TransferId))), cancellationToken).ConfigureAwait(false);
+        // A reply on this ordered connection proves ConfirmTransfer was processed before exposing the stream.
+        await ControlRequestAsync(LinkType.Renew, LinkCbor.Map((1, (ulong)lease.Generation)), cancellationToken).ConfigureAwait(false);
         _ = RenewLoopAsync(tenure);
         return lease;
     }
