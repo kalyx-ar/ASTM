@@ -31,6 +31,9 @@ struct SupervisorOptions {
     std::string install_server_certificate_sha256;
     std::string install_psk_identity;
     std::vector<std::uint8_t> install_psk;
+    /// Agent-initiated mode fixed at installation: the agent connects to this server until a configuration sets the mode.
+    std::string install_server_host;
+    std::uint16_t install_server_port = 0;
     std::uint32_t device_poll_ms = 2000;
 };
 
@@ -63,7 +66,21 @@ private:
 
     void accept_loop();
     void serve(platform::Socket socket);
-    void connection_loop(const std::shared_ptr<AdminConnection>& connection);
+    struct OutboundTarget {
+        std::string host;
+        std::uint16_t port = 0;
+        std::string pin;
+        bool tls = false;
+        std::uint32_t connections = 0;
+        TlsMaterial material;
+    };
+
+    static std::string identity_of(const Transport& transport, const std::string& peer);
+    void serve_admin(std::unique_ptr<Transport> transport, const std::string& identity, std::vector<link::Unit> pending, link::Decoder decoder);
+    void connection_loop(const std::shared_ptr<AdminConnection>& connection, link::Decoder decoder, std::vector<link::Unit> pending);
+    bool outbound_target(OutboundTarget& target);
+    /// One outbound connection of the agent-initiated mode: dial, wait for the server Hello, serve its role, redial.
+    void outbound_slot(std::size_t index);
     void handle(const std::shared_ptr<AdminConnection>& connection, const link::Unit& unit);
     bool authorize(const AdminConnection& connection, std::string& reason);
     void reply(const std::shared_ptr<AdminConnection>& connection, std::uint64_t request_id, const cbor::Value& body);
@@ -100,7 +117,7 @@ private:
     std::uint64_t next_connection_ = 1;
 
     std::mutex agent_mutex_;
-    std::unique_ptr<Agent> agent_;
+    std::shared_ptr<Agent> agent_;  // shared with outbound controller connections while they run
     std::atomic<bool> agent_stop_{false};
     std::thread agent_thread_;
     std::string link_error_;
@@ -108,6 +125,7 @@ private:
     std::vector<platform::SerialDeviceInfo> devices_;
     std::uint64_t next_device_poll_ = 0;
     bool devices_polled_ = false;
+    std::vector<std::thread> outbound_threads_;
 };
 
 }  // namespace portgate

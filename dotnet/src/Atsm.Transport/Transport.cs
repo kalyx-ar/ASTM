@@ -105,6 +105,21 @@ public sealed class LocalTransportProvider : ITransportProvider
         }
     }
 
+    /// <summary>Accepts one connection on <paramref name="listener"/> with optional TLS (server side); the socket is disposed with the stream.</summary>
+    public static async Task<Stream> AcceptAsync(TcpListener listener, TlsOptions? tls, CancellationToken cancellationToken)
+    {
+        var client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await SecureAsync(client, tls, asServer: true, ((IPEndPoint)listener.LocalEndpoint).Address.ToString(), cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            client.Dispose();
+            throw;
+        }
+    }
+
     /// <summary>TCP client with optional TLS; the socket is disposed with the returned stream.</summary>
     public static async Task<Stream> ConnectAsync(TcpEndpoint endpoint, CancellationToken cancellationToken)
     {

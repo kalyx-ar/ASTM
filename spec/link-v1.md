@@ -39,7 +39,7 @@ CBOR (RFC 8949) with deterministic encoding: definite lengths, shortest integer 
 | 0x7E | Heartbeat | both | 0 monotonicMs uint |
 | 0x7F | Error | both | 0 code tstr, 1 requestId uint, 2 detail tstr |
 
-`TraceRead`/`TraceChunk` (0x30/0x31), observers and the agent-initiated connection role are reserved for later versions. Agents of v1 announce `traceCapture = 0`.
+`TraceRead`/`TraceChunk` (0x30/0x31) and observers are reserved for later versions. Agents of v1 announce `traceCapture = 0`. Connections opened by the agent toward the server (agent-initiated mode) carry the same units: see spec/admin-v1.md § Agent-initiated connections.
 
 ## Rules
 

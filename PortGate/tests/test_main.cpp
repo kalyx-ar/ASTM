@@ -598,12 +598,13 @@ void test_supervisor_administration() {
     std::string code;
     CHECK(!admin_call(admin, link::Type::SetTls, {{1, Value::uint(0)}, {5, Value::text("edc")}, {6, Value::bytes(cbor::Bytes(32, 1))}}, &code));
     CHECK(code == "PORTGATE-INSECURE-CHANNEL");
-    // Agent-initiated mode is reported as not implemented, not silently ignored.
+    // Agent-initiated mode needs a way to authenticate the server when TLS is requested.
     auto initiated = sample_config(instrument.listener.port());
     initiated.mode.initiator = ModeConfig::Initiator::Agent;
     initiated.mode.server_host = "127.0.0.1";
     initiated.mode.server_port = 1;
-    CHECK(!admin_call(admin, link::Type::SetConfig, {{1, Value::uint(1)}, {2, encode_config(initiated)}}, &code) && code == "PORTGATE-UNSUPPORTED");
+    initiated.mode.outbound_tls = true;  // TLS toward the server without its fingerprint or a PSK is refused
+    CHECK(!admin_call(admin, link::Type::SetConfig, {{1, Value::uint(1)}, {2, encode_config(initiated)}}, &code) && code == "PORTGATE-OUTBOUND-IDENTITY");
 
     auto applied = admin_call(admin, link::Type::SetConfig, {{1, Value::uint(5)}, {2, encode_config(sample_config(instrument.listener.port()))}}, &code);
     CHECK(applied.has_value());
@@ -902,6 +903,69 @@ void test_hot_device_reconfiguration() {
     platform::network_cleanup();
 }
 
+void test_agent_initiated_connections() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    FakeInstrument instrument;
+    CHECK(instrument.start(error));
+    platform::Listener server;  // the server listens; the agent dials it
+    CHECK(server.open("127.0.0.1", 0, error));
+    const auto directory = temporary_directory("outbound");
+    SupervisorOptions options;
+    options.state_directory = directory;
+    options.admin_host = "127.0.0.1";
+    options.admin_port = 0;
+    options.agent_name = "outbound";
+    options.device_poll_ms = 100000;
+    options.install_server_host = "127.0.0.1";
+    options.install_server_port = server.port();
+    Supervisor supervisor(options, [](LogLevel, const std::string&) {});
+    CHECK(supervisor.start(error));
+    std::atomic<bool> stop{false};
+    std::thread runner([&] { supervisor.run(stop); });
+
+    // Installed with --server: the agent dials and the server, speaking first, uses the connection to administer it.
+    Client admin;
+    admin.socket = server.accept(5000);
+    CHECK(admin.socket.valid());
+    admin.send(link::control(link::Type::Hello, 0, Value::map({{0, Value::uint(1)}, {1, Value::text("admin")}, {2, Value::text("edc-central")}})));
+    CHECK(admin.next(link::Type::Hello).has_value());
+    auto config = sample_config(instrument.listener.port());
+    config.mode.initiator = ModeConfig::Initiator::Agent;
+    config.mode.server_host = "127.0.0.1";
+    config.mode.server_port = server.port();
+    config.mode.connections = 2;
+    std::string code;
+    auto applied = admin_call(admin, link::Type::SetConfig, {{1, Value::uint(1)}, {2, encode_config(config)}}, &code);
+    CHECK(applied && applied->get(1)->as_uint() == std::optional<std::uint64_t>(0));  // no inbound Link endpoint
+    CHECK(instrument.accept(3000));
+
+    // The second connection becomes a controller when the server says so.
+    Client controller;
+    controller.socket = server.accept(5000);
+    CHECK(controller.socket.valid());
+    controller.send(link::control(link::Type::Hello, 0, Value::map({{0, Value::uint(1)}, {1, Value::text("controller")}, {2, Value::text("server-a")}})));
+    CHECK(controller.next(link::Type::Hello).has_value());
+    CHECK(controller.next(link::Type::Capabilities).has_value());
+    controller.send(link::control(link::Type::Acquire, 1, Value::map({{0, Value::uint(1)}, {1, Value::integer(0)}, {2, Value::uint(0)}})));
+    CHECK(controller.next(link::Type::Granted).has_value());
+
+    // A connection lost on the server side is dialed again.
+    controller.socket.close();
+    Client again;
+    again.socket = server.accept(5000);
+    CHECK(again.socket.valid());
+    again.socket.close();
+    admin.socket.close();
+
+    stop = true;
+    runner.join();
+    supervisor.shutdown();
+    platform::network_cleanup();
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+}
+
 void test_handover_and_plain_security() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -1006,6 +1070,7 @@ int main(int argc, char** argv) {
     test_admin_psk_fixed_at_installation();
     test_ethernet_instrument_connects_to_the_agent();
     test_hot_device_reconfiguration();
+    test_agent_initiated_connections();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

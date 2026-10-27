@@ -157,6 +157,8 @@ Solicitud de cesión (cede, mantiene, sin respuesta, límite de pedidos); kill s
 
 Implementado y probado según [spec/admin-v1.md](../spec/admin-v1.md); detalle y pendientes en [CONTINUACION § P-16](CONTINUACION.md). Diferencias respecto del diseño:
 
-- R1: `--server-cert <sha256>` y `--psk <identidad>:<hex>` fijan el servidor al instalar con conexión iniciada por el servidor. La variante iniciada por el agente (`--server host:puerto`) espera el rol cliente de P-09.
+- R1: `--server-cert <sha256>` y `--psk <identidad>:<hex>` fijan el servidor al instalar. Con `--server host:puerto` el agente además inicia las conexiones hacia ese servidor (modo iniciado por el agente, implementado el 2026-10-26; ver spec/admin-v1.md § Agent-initiated connections).
 - Kill switch e impugnación exigen TLS con par autenticado: certificado de cliente verificado contra la CA del enlace o PSK.
 - El éxito de un kill switch o una impugnación se confirma al solicitante con `SecurityResult` (0x1E), además del evento difundido.
+- Cambios de dispositivo en caliente (2026-10-26): si una configuración sólo cambia dispositivos (ajustes serie, ruta o endpoint TCP), cada puerto afectado se reabre sin reiniciar Link ni cortar a los demás controladores; el dueño conserva la tenencia y recibe `PORTGATE-PORT-RECONFIGURED`.
+- Modo iniciado por el agente (2026-10-26): el agente mantiene N conexiones salientes; el servidor habla primero y asigna a cada una el rol `admin` o `controller`. Con TLS, el agente fija el certificado del servidor (o usa la PSK) y presenta el suyo, que el servidor fija. No abre puertos de entrada para Link.

@@ -73,6 +73,12 @@ bool Supervisor::start(std::string& error) {
         state_.admin_tls.psk = options_.install_psk;
         dirty = true;
     }
+    if (!loaded && !options_.install_server_host.empty() && options_.install_server_port != 0) {
+        // Agent-initiated from the start: the agent dials the server, which configures it (no inbound port needed).
+        state_.admin.server_host = options_.install_server_host;
+        state_.admin.server_port = options_.install_server_port;
+        dirty = true;
+    }
     if (!state_.admin_tls.has_certificate() && TlsServer::available()) {
         const std::string name = options_.agent_name.empty() ? "portgate" : options_.agent_name;
         if (!tls::generate_self_signed(name, state_.admin_tls, error)) return false;
@@ -108,6 +114,12 @@ void Supervisor::run(const std::atomic<bool>& stop) {
             next_device_poll_ = now + options_.device_poll_ms;
             poll_devices();
         }
+        OutboundTarget target;
+        if (outbound_target(target))
+            while (outbound_threads_.size() < target.connections) {
+                const auto index = outbound_threads_.size();
+                outbound_threads_.emplace_back([this, index] { outbound_slot(index); });
+            }
     }
 }
 
@@ -128,8 +140,12 @@ void Supervisor::shutdown() {
         connection->transport->shutdown();
     }
     while (active_connections_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    std::lock_guard<std::mutex> lock(agent_mutex_);
-    stop_agent();
+    {
+        std::lock_guard<std::mutex> lock(agent_mutex_);
+        stop_agent();
+    }
+    for (auto& thread : outbound_threads_)
+        if (thread.joinable()) thread.join();
 }
 
 std::uint16_t Supervisor::link_port() {
@@ -158,7 +174,7 @@ bool Supervisor::rebuild_admin_tls(std::string& error) {
 
 bool Supervisor::apply(const AgentConfig& config, const TlsMaterial& link_tls, std::string& error) {
     stop_agent();
-    auto agent = std::make_unique<Agent>(config, logger_, link_tls, [this](Event event) { return record(std::move(event)); });
+    auto agent = std::make_shared<Agent>(config, logger_, link_tls, [this](Event event) { return record(std::move(event)); });
     if (!agent->start(error)) {
         link_error_ = error;
         return false;
@@ -192,12 +208,18 @@ void Supervisor::accept_loop() {
     }
 }
 
+std::string Supervisor::identity_of(const Transport& transport, const std::string& peer) {
+    if (!transport.psk_identity().empty()) return "psk:" + transport.psk_identity();
+    if (!transport.peer_certificate_sha256().empty()) return "sha256:" + transport.peer_certificate_sha256();
+    return "address:" + host_of(peer);
+}
+
 void Supervisor::serve(platform::Socket socket) {
     const std::string peer = socket.peer();
     std::uint8_t first = 0;
     // TLS and plain text share the port: a TLS client starts with a handshake record, a Link client with "AL".
     if (socket.peek(&first, 1, 10000) != 1) return;
-    auto connection = std::make_shared<AdminConnection>();
+    std::unique_ptr<Transport> transport;
     if (first == kTlsHandshakeRecord) {
         std::shared_ptr<TlsServer> server;
         {
@@ -206,18 +228,22 @@ void Supervisor::serve(platform::Socket socket) {
         }
         if (!server) return;
         std::string error;
-        connection->transport = server->accept(std::move(socket), 10000, error);
-        if (!connection->transport) {
+        transport = server->accept(std::move(socket), 10000, error);
+        if (!transport) {
             logger_(LogLevel::Warning, "admin TLS connection from " + peer + " rejected: " + error);
             return;
         }
-        if (!connection->transport->psk_identity().empty()) connection->identity = "psk:" + connection->transport->psk_identity();
-        else if (!connection->transport->peer_certificate_sha256().empty()) connection->identity = "sha256:" + connection->transport->peer_certificate_sha256();
-        else connection->identity = "address:" + host_of(peer);
     } else {
-        connection->transport = std::make_unique<PlainTransport>(std::move(socket));
-        connection->identity = "address:" + host_of(peer);
+        transport = std::make_unique<PlainTransport>(std::move(socket));
     }
+    const auto identity = identity_of(*transport, peer);
+    serve_admin(std::move(transport), identity, {}, link::Decoder(kAdminMaxUnitBytes));
+}
+
+void Supervisor::serve_admin(std::unique_ptr<Transport> transport, const std::string& identity, std::vector<link::Unit> pending, link::Decoder decoder) {
+    auto connection = std::make_shared<AdminConnection>();
+    connection->transport = std::move(transport);
+    connection->identity = identity;
     {
         std::lock_guard<std::mutex> lock(connections_mutex_);
         connection->id = next_connection_++;
@@ -234,7 +260,7 @@ void Supervisor::serve(platform::Socket socket) {
                                                {2, Value::text(agent_id)},
                                                {4, Value::text(options_.platform_profile)},
                                                {5, Value::uint(kAdminMaxUnitBytes)}})));
-    connection_loop(connection);
+    connection_loop(connection, std::move(decoder), std::move(pending));
     {
         std::lock_guard<std::mutex> lock(connections_mutex_);
         connections_.erase(connection->id);
@@ -242,8 +268,11 @@ void Supervisor::serve(platform::Socket socket) {
     connection->transport->shutdown();
 }
 
-void Supervisor::connection_loop(const std::shared_ptr<AdminConnection>& connection) {
-    link::Decoder decoder(kAdminMaxUnitBytes);
+void Supervisor::connection_loop(const std::shared_ptr<AdminConnection>& connection, link::Decoder decoder, std::vector<link::Unit> pending) {
+    for (const auto& unit : pending) {
+        handle(connection, unit);
+        if (!connection->alive) return;
+    }
     std::vector<std::uint8_t> buffer(16 * 1024);
     std::vector<link::Unit> units;
     while (connection->alive && !stopping_) {
@@ -255,6 +284,93 @@ void Supervisor::connection_loop(const std::shared_ptr<AdminConnection>& connect
         for (const auto& unit : units) {
             handle(connection, unit);
             if (!connection->alive) break;
+        }
+    }
+}
+
+bool Supervisor::outbound_target(OutboundTarget& target) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    target.material = state_.admin_tls;
+    if (state_.configured && state_.config.mode.initiator == ModeConfig::Initiator::Agent) {
+        const auto& mode = state_.config.mode;
+        target.host = mode.server_host;
+        target.port = mode.server_port;
+        target.pin = mode.server_certificate_sha256;
+        target.tls = mode.outbound_tls;
+        target.connections = mode.connections;
+        return true;
+    }
+    if (!state_.configured && !state_.admin.server_host.empty() && state_.admin.server_port != 0) {
+        // Fixed at installation (R1): one connection for the server to configure the agent.
+        target.host = state_.admin.server_host;
+        target.port = state_.admin.server_port;
+        target.pin = state_.admin.certificate_sha256;
+        target.tls = !target.pin.empty() || state_.admin_tls.has_psk();
+        target.connections = 1;
+        return true;
+    }
+    return false;
+}
+
+void Supervisor::outbound_slot(std::size_t index) {
+    std::uint64_t backoff = 1000;
+    std::string last_error;
+    auto pause = [this](std::uint64_t ms) {
+        const auto until = platform::monotonic_ms() + ms;
+        while (!stopping_ && platform::monotonic_ms() < until) std::this_thread::sleep_for(std::chrono::milliseconds(kPollMs));
+    };
+    while (!stopping_) {
+        OutboundTarget target;
+        if (!outbound_target(target) || index >= target.connections) {
+            pause(500);
+            continue;
+        }
+        std::string error;
+        std::unique_ptr<Transport> transport;
+        if (auto socket = platform::Socket::connect(target.host, target.port, 5000, error)) {
+            if (target.tls) transport = tls::connect_client(std::move(*socket), target.host, target.material, target.pin, 10000, error);
+            else transport = std::make_unique<PlainTransport>(std::move(*socket));
+        }
+        if (!transport) {
+            if (error != last_error) logger_(LogLevel::Warning, "outbound connection to " + target.host + ":" + std::to_string(target.port) + ": " + error);
+            last_error = error;
+            pause(backoff);
+            backoff = std::min<std::uint64_t>(backoff * 2, 30000);
+            continue;
+        }
+        backoff = 1000;
+        last_error.clear();
+        // The server speaks first: its Hello gives this connection a role.
+        link::Decoder decoder(kAdminMaxUnitBytes);
+        std::vector<link::Unit> units;
+        std::vector<std::uint8_t> buffer(4096);
+        while (!stopping_ && units.empty()) {
+            const int n = transport->receive(buffer.data(), buffer.size(), kPollMs * 2);
+            if (n == -2) continue;
+            if (n <= 0 || decoder.feed(buffer.data(), static_cast<std::size_t>(n), units) != link::DecodeError::None) break;
+        }
+        const auto hello = !units.empty() && units.front().type == link::Type::Hello ? link::parse_map(units.front()) : std::nullopt;
+        const auto role = hello ? text_or(*hello, 1) : std::string();
+        if (role == "admin") {
+            const auto identity = identity_of(*transport, transport->peer());
+            serve_admin(std::move(transport), identity, std::move(units), std::move(decoder));
+        } else if (role == "controller") {
+            std::shared_ptr<Agent> agent;
+            {
+                std::lock_guard<std::mutex> lock(agent_mutex_);
+                agent = agent_;
+            }
+            if (agent) {
+                agent->adopt(std::move(transport), std::move(units), std::move(decoder));
+            } else {
+                const auto refusal = link::encode(link::control(link::Type::Error, 0, Value::map({{0, Value::text("PORTGATE-NOT-CONFIGURED")}, {1, Value::uint(0)},
+                                                                                                  {2, Value::text("the agent has no Link configuration yet")}})));
+                transport->send_all(refusal.data(), refusal.size());
+                transport->shutdown();
+                pause(backoff);
+            }
+        } else {
+            transport->shutdown();
         }
     }
 }
@@ -389,8 +505,6 @@ void Supervisor::set_config(const std::shared_ptr<AdminConnection>& connection, 
     std::string error;
     auto config = encoded ? decode_config(*encoded, error) : std::nullopt;
     if (!config) return refuse(connection, request_id, "PORTGATE-INVALID-CONFIG", encoded ? error : "config/2 required");
-    if (config->mode.initiator == ModeConfig::Initiator::Agent)
-        return refuse(connection, request_id, "PORTGATE-UNSUPPORTED", "the agent-initiated mode is not implemented yet (P-09)");
     if (config->mode.admin_requires_tls && !connection->transport->encrypted())
         return refuse(connection, request_id, "PORTGATE-INSECURE-CHANNEL", "requiring TLS for administration must be set over TLS");
     TlsMaterial link_tls;
@@ -400,7 +514,12 @@ void Supervisor::set_config(const std::shared_ptr<AdminConnection>& connection, 
         link_tls = state_.link_tls;
         previous = state_;
     }
-    if (config->tls == TlsMode::Tls && !link_tls.has_certificate() && !link_tls.has_psk())
+    const bool outbound = config->mode.initiator == ModeConfig::Initiator::Agent;
+    // Outbound TLS authenticates the server by its pinned certificate or by the administration PSK: never blindly.
+    if (outbound && config->mode.outbound_tls && config->mode.server_certificate_sha256.empty() && !previous.admin_tls.has_psk())
+        return refuse(connection, request_id, "PORTGATE-OUTBOUND-IDENTITY", "outbound TLS needs the server certificate fingerprint or an administration PSK");
+    // Inbound Link TLS material is irrelevant when the agent opens the connections (it uses its own certificate).
+    if (!outbound && config->tls == TlsMode::Tls && !link_tls.has_certificate() && !link_tls.has_psk())
         return refuse(connection, request_id, "PORTGATE-TLS-MATERIAL-MISSING", "send SetTls for the Link endpoint before enabling TLS");
 
     std::uint16_t port = 0;

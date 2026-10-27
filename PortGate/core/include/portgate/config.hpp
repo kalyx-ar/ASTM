@@ -66,6 +66,11 @@ struct ModeConfig {
     bool restricted = true;
     /// Refuse plain-text administration (TLS with the agent certificate or the PSK is then required).
     bool admin_requires_tls = false;
+    /// Agent-initiated: pinned certificate of the server (lower-case hex SHA-256), TLS on the outbound connections and how
+    /// many connections the agent keeps open (the server gives each one a role: admin or controller).
+    std::string server_certificate_sha256;
+    bool outbound_tls = false;
+    std::uint32_t connections = 2;
 };
 
 /// Optional security features of the port semaphore (ADMINISTRACION-REMOTA, kill switch and contest).

@@ -56,6 +56,15 @@ Agent::Agent(AgentConfig config, Logger logger, TlsMaterial tls, EventSink sink)
 Agent::~Agent() { shutdown(); }
 
 bool Agent::start(std::string& error) {
+    if (config_.mode.initiator == ModeConfig::Initiator::Agent) {
+        // Agent-initiated: no inbound Link endpoint; the supervisor hands outbound connections to adopt().
+        log(LogLevel::Info, "Link over outbound connections to " + config_.mode.server_host + ":" + std::to_string(config_.mode.server_port));
+        for (auto& port : ports_) {
+            Port* p = port.get();
+            p->reader = std::thread([this, p] { port_loop(*p); });
+        }
+        return true;
+    }
     if (config_.tls == TlsMode::Tls) {
         // Never fall back to plain text when TLS was requested.
         tls_ = TlsServer::create(config_.tls_settings, tls_material_, error);
@@ -204,6 +213,7 @@ bool Agent::reconfigure(const AgentConfig& next) {
         for (auto& port : config.ports) port.device = {};
         return cbor::encode(encode_config(config));
     };
+    if (next.mode.initiator != config_.mode.initiator) return false;  // the Link endpoint changes direction
     std::lock_guard<std::mutex> lock(mutex_);
     AgentConfig current = config_;
     for (std::size_t i = 0; i < ports_.size() && i < current.ports.size(); ++i) current.ports[i].device = ports_[i]->config.device;
@@ -264,10 +274,32 @@ void Agent::serve(platform::Socket socket) {
     log(LogLevel::Info, "connection " + std::to_string(connection->id) + " from " + peer +
                             (connection->transport->authenticated() ? " certificate CN=" + connection->transport->peer_common_name() : std::string()));
     send_hello(connection);
-    connection_loop(connection);
+    connection_loop(connection, link::Decoder(config_.max_unit_bytes), {});
+}
+
+void Agent::adopt(std::unique_ptr<Transport> transport, std::vector<link::Unit> pending, link::Decoder decoder) {
+    if (stopping_) return;
+    ++active_connections_;
+    auto connection = std::make_shared<Connection>();
+    connection->peer = transport->peer();
+    connection->transport = std::move(transport);
+    connection->outbound = true;
+    connection->last_rx_ms = now_ms();
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        connection->id = next_connection_++;
+        connections_[connection->id] = connection;
+    }
+    log(LogLevel::Info, "outbound connection " + std::to_string(connection->id) + " to " + connection->peer + " serves as controller");
+    send_hello(connection);
+    connection_loop(connection, std::move(decoder), std::move(pending));
+    --active_connections_;
 }
 
 bool Agent::authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const {
+    // Outbound (agent-initiated) connections go to the server authenticated by its pinned certificate or the PSK when TLS
+    // is used; the controller id it declares is then accepted (the port list still decides who may use each port).
+    if (connection->outbound) return true;
     if (!tls_) return true;  // plain mode: the id is a declaration, see spec/link-v1.md § Security
     const auto& transport = *connection->transport;
     if (transport.psk_identity().size() > 0) {
@@ -291,11 +323,14 @@ bool Agent::authorize(const std::shared_ptr<Connection>& connection, const std::
 
 bool Agent::strongly_authenticated(const Connection& connection) const {
     // Kill switch and contest need TLS that identifies the peer: a verified client certificate or a PSK.
-    return tls_ && (connection.transport->authenticated() || !connection.transport->psk_identity().empty());
+    return connection.transport->encrypted() && (connection.transport->authenticated() || !connection.transport->psk_identity().empty());
 }
 
-void Agent::connection_loop(std::shared_ptr<Connection> connection) {
-    link::Decoder decoder(config_.max_unit_bytes);
+void Agent::connection_loop(std::shared_ptr<Connection> connection, link::Decoder decoder, std::vector<link::Unit> pending) {
+    for (const auto& unit : pending) {
+        handle(connection, unit);
+        if (!connection->alive) break;
+    }
     std::vector<std::uint8_t> buffer(16 * 1024);
     std::vector<link::Unit> units;
     while (connection->alive && !stopping_) {

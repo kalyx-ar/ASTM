@@ -22,3 +22,12 @@ std::string certificate_sha256(const std::string&) { return {}; }
 }  // namespace tls
 
 }  // namespace portgate
+
+namespace portgate::tls {
+
+std::unique_ptr<Transport> connect_client(platform::Socket, const std::string&, const TlsMaterial&, const std::string&, int, std::string& error) {
+    error = "this agent was built without TLS (PORTGATE_ENABLE_TLS=OFF)";
+    return nullptr;
+}
+
+}  // namespace portgate::tls

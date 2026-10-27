@@ -60,6 +60,11 @@ namespace tls {
 
 /// Generates an ECDSA P-256 key and a self-signed certificate for `common_name` (agent identity on the admin endpoint).
 bool generate_self_signed(const std::string& common_name, TlsMaterial& out, std::string& error);
+/// Outbound TLS (agent-initiated mode): presents the agent certificate of `own` and authenticates the server by its
+/// pinned certificate fingerprint or, without a pin, by the PSK of `own`. Never trusts a CA.
+std::unique_ptr<Transport> connect_client(platform::Socket socket, const std::string& host, const TlsMaterial& own, const std::string& server_sha256,
+                                          int timeout_ms, std::string& error);
+
 /// Lower-case hex SHA-256 of the first certificate (DER) of a PEM chain; empty when it does not parse.
 std::string certificate_sha256(const std::string& pem);
 

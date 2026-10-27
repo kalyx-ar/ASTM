@@ -63,6 +63,9 @@ public:
     /// Applies a configuration that differs only in devices (serial settings, path, endpoint) without restarting the
     /// Link endpoint: each changed port is reopened by its own thread. Returns false when a restart is required.
     bool reconfigure(const AgentConfig& next);
+    /// Serves an outbound connection whose server answered Hello as a controller (`pending` holds that Hello and any
+    /// following units already decoded). Blocks until the connection ends.
+    void adopt(std::unique_ptr<Transport> transport, std::vector<link::Unit> pending, link::Decoder decoder);
 
 private:
     struct Connection {
@@ -72,6 +75,7 @@ private:
         std::string controller_id;
         std::string peer;
         bool hello = false;
+        bool outbound = false;  // opened by the agent toward the server (agent-initiated mode)
         std::atomic<bool> alive{true};
         std::atomic<std::uint64_t> last_rx_ms{0};
     };
@@ -113,7 +117,7 @@ private:
     void accept_loop();
     void serve(platform::Socket socket);
     bool authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const;
-    void connection_loop(std::shared_ptr<Connection> connection);
+    void connection_loop(std::shared_ptr<Connection> connection, link::Decoder decoder, std::vector<link::Unit> pending);
     void port_loop(Port& port);
     void handle(const std::shared_ptr<Connection>& connection, const link::Unit& unit);
     void handle_serial_data(const std::shared_ptr<Connection>& connection, Port& port, const link::Unit& unit);

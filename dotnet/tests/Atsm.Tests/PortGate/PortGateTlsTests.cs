@@ -180,6 +180,58 @@ public class PortGateTlsTests
         Assert.Equal(["kill-switch-denied", "kill-switch", "contest", "secure-close", "reopen"], kinds.Where(k => k is "kill-switch-denied" or "kill-switch" or "contest" or "secure-close" or "reopen"));
     }
 
+    [PortGateFact]
+    public async Task Agent_initiated_connections_need_no_inbound_port_and_pin_both_ends()
+    {
+        using var pki = TestPki.Create();
+        using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
+        instrumentListener.Start();
+        var serverSha = Convert.ToHexStringLower(SHA256.HashData(pki.Server.RawData));
+        string? agentSha = null;
+        // The server listens; it accepts only the agent whose self-signed certificate it pinned.
+        using var listener = new PortGateListener(new IPEndPoint(IPAddress.Loopback, 0), new TlsOptions
+        {
+            ServerCertificate = pki.Server,
+            RequireClientCertificate = true,
+            CertificateValidation = (_, certificate, _, _) => certificate is not null && agentSha is not null &&
+                Convert.ToHexStringLower(SHA256.HashData(certificate.GetRawCertData())) == agentSha,
+        });
+        listener.Start();
+
+        // Installed with --server and the server fingerprint: it dials out and nobody else can administer it.
+        await using var agent = await PortGateProcess.LaunchAsync("--server", $"127.0.0.1:{listener.Port}", "--server-cert", serverSha);
+        agentSha = agent.AgentCertificateSha256;
+        await using var admin = await PortGateAdminClient.OpenAsync(await listener.AcceptAsync().WaitAsync(Timeout), "edc-central");
+        var configuration = PortGateProcess.Configuration(((IPEndPoint)instrumentListener.LocalEndpoint).Port) with
+        {
+            Outbound = new PortGateOutbound("127.0.0.1", listener.Port) { ServerCertificateSha256 = serverSha, Tls = true, Connections = 2 },
+        };
+        Assert.Equal(0, await admin.SetConfigAsync(1, configuration));  // no inbound Link endpoint
+        using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
+
+        // The next outbound connection becomes a controller; the server authenticated it, so its declaration is accepted.
+        await using var channel = await PortGateChannel.OpenAsync(await listener.AcceptAsync().WaitAsync(Timeout), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await channel.AcquireAsync().WaitAsync(Timeout);
+        await Task.Delay(200);
+        await channel.Stream!.WriteAsync(new byte[] { 0x05 });
+        var received = new byte[1];
+        await instrument.GetStream().ReadExactlyAsync(received).AsTask().WaitAsync(Timeout);
+        Assert.Equal(0x05, received[0]);
+        var status = await admin.GetStatusAsync();
+        Assert.Equal(0UL, status[8UL]);
+
+        // An agent that pinned another server never completes the handshake with this one.
+        using var other = TestPki.Create();
+        await using var misled = await PortGateProcess.LaunchAsync("--server", $"127.0.0.1:{listener.Port}",
+            "--server-cert", Convert.ToHexStringLower(SHA256.HashData(other.Server.RawData)));
+        agentSha = misled.AgentCertificateSha256;
+        await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            await using var stream = await listener.AcceptAsync().WaitAsync(Timeout);
+            await using var refused = await PortGateAdminClient.OpenAsync(stream, "edc-central");
+        });
+    }
+
     private static async Task WaitForEventAsync(PortGateChannel channel, PortGateEventKind kind, string? code)
     {
         using var timeout = new CancellationTokenSource(Timeout);

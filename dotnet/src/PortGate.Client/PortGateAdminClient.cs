@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Channels;
+using Atsm.Transport;
 
 namespace PortGate.Client;
 
@@ -42,7 +43,7 @@ public sealed class PortGateAdminClient : IAsyncDisposable
 {
     public const int DefaultPort = 28240;
 
-    private readonly TcpClient _client;
+    private readonly IDisposable _owner;
     private readonly Stream _stream;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _replies = new();
@@ -52,9 +53,9 @@ public sealed class PortGateAdminClient : IAsyncDisposable
     private long _requestId;
     private Exception? _refusal;
 
-    private PortGateAdminClient(TcpClient client, Stream stream, string agentId)
+    private PortGateAdminClient(IDisposable owner, Stream stream, string agentId)
     {
-        _client = client;
+        _owner = owner;
         _stream = stream;
         AgentId = agentId;
     }
@@ -94,17 +95,36 @@ public sealed class PortGateAdminClient : IAsyncDisposable
                 }, timeout.Token).ConfigureAwait(false);
                 stream = tls;
             }
+            return await OpenAsync(new OwnedStream(stream, client), serverId, timeout.Token).ConfigureAwait(false);
+        }
+        catch
+        {
+            client.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Administers over an established connection: one this server dialed, or one the agent dialed in the
+    /// agent-initiated mode (<see cref="PortGateListener"/>). Answering Hello as admin gives it that role. Owns <paramref name="stream"/>.
+    /// </summary>
+    public static async Task<PortGateAdminClient> OpenAsync(Stream stream, string serverId, CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        try
+        {
             var decoder = new LinkDecoder(1024 * 1024);
             var units = new List<LinkUnit>();
             await stream.WriteAsync(LinkUnit.Control(LinkType.Hello, 0, LinkCbor.Map((0, 1UL), (1, "admin"), (2, serverId))).Encode(), timeout.Token).ConfigureAwait(false);
             var hello = await ReceiveAsync(stream, decoder, units, LinkType.Hello, timeout.Token).ConfigureAwait(false);
-            var admin = new PortGateAdminClient(client, stream, hello.Map()?.GetValueOrDefault(2UL) as string ?? "");
+            var admin = new PortGateAdminClient(stream, stream, hello.Map()?.GetValueOrDefault(2UL) as string ?? "");
             admin._readLoop = Task.Run(() => admin.ReadLoopAsync(decoder, units));
             return admin;
         }
         catch
         {
-            client.Dispose();
+            await stream.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -180,7 +200,7 @@ public sealed class PortGateAdminClient : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _stop.Cancel();
-        _client.Dispose();
+        _owner.Dispose();
         await _readLoop.ContinueWith(_ => { }, TaskScheduler.Default).ConfigureAwait(false);
         _sendGate.Dispose();
         _stop.Dispose();

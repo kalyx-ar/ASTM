@@ -195,6 +195,9 @@ Value encode_config(const AgentConfig& config) {
                                         {4, Value::boolean(config.mode.admin_requires_tls)}};
     if (!config.mode.server_host.empty()) mode.emplace(1, Value::text(config.mode.server_host));
     if (config.mode.server_port != 0) mode.emplace(2, Value::uint(config.mode.server_port));
+    if (!config.mode.server_certificate_sha256.empty()) mode.emplace(5, Value::text(config.mode.server_certificate_sha256));
+    mode.emplace(6, Value::boolean(config.mode.outbound_tls));
+    mode.emplace(7, Value::uint(config.mode.connections));
     const auto& s = config.security;
     return Value::map({{0, Value::text(config.agent_id)},
                        {1, Value::text(config.platform_profile)},
@@ -228,12 +231,21 @@ std::optional<AgentConfig> decode_config(const Value& value, std::string& error)
     config.max_unit_bytes = static_cast<std::uint32_t>(r.number(*m, "config", 5, 64 * 1024, 1024, 16 * 1024 * 1024));
 
     if (auto mode = m->find(2); mode != m->end() && r.ok()) {
-        if (const auto* mm = r.map(mode->second, "config/2", 4)) {
+        if (const auto* mm = r.map(mode->second, "config/2", 7)) {
             config.mode.initiator = r.number(*mm, "config/2", 0, 0, 0, 1) == 0 ? ModeConfig::Initiator::Server : ModeConfig::Initiator::Agent;
             config.mode.server_host = r.text(*mm, "config/2", 1, false);
             config.mode.server_port = static_cast<std::uint16_t>(r.number(*mm, "config/2", 2, 0, 0, 65535));
             config.mode.restricted = r.flag(*mm, "config/2", 3, true);
             config.mode.admin_requires_tls = r.flag(*mm, "config/2", 4, false);
+            config.mode.server_certificate_sha256 = r.text(*mm, "config/2", 5, false);
+            for (auto& ch : config.mode.server_certificate_sha256) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            config.mode.server_certificate_sha256.erase(std::remove(config.mode.server_certificate_sha256.begin(), config.mode.server_certificate_sha256.end(), ':'),
+                                                        config.mode.server_certificate_sha256.end());
+            if (r.ok() && !config.mode.server_certificate_sha256.empty() && (config.mode.server_certificate_sha256.size() != 64 ||
+                                                                             config.mode.server_certificate_sha256.find_first_not_of("0123456789abcdef") != std::string::npos))
+                r.fail("config/2/5", "expected 64 hex digits");
+            config.mode.outbound_tls = r.flag(*mm, "config/2", 6, !config.mode.server_certificate_sha256.empty());
+            config.mode.connections = static_cast<std::uint32_t>(r.number(*mm, "config/2", 7, 2, 1, 16));
             if (r.ok() && config.mode.initiator == ModeConfig::Initiator::Agent && (config.mode.server_host.empty() || config.mode.server_port == 0))
                 r.fail("config/2", "the agent-initiated mode needs the server host and port");
         }

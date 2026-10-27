@@ -14,7 +14,7 @@ Normative extension of [PortGate Link v1](link-v1.md): same unit framing (magic 
 | State | Rule |
 |---|---|
 | Fresh install, nothing fixed | Any client. The first `SetConfig` records its identity (certificate fingerprint, else address). |
-| Fixed at install (`--server-cert sha256`, `--psk id:hex`) | Only a TLS client with that certificate fingerprint or PSK identity. |
+| Fixed at install (`--server-cert sha256`, `--psk id:hex`) | Only a TLS client with that certificate fingerprint or PSK identity. With `--server host:port` the agent dials that server (agent-initiated) and the same pin or PSK authenticates it. |
 | Configured, `mode.restricted = true` | Only the recorded identity (certificate fingerprint, PSK identity, or address when it administered in plain text). |
 | Configured, `mode.restricted = false` | Any client; the last configurator is recorded. |
 | `mode.adminRequiresTls = true` | Plain-text administration is refused. It can only be set over TLS. |
@@ -47,7 +47,7 @@ Rules:
 2. The agent keeps only the configuration in force; versions and rollback are the server's. To roll back, the server sends a complete previous configuration.
 3. The agent always starts with the last installed configuration. It never returns to "not configured" by itself; a damaged state stops the service with an error (recovery: reinstall with operating-system administrator rights).
 4. `SetTls` with a private key or PSK over a plain channel is refused (`PORTGATE-INSECURE-CHANNEL`). PSKs shorter than 16 bytes are refused (`PORTGATE-WEAK-PSK`). Material is validated by building a TLS server before it is saved; it is never returned by `GetConfig`.
-5. Agent-initiated connections (`mode.initiator = 1`) are part of the configuration model but answer `PORTGATE-UNSUPPORTED` until P-09 implements the client role.
+5. Agent-initiated mode (`mode.initiator = 1`): see § Agent-initiated connections.
 
 ### Configuration map
 
@@ -55,7 +55,7 @@ Rules:
 |---|---|
 | 0 | agentId tstr (required) |
 | 1 | platformProfile tstr |
-| 2 | mode {0 initiator (0 server, 1 agent), 1 serverHost, 2 serverPort, 3 restricted bool (default true), 4 adminRequiresTls bool} |
+| 2 | mode {0 initiator (0 server, 1 agent), 1 serverHost, 2 serverPort, 3 restricted bool (default true), 4 adminRequiresTls bool, 5 serverCertificateSha256 tstr, 6 outboundTls bool (default true when 5 is set), 7 connections [1, 16] (default 2)} |
 | 3 | link {0 host, 1 port (0 = ephemeral), 2 tls bool, 3 requireClientCertificate bool (default true), 4 minimumTls13 bool} |
 | 4 | heartbeatMs [500, 600000] |
 | 5 | maxUnitBytes [1024, 16 MiB] |
@@ -65,6 +65,17 @@ Rules:
 Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest)}], 7 maxWriteBytes}.
 
 Unknown keys and out-of-range values are rejected with the path of the field.
+
+## Agent-initiated connections
+
+For agents behind isolated networks or without inbound ports. Enabled by `mode.initiator = 1` or, before any configuration, by installing with `--server host:port`.
+
+1. The agent keeps `mode.connections` TCP connections to `serverHost:serverPort` (one before configuration) and opens no inbound Link endpoint (`GetStatus` and `SetConfig` report Link port 0). The administration endpoint keeps listening where `--admin` says (use `127.0.0.1` for a local UI only).
+2. TLS (`outboundTls`, or install with `--server-cert`/`--psk`): the agent is the TLS client. It presents its own certificate (the one of the administration endpoint) and authenticates the server by `serverCertificateSha256` or, without it, by the administration PSK; it never trusts a CA. A pin and a PSK are not offered together (the pin wins). Outbound TLS without either is refused (`PORTGATE-OUTBOUND-IDENTITY`). The server pins the agent certificate (reported by `GetStatus` and printed at start).
+3. The **server speaks first**: its `Hello` gives the connection its role. Role `admin` runs the administration protocol (same authorization rules, identity = server certificate fingerprint, PSK identity or address). Role `controller` runs Link: the agent answers `Hello` and `Capabilities`, and the controller id declared by the server is accepted because the server was authenticated (the port's controller list still applies; kill switch and contest need TLS). A controller connection before any configuration is answered with `Error` `PORTGATE-NOT-CONFIGURED`.
+4. A connection that ends is dialed again (1 s, doubling up to 30 s while it fails). Changing between server- and agent-initiated modes restarts Link; connections already serving keep their role until they end.
+
+Server side (.NET): `PortGateListener` accepts the agent connections; `PortGateAdminClient.OpenAsync` and `PortGateChannel.OpenAsync` give them their role over the accepted stream.
 
 ## Semaphore extensions (Link endpoint)
 

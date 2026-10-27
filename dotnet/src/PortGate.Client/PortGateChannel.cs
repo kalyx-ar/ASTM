@@ -86,6 +86,18 @@ public sealed class PortGateChannel : IAsyncDisposable
         timeout.CancelAfter(options.HandshakeTimeout);
         // TLS is decided by the endpoint and never downgraded; the agent verifies the client certificate (mTLS) or PSK.
         var stream = await LocalTransportProvider.ConnectAsync(agent, timeout.Token).ConfigureAwait(false);
+        return await OpenAsync(stream, options, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens the channel on an established connection: the one this host dialed, or one the agent dialed in the
+    /// agent-initiated mode (<see cref="PortGateListener"/>). Answering Hello as a controller gives it that role.
+    /// The channel owns <paramref name="stream"/>.
+    /// </summary>
+    public static async Task<PortGateChannel> OpenAsync(Stream stream, PortGateOptions options, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(options.HandshakeTimeout);
         try
         {
             var decoder = new LinkDecoder(options.MaxUnitBytes);

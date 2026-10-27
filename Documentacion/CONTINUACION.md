@@ -75,14 +75,14 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-06 | Build Windows XP | Instalar toolset `v141_xp`; equipo o VM XP |
 | P-07 | Build Linux / Raspberry Pi | Distro WSL o equipo Linux/ARM |
 | P-08 | Firmware ESP32 | ESP-IDF y hardware con interfaz RS232 |
-| P-09 | Agente: rol cliente TLS, captura protegida y lectura de traza, observadores | Definir custodia/cifrado antes de persistencia sensible |
+| P-09 | Parcial: rol cliente TLS resuelto en P-16 (modo iniciado por el agente); faltan captura protegida, lectura de traza y observadores | Definir custodia/cifrado antes de persistencia sensible |
 | P-10 | Resuelto: COM local en `Atsm.Transport` (`System.IO.Ports` aprobado 2026-10-26); falta prueba con hardware | Adaptador USB-serie real |
 | P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
 | P-12 | Robustez del agente | Ninguno |
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
-| P-16 | Parcial: PortGate como servicio y administración remota implementados; faltan modo iniciado por el agente, verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
+| P-16 | Parcial: PortGate como servicio, administración remota, cambios de dispositivo en caliente y modo iniciado por el agente implementados; faltan verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
 
 ### P-01 Resuelto: mensajes completos del anfitrión
 
@@ -164,7 +164,7 @@ Implementado según [ADMINISTRACION-REMOTA](ADMINISTRACION-REMOTA.md) y [spec/ad
 
 Pendiente:
 
-- **Modo iniciado por el agente** (rol cliente TLS, P-09): el modelo de configuración lo admite y el agente responde `PORTGATE-UNSUPPORTED`.
+- **Resuelto (2026-10-26):** modo iniciado por el agente (conexiones salientes con rol asignado por el servidor, TLS con fijación mutua o PSK, reintento exponencial) y cambios de dispositivo en caliente.
 - **Verificar `service install` elevado** en Windows (instalación, ACL, arranque automático y recuperación). En esta sesión sólo se comprobaron los caminos sin elevación.
 - **POSIX**: `devices_posix.cpp`, `protect_posix.cpp` y la unidad systemd están escritos sin compilar (igual que P-07).
 - **Windows XP (P-06)**: `std::filesystem` del STL v141 y SetupAPI por sondeo sin probar.

@@ -38,6 +38,7 @@ int usage() {
                  "       portgate service start | stop\n"
                  "options: --state <dir>  --admin <host:port> (default 0.0.0.0:28240)  --name <agent>\n"
                  "         --server-cert <sha256> | --psk <identity>:<hex>   fix the administering server at installation\n"
+                 "         --server <host:port>   agent-initiated: dial this server, no inbound port needed\n"
                  "         --quiet\n";
     return 64;
 }
@@ -149,6 +150,12 @@ int parse(const std::vector<std::string>& args, RunOptions& out) {
             if (colon == std::string::npos) return usage();
             options.admin_host = value.substr(0, colon);
             options.admin_port = static_cast<std::uint16_t>(std::stoul(value.substr(colon + 1)));
+        } else if (arg == "--server" && has_value) {
+            const std::string& value = args[++i];
+            const auto colon = value.rfind(':');
+            if (colon == std::string::npos) return usage();
+            options.install_server_host = value.substr(0, colon);
+            options.install_server_port = static_cast<std::uint16_t>(std::stoul(value.substr(colon + 1)));
         } else if (arg == "--name" && has_value) {
             options.agent_name = args[++i];
         } else if (arg == "--server-cert" && has_value) {

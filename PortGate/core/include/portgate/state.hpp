@@ -19,6 +19,9 @@ struct AdminAccess {
     std::string server_id;           // id announced in Hello
     std::string certificate_sha256;  // verified client certificate, when the admin channel used TLS
     std::string address;             // peer address (host, no port), the only identity on a plain channel
+    /// Server fixed at installation for the agent-initiated mode, used until a configuration sets the mode.
+    std::string server_host;
+    std::uint16_t server_port = 0;
 };
 
 

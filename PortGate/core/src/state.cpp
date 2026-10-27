@@ -72,6 +72,8 @@ std::optional<AgentState> StateStore::load(std::string& error) const {
         state.admin.certificate_sha256 = text_or(*admin, 2);
         state.admin.address = text_or(*admin, 3);
         state.admin.restricted = bool_or(*admin, 4);
+        state.admin.server_host = text_or(*admin, 5);
+        if (const Value* port = admin->get(6); port && port->as_uint()) state.admin.server_port = static_cast<std::uint16_t>(*port->as_uint());
     }
     state.link_tls = decode_tls(value->get(5));
     state.admin_tls = decode_tls(value->get(6));
@@ -87,7 +89,9 @@ bool StateStore::save(const AgentState& state, std::string& error) const {
                                                      {1, Value::text(state.admin.server_id)},
                                                      {2, Value::text(state.admin.certificate_sha256)},
                                                      {3, Value::text(state.admin.address)},
-                                                     {4, Value::boolean(state.admin.restricted)}})},
+                                                     {4, Value::boolean(state.admin.restricted)},
+                                                     {5, Value::text(state.admin.server_host)},
+                                                     {6, Value::uint(state.admin.server_port)}})},
                                      {5, encode_tls(state.link_tls)},
                                      {6, encode_tls(state.admin_tls)}};
     if (state.configured) m.emplace(2, encode_config(state.config));

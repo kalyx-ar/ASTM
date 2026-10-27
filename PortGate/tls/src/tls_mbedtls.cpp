@@ -150,6 +150,9 @@ public:
     std::string psk_identity() const override { return psk_identity_; }
 
     void set_psk_identity(std::string identity) { psk_identity_ = std::move(identity); }
+    void set_authenticated(bool value) { authenticated_ = value; }
+    void keep_alive(std::shared_ptr<void> holder) { keep_alive_ = std::move(holder); }
+    mbedtls_ssl_context* context() { return &ssl_; }
 
 private:
     static int bio_send(void* context, const unsigned char* data, std::size_t size) {
@@ -183,6 +186,7 @@ private:
     std::string fingerprint_;
     std::string common_name_;
     std::string psk_identity_;
+    std::shared_ptr<void> keep_alive_;  // client configuration owned by this connection
 };
 
 class MbedTlsServer final : public TlsServer {
@@ -299,6 +303,90 @@ std::unique_ptr<TlsServer> TlsServer::create(const TlsServerSettings& settings, 
 bool TlsServer::available() { return true; }
 
 namespace tls {
+
+namespace {
+
+/// Configuration of one outbound connection; it must outlive the SSL context, so the transport owns it.
+struct ClientConfig {
+    mbedtls_ssl_config config;
+    mbedtls_x509_crt certificate;
+    mbedtls_pk_context key;
+    std::vector<int> suites;
+    ClientConfig() {
+        mbedtls_ssl_config_init(&config);
+        mbedtls_x509_crt_init(&certificate);
+        mbedtls_pk_init(&key);
+    }
+    ~ClientConfig() {
+        mbedtls_ssl_config_free(&config);
+        mbedtls_pk_free(&key);
+        mbedtls_x509_crt_free(&certificate);
+    }
+    ClientConfig(const ClientConfig&) = delete;
+    ClientConfig& operator=(const ClientConfig&) = delete;
+};
+
+}  // namespace
+
+std::unique_ptr<Transport> connect_client(platform::Socket socket, const std::string& host, const TlsMaterial& own, const std::string& server_sha256,
+                                          int timeout_ms, std::string& error) {
+    if (!global_init(error)) return nullptr;
+    if (server_sha256.empty() && !own.has_psk()) {
+        error = "an outbound TLS connection needs the pinned server certificate or a PSK";
+        return nullptr;
+    }
+    auto holder = std::make_shared<ClientConfig>();
+    int ret = mbedtls_ssl_config_defaults(&holder->config, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
+    if (ret != 0) {
+        error = "ssl defaults: " + describe(ret);
+        return nullptr;
+    }
+    // The server is authenticated by its pinned fingerprint (checked after the handshake) or by the PSK, never by a CA.
+    mbedtls_ssl_conf_authmode(&holder->config, MBEDTLS_SSL_VERIFY_NONE);
+    mbedtls_ssl_conf_read_timeout(&holder->config, kReadTimeoutMs);
+    if (own.has_certificate()) {
+        if ((ret = parse_certificates(&holder->certificate, own.certificate_pem)) != 0 ||
+            (ret = mbedtls_pk_parse_key(&holder->key, reinterpret_cast<const unsigned char*>(own.private_key_pem.c_str()), own.private_key_pem.size() + 1, nullptr, 0)) != 0 ||
+            (ret = mbedtls_ssl_conf_own_cert(&holder->config, &holder->certificate, &holder->key)) != 0) {
+            error = "agent certificate: " + describe(ret);
+            return nullptr;
+        }
+    }
+    // A pinned certificate takes precedence: offering the PSK too would let the server skip the certificate.
+    const bool use_psk = server_sha256.empty();
+    if (use_psk && (ret = mbedtls_ssl_conf_psk(&holder->config, own.psk.data(), own.psk.size(),
+                                               reinterpret_cast<const unsigned char*>(own.psk_identity.data()), own.psk_identity.size())) != 0) {
+        error = "psk: " + describe(ret);
+        return nullptr;
+    }
+    mbedtls_ssl_conf_tls13_key_exchange_modes(&holder->config, use_psk ? MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL : MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL);
+    for (const int* id = mbedtls_ssl_list_ciphersuites(); *id != 0; ++id) {
+        const char* name = mbedtls_ssl_get_ciphersuite_name(*id);
+        if (name && std::strncmp(name, "TLS-PSK-", 8) == 0) continue;
+        holder->suites.push_back(*id);
+    }
+    holder->suites.push_back(0);
+    mbedtls_ssl_conf_ciphersuites(&holder->config, holder->suites.data());
+
+    auto transport = std::make_unique<MbedTlsTransport>(std::move(socket), &holder->config);
+    transport->keep_alive(holder);
+    mbedtls_ssl_set_hostname(transport->context(), host.c_str());
+    if (!transport->handshake(timeout_ms, error)) {
+        transport->shutdown();
+        return nullptr;
+    }
+    if (!use_psk) {
+        if (transport->peer_certificate_sha256() != server_sha256) {
+            error = "the server certificate does not match the pinned fingerprint";
+            transport->shutdown();
+            return nullptr;
+        }
+        transport->set_authenticated(true);
+    } else {
+        transport->set_psk_identity(own.psk_identity);
+    }
+    return transport;
+}
 
 bool generate_self_signed(const std::string& common_name, TlsMaterial& out, std::string& error) {
     if (!global_init(error)) return false;

@@ -83,6 +83,8 @@ public sealed record PortGateConfiguration(string AgentId, IReadOnlyList<PortGat
     public string PlatformProfile { get; init; } = "unspecified";
     public bool Restricted { get; init; } = true;
     public bool AdminRequiresTls { get; init; }
+    /// <summary>Agent-initiated mode: the agent dials this server; null keeps the server-initiated mode.</summary>
+    public PortGateOutbound? Outbound { get; init; }
     public string ListenHost { get; init; } = "0.0.0.0";
     public int ListenPort { get; init; }
     public bool Tls { get; init; }
@@ -91,11 +93,38 @@ public sealed record PortGateConfiguration(string AgentId, IReadOnlyList<PortGat
     public TimeSpan Heartbeat { get; init; } = TimeSpan.FromSeconds(5);
     public PortGateSecurity Security { get; init; } = new();
 
+    private SortedDictionary<ulong, object?> Mode()
+    {
+        var mode = LinkCbor.Map((0, Outbound is null ? 0UL : 1UL), (3, Restricted), (4, AdminRequiresTls));
+        if (Outbound is { } outbound)
+        {
+            mode[1] = outbound.Host;
+            mode[2] = (ulong)outbound.Port;
+            if (outbound.ServerCertificateSha256 is not null)
+                mode[5] = outbound.ServerCertificateSha256;
+            mode[6] = outbound.Tls;
+            mode[7] = (ulong)outbound.Connections;
+        }
+        return mode;
+    }
+
     public SortedDictionary<ulong, object?> ToMap() => LinkCbor.Map(
         (0, AgentId), (1, PlatformProfile),
-        (2, LinkCbor.Map((0, 0UL), (3, Restricted), (4, AdminRequiresTls))),
+        (2, Mode()),
         (3, LinkCbor.Map((0, ListenHost), (1, (ulong)ListenPort), (2, Tls), (3, RequireClientCertificate), (4, MinimumTls13))),
         (4, (ulong)Heartbeat.TotalMilliseconds),
         (6, Security.ToMap()),
         (7, Ports.Select(p => (object?)p.ToMap()).ToList()));
+}
+
+/// <summary>
+/// Agent-initiated mode: the agent keeps <see cref="Connections"/> connections to <see cref="Host"/>:<see cref="Port"/>
+/// and the server gives each one a role (admin or controller). With TLS the agent authenticates the server by
+/// <see cref="ServerCertificateSha256"/> (or the administration PSK) and presents its own certificate.
+/// </summary>
+public sealed record PortGateOutbound(string Host, int Port)
+{
+    public string? ServerCertificateSha256 { get; init; }
+    public bool Tls { get; init; }
+    public int Connections { get; init; } = 2;
 }
