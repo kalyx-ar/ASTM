@@ -84,9 +84,9 @@ private:
 };
 
 bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfig& device) {
-    const auto* m = r.map(v, path, 8);
+    const auto* m = r.map(v, path, 10);
     if (!m) return false;
-    const auto kind = r.number(*m, path, 0, 0, 0, 1);
+    const auto kind = r.number(*m, path, 0, 0, 0, 2);
     if (kind == 0) {
         device.kind = DeviceConfig::Kind::Serial;
         device.path = r.text(*m, path, 1, true);
@@ -95,10 +95,12 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
         device.parity = static_cast<Parity>(r.number(*m, path, 4, 0, 0, 4));
         device.stop_bits = static_cast<std::uint8_t>(r.number(*m, path, 5, 1, 1, 2));
         device.flow_control = static_cast<FlowControl>(r.number(*m, path, 6, 0, 0, 2));
+        device.dtr = r.flag(*m, path, 9, true);
+        device.rts = r.flag(*m, path, 10, true);
         if (r.ok() && device.path.empty()) return r.fail(path + "/1", "required");
     } else {
-        device.kind = DeviceConfig::Kind::Tcp;
-        device.host = r.text(*m, path, 7, true);
+        device.kind = kind == 1 ? DeviceConfig::Kind::Tcp : DeviceConfig::Kind::TcpListen;
+        device.host = r.text(*m, path, 7, kind == 1, kind == 1 ? std::string() : "0.0.0.0");
         device.port = static_cast<std::uint16_t>(r.number(*m, path, 8, 0, 1, 65535));
         if (r.ok() && device.port == 0) return r.fail(path + "/8", "required");
     }
@@ -148,22 +150,28 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
 
 }  // namespace
 
+Value encode_device(const DeviceConfig& d) {
+    std::map<std::uint64_t, Value> device;
+    device.emplace(0, Value::uint(d.kind == DeviceConfig::Kind::Serial ? 0 : d.kind == DeviceConfig::Kind::Tcp ? 1 : 2));
+    if (d.kind == DeviceConfig::Kind::Serial) {
+        device.emplace(1, Value::text(d.path));
+        device.emplace(2, Value::uint(d.baud_rate));
+        device.emplace(3, Value::uint(d.data_bits));
+        device.emplace(4, Value::uint(static_cast<std::uint64_t>(d.parity)));
+        device.emplace(5, Value::uint(d.stop_bits));
+        device.emplace(6, Value::uint(static_cast<std::uint64_t>(d.flow_control)));
+        device.emplace(9, Value::boolean(d.dtr));
+        device.emplace(10, Value::boolean(d.rts));
+    } else {
+        device.emplace(7, Value::text(d.host));
+        device.emplace(8, Value::uint(d.port));
+    }
+    return Value::map(std::move(device));
+}
+
 Value encode_config(const AgentConfig& config) {
     std::vector<Value> ports;
     for (const auto& port : config.ports) {
-        std::map<std::uint64_t, Value> device;
-        device.emplace(0, Value::uint(port.device.kind == DeviceConfig::Kind::Serial ? 0 : 1));
-        if (port.device.kind == DeviceConfig::Kind::Serial) {
-            device.emplace(1, Value::text(port.device.path));
-            device.emplace(2, Value::uint(port.device.baud_rate));
-            device.emplace(3, Value::uint(port.device.data_bits));
-            device.emplace(4, Value::uint(static_cast<std::uint64_t>(port.device.parity)));
-            device.emplace(5, Value::uint(port.device.stop_bits));
-            device.emplace(6, Value::uint(static_cast<std::uint64_t>(port.device.flow_control)));
-        } else {
-            device.emplace(7, Value::text(port.device.host));
-            device.emplace(8, Value::uint(port.device.port));
-        }
         std::vector<Value> controllers;
         for (const auto& [id, priority] : port.controllers) {
             std::map<std::uint64_t, Value> c{{0, Value::text(id)}, {1, Value::uint(static_cast<std::uint64_t>(priority))}};
@@ -175,7 +183,7 @@ Value encode_config(const AgentConfig& config) {
         }
         ports.push_back(Value::map({{0, Value::text(port.port_id)},
                                     {1, Value::text(port.instrument_id)},
-                                    {2, Value::map(std::move(device))},
+                                    {2, encode_device(port.device)},
                                     {3, Value::uint(port.lease_ms)},
                                     {4, Value::uint(port.max_queued_requests)},
                                     {5, Value::uint(port.max_hold_ms)},

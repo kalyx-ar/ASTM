@@ -793,7 +793,8 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
                                     {3, Value::uint(0)},
                                     {4, Value::boolean(false)},
                                     {5, Value::uint(port->config.max_write_bytes)},
-                                    {6, Value::boolean(port->config.max_queued_requests > 0)}}));
+                                    {6, Value::boolean(port->config.max_queued_requests > 0)},
+                                    {7, encode_device(port->config.device)}}));
     }
     send(connection, link::control(link::Type::Capabilities, 0, Value::map({{0, Value::array(std::move(ports))}})));
 }

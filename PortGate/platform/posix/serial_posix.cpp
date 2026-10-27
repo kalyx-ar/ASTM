@@ -1,6 +1,7 @@
 // POSIX termios serial port (Linux, Raspberry Pi OS, macOS).
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -72,6 +73,13 @@ public:
         tio.c_cc[VMIN] = 0;
         tio.c_cc[VTIME] = 0;
         if (tcsetattr(fd_, TCSANOW, &tio) != 0) return fail(error, "tcsetattr");
+        // Modem lines: DTR always as configured; RTS unless the driver owns it (RTS/CTS flow control).
+        int lines = 0;
+        if (::ioctl(fd_, TIOCMGET, &lines) == 0) {
+            lines = config_.dtr ? (lines | TIOCM_DTR) : (lines & ~TIOCM_DTR);
+            if (config_.flow_control != FlowControl::RtsCts) lines = config_.rts ? (lines | TIOCM_RTS) : (lines & ~TIOCM_RTS);
+            ::ioctl(fd_, TIOCMSET, &lines);
+        }
         tcflush(fd_, TCIOFLUSH);
         return true;
     }

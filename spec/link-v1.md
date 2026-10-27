@@ -24,7 +24,7 @@ CBOR (RFC 8949) with deterministic encoding: definite lengths, shortest integer 
 | Type | Name | Direction | Map |
 |---|---|---|---|
 | 0x01 | Hello | both | 0 version uint, 1 role tstr (`agent`/`controller`), 2 id tstr, 3 agentEpoch bstr(16) (agent), 4 platform tstr, 5 maxUnitBytes uint |
-| 0x02 | Capabilities | agent → host | 0 ports: array of {0 portId tstr, 1 instrumentId tstr, 2 ownership uint (0 none, 1 advisory, 2 enforced), 3 traceCapture uint (0 none, 1 ram, 2 durable), 4 serialSignals bool, 5 maxRecordBytes uint, 6 queuedAcquisition bool} |
+| 0x02 | Capabilities | agent → host | 0 ports: array of {0 portId tstr, 1 instrumentId tstr, 2 ownership uint (0 none, 1 advisory, 2 enforced), 3 traceCapture uint (0 none, 1 ram, 2 durable), 4 serialSignals bool, 5 maxRecordBytes uint, 6 queuedAcquisition bool, 7 device map in force (spec/admin-v1.md § Configuration map), so a controller can compare serial settings} |
 | 0x10 | Acquire | host → agent | 0 requestId uint, 1 priority int, 2 deadlineMs uint |
 | 0x11 | Queued | agent → host | 0 requestId uint, 1 position uint |
 | 0x12 | Granted | agent → host | 0 requestId uint, 1 generation uint, 2 transferId bstr(16), 3 leaseMs uint, 4 pendingTxBytes uint, 5 uncertainTx bool, 6 unownedRxBytes uint |

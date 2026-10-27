@@ -33,8 +33,8 @@ public:
             case Parity::Space: dcb.Parity = SPACEPARITY; dcb.fParity = TRUE; break;
         }
         dcb.fOutxCtsFlow = config_.flow_control == FlowControl::RtsCts;
-        dcb.fRtsControl = config_.flow_control == FlowControl::RtsCts ? RTS_CONTROL_HANDSHAKE : RTS_CONTROL_ENABLE;
-        dcb.fDtrControl = DTR_CONTROL_ENABLE;
+        dcb.fRtsControl = config_.flow_control == FlowControl::RtsCts ? RTS_CONTROL_HANDSHAKE : config_.rts ? RTS_CONTROL_ENABLE : RTS_CONTROL_DISABLE;
+        dcb.fDtrControl = config_.dtr ? DTR_CONTROL_ENABLE : DTR_CONTROL_DISABLE;
         dcb.fOutX = dcb.fInX = config_.flow_control == FlowControl::XonXoff;
         dcb.fOutxDsrFlow = FALSE;
         dcb.fDsrSensitivity = FALSE;

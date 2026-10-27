@@ -21,7 +21,9 @@ enum class TlsMode { Plain, Tls };
 enum ControllerRight : std::uint32_t { RightKillSwitch = 1, RightContest = 2 };
 
 struct DeviceConfig {
-    enum class Kind { Serial, Tcp };
+    /// Serial: local port. Tcp: the agent connects to an instrument (or terminal server) that listens. TcpListen: the agent
+    /// listens on host:port and the instrument connects to it (Ethernet instruments that act as TCP clients).
+    enum class Kind { Serial, Tcp, TcpListen };
     Kind kind = Kind::Serial;
     // Serial
     std::string path;
@@ -30,7 +32,10 @@ struct DeviceConfig {
     Parity parity = Parity::None;
     std::uint8_t stop_bits = 1;
     FlowControl flow_control = FlowControl::None;
-    // Serial over TCP (terminal servers, simulators)
+    /// Modem lines asserted while the port is open (RTS is driven by the driver with RTS/CTS flow control).
+    bool dtr = true;
+    bool rts = true;
+    // Tcp: remote endpoint; TcpListen: local address and port
     std::string host;
     std::uint16_t port = 0;
 };
@@ -91,6 +96,8 @@ struct AgentConfig {
 /// CBOR form used by SetConfig/GetConfig and by the protected state. Private keys and PSKs are never encoded here:
 /// TLS material travels only through SetTls.
 cbor::Value encode_config(const AgentConfig& config);
+/// Device map of a port (key 2 of a port), also announced in Capabilities so a controller can compare settings.
+cbor::Value encode_device(const DeviceConfig& device);
 /// Validates the whole configuration; on error nothing is returned and `error` names the field.
 std::optional<AgentConfig> decode_config(const cbor::Value& value, std::string& error);
 

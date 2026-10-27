@@ -778,6 +778,73 @@ void test_admin_psk_fixed_at_installation() {
     std::filesystem::remove_all(directory, ignored);
 }
 
+void test_ethernet_instrument_connects_to_the_agent() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    std::uint16_t device_port = 0;
+    {
+        platform::Listener probe;  // a free local port for the instrument side
+        CHECK(probe.open("127.0.0.1", 0, error));
+        device_port = probe.port();
+    }
+    AgentConfig config = sample_config(1);
+    config.ports[0].device = DeviceConfig{};
+    config.ports[0].device.kind = DeviceConfig::Kind::TcpListen;
+    config.ports[0].device.host = "127.0.0.1";
+    config.ports[0].device.port = device_port;
+    auto encoded = decode_config(encode_config(config), error);
+    CHECK(encoded && encoded->ports[0].device.kind == DeviceConfig::Kind::TcpListen && encoded->ports[0].device.port == device_port);
+
+    Agent agent(config, [](LogLevel, const std::string&) {});
+    CHECK(agent.start(error));
+    std::atomic<bool> stop{false};
+    std::thread housekeeping([&] { agent.run(stop); });
+
+    Client a = hello_client(agent.listen_port(), "controller", "server-a");
+    auto capabilities = a.next(link::Type::Capabilities);
+    const auto* device = capabilities ? (*link::parse_map(*capabilities)->get(0)->as_array())[0].get(7) : nullptr;
+    CHECK(device && device->get(0)->as_uint() == std::optional<std::uint64_t>(2) && device->get(8)->as_uint() == std::optional<std::uint64_t>(device_port));
+    a.send(link::control(link::Type::Acquire, 1, Value::map({{0, Value::uint(1)}, {1, Value::integer(0)}, {2, Value::uint(0)}})));
+    auto granted = a.next(link::Type::Granted);
+    CHECK(granted.has_value());
+    if (granted) {
+        auto grant = *link::parse_map(*granted);
+        const auto generation = static_cast<std::uint32_t>(*grant.get(1)->as_uint());
+        a.send(link::control(link::Type::ConfirmTransfer, 1, Value::map({{1, Value::uint(generation)}, {2, *grant.get(2)}})));
+
+        // The instrument is the TCP client: it connects to the agent, sends, and receives what the owner writes.
+        std::optional<platform::Socket> instrument;
+        for (int attempt = 0; attempt < 20 && !instrument; ++attempt) {
+            instrument = platform::Socket::connect("127.0.0.1", device_port, 500, error);
+            if (!instrument) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        CHECK(instrument.has_value());
+        if (instrument) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));  // accepted by the port thread
+            const std::uint8_t enq[] = {0x05};
+            instrument->send_all(enq, sizeof(enq));
+            auto data = a.next(link::Type::SerialData);
+            auto parsed = data ? link::parse_serial_data(*data) : std::nullopt;
+            CHECK(parsed && parsed->data.size() == 1 && parsed->data[0] == 0x05);
+            link::SerialData ack;
+            ack.seq = 1;
+            ack.generation = generation;
+            ack.data = {0x06};
+            a.send(link::serial_data(1, ack));
+            auto status = a.next(link::Type::WriteStatus);
+            CHECK(status && *link::parse_map(*status)->get(3)->as_uint() == static_cast<std::uint64_t>(link::WriteResult::Completed));
+            std::uint8_t received = 0;
+            CHECK(instrument->receive(&received, 1, 2000) == 1 && received == 0x06);
+            instrument->close();
+        }
+    }
+    a.socket.close();
+    stop = true;
+    housekeeping.join();
+    agent.shutdown();
+    platform::network_cleanup();
+}
+
 void test_handover_and_plain_security() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -880,6 +947,7 @@ int main(int argc, char** argv) {
     test_supervisor_administration();
     test_handover_and_plain_security();
     test_admin_psk_fixed_at_installation();
+    test_ethernet_instrument_connects_to_the_agent();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

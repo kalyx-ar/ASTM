@@ -61,7 +61,7 @@ Rules:
 | 6 | security {0 killSwitch bool, 1 contest bool, 2 quarantineMs, 3 killCooldownMs, 4 contestBlockMs, 5 handoverIntervalMs, 6 handoverTimeoutMs} |
 | 7 | ports [Port] |
 
-Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host, 8 port}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest)}], 7 maxWriteBytes}.
+Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest)}], 7 maxWriteBytes}.
 
 Unknown keys and out-of-range values are rejected with the path of the field.
 
