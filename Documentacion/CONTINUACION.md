@@ -85,7 +85,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-10 | Resuelto: COM local en `Astm.Transport` (`System.IO.Ports` aprobado 2026-10-26); falta prueba con hardware | Adaptador USB-serie real |
 | P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
 | P-12 | Robustez del agente | Ninguno |
-| P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
+| P-13 | Parcial (2026-10-27): EDC consume el feed 0.3.0 con plugins de fabricante y se comunica por ASTM/PortGate (servicio residente por equipo, custodia SQLCipher en LIMS con autopurga de control > 7 días, modos results/query/worklist; EDC #300, verificado con el analizador sintético y el agente real). Faltan pantalla de configuración/monitor, identidad de servicio sin sesión, TLS/PSK de PortGate y HL7 en EDC | Trabajo en el repositorio EDC |
 | P-14 | Empaquetado NuGet, API pública y CI | Decidir el feed |
 | P-15 | Completar semántica binaria UF en la familia Sysmex | Encuadre completo: 2.193 mensajes/500.444 bytes, 349 avisos y 1.981 mensajes de estado/contadores; lecturas relacionadas con campos. Faltan asignación física/unidades de los siete contadores/niveles, nombres operativos de estados/indicadores, campos restantes, integridad, roles y límites de operaciones reales. Hipótesis de disponibilidad de reactivos documentada. No convertir instrucciones/necesidades en ejecuciones ni tiempos entre lecturas en RTT. Ver UF-CONTROL-Y-TIEMPOS |
 | P-16 | Parcial: PortGate como servicio, administración remota, cambios de dispositivo en caliente y modo iniciado por el agente implementados; faltan verificación de `service install` elevado, build POSIX e integración EDC | Ver § P-16 |
