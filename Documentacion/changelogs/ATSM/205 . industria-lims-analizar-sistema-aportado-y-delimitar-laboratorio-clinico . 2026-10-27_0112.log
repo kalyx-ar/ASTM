@@ -1,0 +1,40 @@
+Issue: https://github.com/kalyx-ar/EDC/issues/205
+Alcance previo: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6433024987
+Resultado: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6433566514
+Commit funcional: d6f101d0e1d4fa290c92aa6854d0ea51d7cb696a
+Commit consumidor EDC: 42696fd
+Tipo: feat / pruebas de comunicacion y adaptacion del anfitrion de mantenimiento.
+
+Decision humana: basta COM de prueba; no requiere puerto registrado en Windows ni driver.
+Circuito: ATSM -> PortGate.Client -> agente nativo -> Device serie de prueba -> instrumento simulado -> respuesta por PortGate.
+El instrumento simulado comprueba muestra/pruebas de una orden real del plugin antes de responder. Escenarios desde mensajes completos de trazas privadas, equivalencia de resultados, consultas/respuestas, checksum incorrecto/NAK/reintento y presupuestos ENQ/frame ACK del perfil.
+TestSerial: loopback exclusivo, FlowControl.None, baudios/bits/paridad/parada, mascara de bits y cierre que interrumpe la escritura. No acredita driver, IOCTL ni señales electricas.
+Sin instalar servicios/drivers, modificar seguridad de Windows, logs planos, datos privados publicados ni ZIP. Instaladores investigados y no usados retirados de artifacts/com-driver.
+
+Rutas afectadas:
+- PortGate/platform/common/test_serial.cpp, factory de dispositivos, config_cbor y CMake/tests.
+- Atsm.Plugins: IInstrumentCommandPlugin opcional, catalogo/parametros/etiquetas/construccion. OrderDownload adoptado por Standard/ARCHITECT/U-WAM; no ordenes inventadas de estado/mantenimiento para perfiles propietarios.
+- Astm.Runtime: comando por la cola LIS01 existente; cancelacion antes de encolar, sin lectores ni escrituras paralelos.
+- Atsm.Testing: payloads con framing declarado por perfil.
+- Diagnostics.Core: escenarios, banco PortGate, targets COM/TCP/PortGate y callback de comandos.
+- Diagnostics.Maui: conexiones y acciones del plugin, boton Probar PortGate y self-test del banco nativo.
+- CLI: test-portgate, plan de bytes/tiempo minimo y limite global con salida 124; NativeAOT con agente incluido.
+- Documentacion: PRUEBAS-SERIE, TRANSPORTE, ESTADO/CONTINUACION, README de entrega.
+
+Verificacion:
+- .NET: 412 total, 411 correctas/una omitida por traza privada no seleccionada, repetidas 5/3/3 s. TRX en artifacts/testresults/transport.
+- Nativo: 746 comprobaciones correctas, repetidas; CTest 6,06 s. Prueba de 7 bits/paridad/parada/300 baudios en ambos sentidos y cierre durante escritura.
+- Lang real: 1/1, 191 ms.
+- GUI autonoma/ReadyToRun y CLI NativeAOT: 0.2.0+d6f101d0e1d4fa290c92aa6854d0ea51d7cb696a. Self-tests y auditoria de referencias correctos. GUI self-test ejecuta el banco sintetico real.
+- NativeAOT + PortGate incluido: UF-5000, tres mensajes/9600 baudios, una orden/44 observaciones/dos consultas-respuestas/63 frames confirmados, 00:00:11.656.
+- NativeAOT + PortGate incluido: AMS, tres mensajes/115200 baudios de ensayo, una orden/252 observaciones/276 frames confirmados, 00:00:37.268.
+- Ambos perfiles dentro de presupuestos; cancelacion global salida 124 y cero procesos hijos nuevos restantes. AMS a 9600 excedio el limite global original de 60 s; el volumen y tiempo minimo ahora se informan, sin alterar timers de protocolo. GUI dimensiona el limite global con el payload.
+- EDC: cinco pruebas correctas repetidas, 17/12 s, contra paquetes propios 0.2.0 firmados; fuente d6f101d registrada en diez nuspec.
+
+Firmas/limites: 21 ensamblados propios con token 066190A23251F202. Cinco CS8002 conocidas de MAUI oficial sin Strong Name, visibles. Authenticode propio y firma NuGet pendientes. System.IO.Ports original Microsoft: Authenticode valido; copia ReadyToRun publicada: token cc7b13ffcd2ddd51, cabecera nativa administrada de 196 bytes, sin Authenticode. No se cambia confianza ni admision. La intermitencia previa de diagnostico/cierre TLS sigue documentada; no se modificaron sus tests ni timeouts.
+El ACK acredita enlace, no ejecucion clinica. No conformidad fisica ni nuevos comandos sin manual. EDC mantiene pendientes Scheduler/reconexion, SQLCipher y monitor integrado en P-13; #205 abierto/En progreso.
+
+Salidas directas:
+dotnet/tools/Atsm.Diagnostics.Maui/bin/Release/atsm-diagnostics.exe
+dotnet/tools/Atsm.Tools.Trace/bin/Release/Native/atsm-trace.exe
+Sin push ni PR. Changelog registrado en commit documental posterior al funcional.
