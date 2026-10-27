@@ -1,5 +1,7 @@
 # Interfaz de comunicación
 
+> **Actualización 2026-10-26:** el contrato `IInstrumentChannel` y `Atsm.Channels` se retiraron. ATSM recibe el transporte final como un `Stream` abierto por el anfitrión; los plugins declaran `TransportKnowledge`; `Atsm.Transport` y `PortGate.Client` son opcionales. Ver [TRANSPORTE](TRANSPORTE.md). Lo que sigue se conserva como antecedente de diseño.
+
 Estado: propuesta. Concreta la capa de transporte descrita en [ARQUITECTURA](ARQUITECTURA.md) y la semántica de arbitraje de [CONTRATOS](CONTRATOS.md). Aquí se fija **qué canales existen, cómo se ve el canal desde el motor y cómo viaja todo por la red**.
 
 ## Objetivo

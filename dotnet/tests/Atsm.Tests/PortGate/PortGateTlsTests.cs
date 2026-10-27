@@ -3,11 +3,10 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using Atsm.Abstractions.Channels;
-using Atsm.Channels;
-using Atsm.Channels.SerialTunnel;
+using Atsm.Transport;
+using PortGate.Client;
 
-namespace Atsm.Tests.SerialTunnel;
+namespace Atsm.Tests.PortGate;
 
 public class PortGateTlsTests
 {
@@ -31,21 +30,20 @@ public class PortGateTlsTests
         await using var agent = await StartTlsAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port, pki);
         using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
 
-        await using var channel = await SerialTunnelChannel.ConnectAsync("tls", pki.Endpoint(agent.Port, pki.Controller), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None);
-        var lease = await channel.AcquireAsync(new ControlRequest("edc-test"), CancellationToken.None);
-        await channel.ConfirmTransferAsync(lease, lease.TransferId, CancellationToken.None);
+        await using var channel = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Controller), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await channel.AcquireAsync();
+        var stream = channel.Stream!;
         await Task.Delay(200);
 
-        var write = await channel.WriteAsync(new byte[] { 0x05, 0x00, 0xFF }, lease, CancellationToken.None);
+        await stream.WriteAsync(new byte[] { 0x05, 0x00, 0xFF });  // throws unless the agent completed the write
         var received = new byte[3];
         await instrument.GetStream().ReadExactlyAsync(received).AsTask().WaitAsync(Timeout);
         await instrument.GetStream().WriteAsync(new byte[] { 0x06 });
         var reply = new byte[1];
-        var read = await channel.ReadAsync(reply, CancellationToken.None).AsTask().WaitAsync(Timeout);
+        var read = await stream.ReadAsync(reply).AsTask().WaitAsync(Timeout);
 
-        Assert.Equal(WriteProgress.Completed, write.Progress);
         Assert.Equal(new byte[] { 0x05, 0x00, 0xFF }, received);
-        Assert.Equal((1, (byte)0x06), (read.Count, reply[0]));
+        Assert.Equal((1, (byte)0x06), (read, reply[0]));
     }
 
     [PortGateFact]
@@ -57,7 +55,7 @@ public class PortGateTlsTests
         await using var agent = await StartTlsAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port, pki);
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            SerialTunnelChannel.ConnectAsync("tls", pki.Endpoint(agent.Port, clientCertificate: null), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None));
+            PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, clientCertificate: null), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None));
     }
 
     [PortGateFact]
@@ -69,7 +67,7 @@ public class PortGateTlsTests
         await using var agent = await StartTlsAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port, pki);
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            SerialTunnelChannel.ConnectAsync("plain", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-test", "architect-port") { HandshakeTimeout = TimeSpan.FromSeconds(5) }, CancellationToken.None));
+            PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port") { HandshakeTimeout = TimeSpan.FromSeconds(5) }, CancellationToken.None));
     }
 
     [PortGateFact]
@@ -82,9 +80,9 @@ public class PortGateTlsTests
         await using var agent = await StartTlsAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port, pki);
 
         // The host trusts another CA: the handshake must fail on the host side.
-        var endpoint = pki.Endpoint(agent.Port, pki.Controller) with { CertificateValidation = other.Validator };
+        var endpoint = pki.Endpoint(agent.Port, pki.Controller) with { Tls = pki.Endpoint(agent.Port, pki.Controller).Tls! with { CertificateValidation = other.Validator } };
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            SerialTunnelChannel.ConnectAsync("tls", endpoint, new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None));
+            PortGateChannel.ConnectAsync(endpoint, new PortGateOptions("edc-test", "architect-port"), CancellationToken.None));
     }
 
     [PortGateFact]
@@ -96,14 +94,14 @@ public class PortGateTlsTests
         await using var agent = await StartTlsAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port, pki, backupCertificateSha256: Convert.ToHexStringLower(SHA256.HashData(pki.Backup.RawData)));
 
         // A valid certificate (same CA) whose CN is not the controller it claims to be.
-        await using var intruder = await SerialTunnelChannel.ConnectAsync("tls", pki.Endpoint(agent.Port, pki.Intruder), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None);
-        var refused = await Assert.ThrowsAsync<IOException>(() => intruder.AcquireAsync(new ControlRequest("edc-test"), CancellationToken.None).AsTask().WaitAsync(Timeout));
+        await using var intruder = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Intruder), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        var refused = await Assert.ThrowsAsync<IOException>(() => intruder.AcquireAsync().WaitAsync(Timeout));
         Assert.Contains("PORTGATE-IDENTITY-MISMATCH", refused.Message);
 
         // A certificate pinned by its SHA-256 for edc-backup is accepted even though its CN differs.
-        await using var backup = await SerialTunnelChannel.ConnectAsync("tls", pki.Endpoint(agent.Port, pki.Backup), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None);
-        var lease = await backup.AcquireAsync(new ControlRequest("edc-backup"), CancellationToken.None).AsTask().WaitAsync(Timeout);
-        Assert.Equal("edc-backup", lease.ControllerId);
+        await using var backup = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Backup), new PortGateOptions("edc-backup", "architect-port"), CancellationToken.None);
+        var lease = await backup.AcquireAsync().WaitAsync(Timeout);
+        Assert.True(lease.Generation > 0);
     }
 
     [PortGateFact]
@@ -148,41 +146,41 @@ public class PortGateTlsTests
         await agent.ConfigureAsync(configuration, pki.ProvisionAsync, tls: true);
         using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
 
-        await using var owner = await SerialTunnelChannel.ConnectAsync("owner", pki.Endpoint(agent.Port, pki.Controller), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None);
-        await using var killer = await SerialTunnelChannel.ConnectAsync("killer", pki.Endpoint(agent.Port, pki.Backup), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None);
-        await using var observer = await SerialTunnelChannel.ConnectAsync("observer", pki.Endpoint(agent.Port, pki.Intruder), new SerialTunnelOptions("intruder", "architect-port"), CancellationToken.None);
-        var lease = await owner.AcquireAsync(new ControlRequest("edc-test"), CancellationToken.None);
+        await using var owner = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Controller), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await using var killer = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Backup), new PortGateOptions("edc-backup", "architect-port"), CancellationToken.None);
+        await using var observer = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Intruder), new PortGateOptions("intruder", "architect-port"), CancellationToken.None);
+        var lease = await owner.AcquireAsync();
         using var observing = new CancellationTokenSource(Timeout);
         var observed = observer.SecurityEventsAsync(observing.Token).GetAsyncEnumerator(observing.Token);
 
         // An observer without the right cannot cut; the killer can, and the owner learns why.
-        Assert.Equal("PORTGATE-KILL-NOT-ALLOWED", (await Assert.ThrowsAsync<SerialTunnelException>(() => observer.KillSwitchAsync("not mine", CancellationToken.None))).Code);
+        Assert.Equal("PORTGATE-KILL-NOT-ALLOWED", (await Assert.ThrowsAsync<PortGateException>(() => observer.KillSwitchAsync("not mine", CancellationToken.None))).Code);
         var killId = await killer.KillSwitchAsync("maintenance test", CancellationToken.None).WaitAsync(Timeout);
         Assert.True(killId > 0);
-        await WaitForEventAsync(owner, ChannelEventKind.OwnershipRevoked, "PORTGATE-KILLED");
+        await WaitForEventAsync(owner, PortGateEventKind.Revoked, "PORTGATE-KILLED");
         Assert.True(await observed.MoveNextAsync());
         Assert.Equal(("kill-switch", "edc-backup", "edc-test", lease.Generation), (observed.Current.Kind, observed.Current.Actor, observed.Current.Target, observed.Current.Generation));
         Assert.NotNull(observed.Current.Until);
 
         // Contest with secure close: the killer is dropped and blocked, the port is closed for everyone.
         Assert.True(await observer.ContestAsync(killId, "no maintenance window", secureClose: true, CancellationToken.None).WaitAsync(Timeout) > 0);
-        await WaitForEventAsync(killer, ChannelEventKind.Closed, null);
-        await using (var again = await SerialTunnelChannel.ConnectAsync("again", pki.Endpoint(agent.Port, pki.Backup), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None))
+        await WaitForEventAsync(killer, PortGateEventKind.Closed, null);
+        await using (var again = await PortGateChannel.ConnectAsync(pki.Endpoint(agent.Port, pki.Backup), new PortGateOptions("edc-backup", "architect-port"), CancellationToken.None))
         {
-            var blocked = await Assert.ThrowsAnyAsync<Exception>(() => again.AcquireAsync(new ControlRequest("edc-backup"), CancellationToken.None).AsTask().WaitAsync(Timeout));
+            var blocked = await Assert.ThrowsAnyAsync<Exception>(() => again.AcquireAsync().WaitAsync(Timeout));
             Assert.Contains("PORTGATE-CONTROLLER-BLOCKED", blocked.Message);
         }
-        Assert.Equal("PORTGATE-SECURE-CLOSED", (await Assert.ThrowsAsync<SerialTunnelException>(() => owner.AcquireAsync(new ControlRequest("edc-test"), CancellationToken.None).AsTask().WaitAsync(Timeout))).Code);
+        Assert.Equal("PORTGATE-SECURE-CLOSED", (await Assert.ThrowsAsync<PortGateException>(() => owner.AcquireAsync().WaitAsync(Timeout))).Code);
 
         await using var admin = await agent.AdminAsync(tls: true);
         await admin.ReopenPortAsync("architect-port");
-        var reopened = await owner.AcquireAsync(new ControlRequest("edc-test"), CancellationToken.None).AsTask().WaitAsync(Timeout);
+        var reopened = await owner.AcquireAsync().WaitAsync(Timeout);
         Assert.True(reopened.Generation > lease.Generation);
         var kinds = (await admin.ReadEventsAsync()).Select(e => e.Kind).ToList();
         Assert.Equal(["kill-switch-denied", "kill-switch", "contest", "secure-close", "reopen"], kinds.Where(k => k is "kill-switch-denied" or "kill-switch" or "contest" or "secure-close" or "reopen"));
     }
 
-    private static async Task WaitForEventAsync(SerialTunnelChannel channel, ChannelEventKind kind, string? code)
+    private static async Task WaitForEventAsync(PortGateChannel channel, PortGateEventKind kind, string? code)
     {
         using var timeout = new CancellationTokenSource(Timeout);
         await foreach (var item in channel.EventsAsync(timeout.Token))
@@ -238,11 +236,14 @@ public class PortGateTlsTests
         public Task ProvisionAsync(PortGateAdminClient admin) => admin.SetTlsAsync(false,
             File.ReadAllText(Path.Combine(Directory, "agent.pem")), File.ReadAllText(Path.Combine(Directory, "agent.key")), File.ReadAllText(Path.Combine(Directory, "ca.pem")));
 
-        public TcpEndpointOptions Endpoint(int port, X509Certificate2? clientCertificate) => new("127.0.0.1", port, TlsMode.Tls)
+        public TcpEndpoint Endpoint(int port, X509Certificate2? clientCertificate) => new("127.0.0.1", port)
         {
-            TargetHost = "localhost",
-            ClientCertificates = clientCertificate is null ? null : [clientCertificate],
-            CertificateValidation = Validator,
+            Tls = new TlsOptions
+            {
+                TargetHost = "localhost",
+                ClientCertificates = clientCertificate is null ? null : [clientCertificate],
+                CertificateValidation = Validator,
+            },
             ConnectTimeout = TimeSpan.FromSeconds(10),
         };
 

@@ -2,6 +2,8 @@
   <PropertyGroup><Description>Independent diagnostic host: bundled catalog, analysis and protected-case contracts.</Description></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
+    <ProjectReference Include="..\..\src\Atsm.Transport\Atsm.Transport.csproj" />
+    <ProjectReference Include="..\..\src\PortGate.Client\PortGate.Client.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.CellDynRuby\Atsm.Plugin.Abbott.CellDynRuby.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Urinalysis\Atsm.Plugin.Sysmex.Urinalysis.csproj" />

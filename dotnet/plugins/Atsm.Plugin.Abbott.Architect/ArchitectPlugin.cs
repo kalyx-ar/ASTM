@@ -1,5 +1,4 @@
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
 using Atsm.Protocol.Lis02;
@@ -49,13 +48,19 @@ public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = n
             CodePage850.Value,
             new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
             QueryAnswerBudget: TimeSpan.FromSeconds(10),
-            RequiredOwnership: OwnershipEnforcement.Advisory,
             Evidence:
             [
                 "Abbott 91407-108 (2012) §1 Data Link Layer: frames of 247 characters, six retransmissions, timers 15/20/30 s",
                 "Abbott 91407-108 §4: 15 s between establishment attempts; EOT reply treated as ACK by the instrument",
                 "Abbott 91407-108 §4 Table 4.1: code page subset of MS-DOS 850",
-            ]),
+            ])
+        {
+            // 91407-108 §1 Physical Layer: every ASI instrument supports and defaults to 9600 baud with eight data bits; other rates depend on the model.
+            Transport = new(Atsm.Abstractions.Transport.TransportDirection.Bidirectional, ["Abbott 91407-108 (2012) §1 Physical Layer: Speed, Figure 1.13 character structure"])
+            {
+                Serial = new(new Atsm.Abstractions.Transport.SerialSettings(9600), [9600]),
+            },
+        },
     ];
 
     public PluginDescriptor Describe() => new(

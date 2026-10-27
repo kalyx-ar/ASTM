@@ -5,11 +5,11 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using Atsm.Abstractions.Channels;
+using Atsm.Abstractions.Transport;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
-using Atsm.Channels;
-using Atsm.Channels.SerialTunnel;
+using Atsm.Transport;
+using PortGate.Client;
 using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Plugin.Sysmex.Urinalysis;
 using Atsm.Runtime.Tracing;
@@ -274,7 +274,7 @@ public sealed class MainPage : ContentPage
             var transport = _transport.SelectedIndex; var simulate = _mode.SelectedIndex == 1; var tls = _tls.IsChecked;
             if (_certificateBytes is not null) certificate = X509CertificateLoader.LoadPkcs12(_certificateBytes, _password.Text, X509KeyStorageFlags.EphemeralKeySet);
             if (tls && transport == 1 && certificate is null) throw new ArgumentException(T("Validation.Certificate"));
-            var endpoint = new TcpEndpointOptions(host, port, tls ? TlsMode.Tls : TlsMode.Plain) { ClientCertificates = certificate is null ? null : new X509CertificateCollection { certificate }, ServerCertificate = certificate };
+            var tlsOptions = tls ? new TlsOptions { ClientCertificates = certificate is null ? null : new X509CertificateCollection { certificate }, ServerCertificate = certificate } : null;
             var destination = await _platform.PickCaseDestinationAsync(); if (destination is null) return;
             var header = new TraceHeader(Guid.CreateVersion7(), transport == 2 ? "SerialTunnel" : "TCP", "diagnostic", selected.Id, DateTimeOffset.UtcNow,
                 new Dictionary<string, string> { ["protocol"] = selected.Protocol, ["mode"] = simulate ? "diagnostic-host" : "capture-no-responses", ["protection"] = "Windows DPAPI CurrentUser" });
@@ -283,17 +283,18 @@ public sealed class MainPage : ContentPage
             _status.Text = T("Live.Opening"); var token = _liveStop.Token;
             await Task.Run(() => LiveDiagnostic.RunAsync(selected, timing, _capture, async stop =>
             {
-                IInstrumentChannel channel;
-                if (transport == 2) channel = await SerialTunnelChannel.ConnectAsync("maintenance", endpoint, new(controller, agentPort), stop);
-                else if (transport == 1)
+                // The same router hands a local endpoint or a port behind PortGate to the session.
+                var router = new TransportRouter([new LocalTransportProvider(), new PortGateTransportProvider()]);
+                TransportTarget target = transport switch
                 {
-                    var listener = new TcpListener(IPAddress.Parse(host), port); listener.Start();
-                    try { channel = await TcpNativeChannel.AcceptAsync("maintenance", listener, endpoint, "diagnostic", stop); } finally { listener.Stop(); }
-                }
-                else channel = await TcpNativeChannel.ConnectAsync("maintenance", endpoint, "diagnostic", stop);
+                    2 => new PortGateTarget("maintenance", new TcpEndpoint(host, port) { Tls = tlsOptions }, agentPort, controller),
+                    1 => new TcpListenTarget("maintenance", new IPEndPoint(IPAddress.Parse(host), port)) { Tls = tlsOptions },
+                    _ => new TcpClientTarget("maintenance", new TcpEndpoint(host, port) { Tls = tlsOptions }),
+                };
+                var stream = await router.OpenAsync(target, stop);
                 Dispatcher.Dispatch(() => _status.Text = simulate ? T("Live.Simulating") : T("Live.Connected"));
-                return channel;
-            }, simulate, controller, token));
+                return stream;
+            }, simulate, token));
             _status.Text = T("Live.Closed");
         }
         catch (OperationCanceledException) { _status.Text = T("Live.Stopped"); }

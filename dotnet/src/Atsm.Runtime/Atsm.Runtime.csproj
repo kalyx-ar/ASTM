@@ -4,7 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Atsm.Plugins\Atsm.Plugins.csproj" />
-    <ProjectReference Include="..\Atsm.Channels\Atsm.Channels.csproj" />
     <ProjectReference Include="..\Atsm.Protocol.Mllp\Atsm.Protocol.Mllp.csproj" />
   </ItemGroup>
 </Project>

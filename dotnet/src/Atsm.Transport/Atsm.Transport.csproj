@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Optional transport helpers for ATSM hosts: local COM (System.IO.Ports), TCP/TLS client and server, and a router that hands the open Stream to ATSM.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Atsm.Abstractions\Atsm.Abstractions.csproj" />
+    <PackageReference Include="System.IO.Ports" />
+  </ItemGroup>
+</Project>

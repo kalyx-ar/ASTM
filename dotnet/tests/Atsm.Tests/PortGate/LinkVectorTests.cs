@@ -1,6 +1,6 @@
-using Atsm.Channels.SerialTunnel;
+using PortGate.Client;
 
-namespace Atsm.Tests.SerialTunnel;
+namespace Atsm.Tests.PortGate;
 
 public class LinkVectorTests
 {

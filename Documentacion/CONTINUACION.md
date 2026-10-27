@@ -53,7 +53,7 @@ Los mismos pasos sirven con `legacy.interface-log` (logs `Documentacion/trazas_e
 | LIS02-A2 / MLLP | `dotnet/src/Atsm.Protocol.Lis02`, `Atsm.Protocol.Mllp` |
 | SDK de plugins, dialecto estándar, adaptador regex de logs | `dotnet/src/Atsm.Plugins` |
 | Sesión ASTM | `dotnet/src/Atsm.Runtime/Sessions/AstmInstrumentSession.cs` |
-| Canales (Stream, TCP, Replay, SerialTunnel) | `dotnet/src/Atsm.Channels` |
+| Transporte opcional y cliente PortGate | `dotnet/src/Atsm.Transport`, `dotnet/src/PortGate.Client` |
 | Trazas real/teórica, pila, métricas, anonimizador | `dotnet/src/Atsm.Tracing`, CLI `dotnet/tools/Atsm.Tools.Trace` |
 | Plugins | `dotnet/plugins/*` (Architect, Ruby, U-WAM, XN-L, CS-2500, Bio-Rad CFX, QWALYS y legacy de pruebas) |
 | Catálogo compartido y anfitrión de mantenimiento | `dotnet/tools/Atsm.Diagnostics.Core` |
@@ -76,7 +76,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-07 | Build Linux / Raspberry Pi | Distro WSL o equipo Linux/ARM |
 | P-08 | Firmware ESP32 | ESP-IDF y hardware con interfaz RS232 |
 | P-09 | Agente: rol cliente TLS, captura protegida y lectura de traza, observadores | Definir custodia/cifrado antes de persistencia sensible |
-| P-10 | Canal LocalSerial .NET | Aprobación del paquete oficial `System.IO.Ports` |
+| P-10 | Resuelto: COM local en `Atsm.Transport` (`System.IO.Ports` aprobado 2026-10-26); falta prueba con hardware | Adaptador USB-serie real |
 | P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
 | P-12 | Robustez del agente | Ninguno |
 | P-13 | Integración con EDC | Proceso de EDC (Issue de decisión, aprobación de paquetes) |
@@ -147,7 +147,7 @@ Crear `PortGate/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae
 
 ### P-10 Canal LocalSerial .NET
 
-Requiere `System.IO.Ports` (paquete oficial de Microsoft que no estaba en la caché). Implementar sobre `StreamInstrumentChannel` con la configuración serial del perfil y registrar la dependencia.
+Resuelto el 2026-10-26: `Atsm.Transport.LocalSerial` abre el COM con los `SerialSettings` del perfil (`TransportKnowledge`) y entrega el `Stream`; el mapeo se prueba sin hardware. Falta la prueba con un adaptador real y, en Linux/macOS, verificar las bibliotecas nativas del paquete. Ver [TRANSPORTE](TRANSPORTE.md).
 
 ### P-11 Confirmación del CELL-DYN Ruby
 

@@ -1,59 +1,38 @@
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Tracing;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis02;
 
 namespace Atsm.Runtime.Sessions;
 
-/// <summary>Consumes message boundaries supplied by the host. No LIS01 handshakes, directory
-/// watchers, file moves or disk buffers. A channel write is not a business acknowledgement.</summary>
-public sealed class WholeMessageInstrumentSession(IInstrumentChannel channel, AstmMessageProcessor processor,
-    AstmProfile profile, ITraceSink trace, string controllerId)
+/// <summary>Consumes complete messages supplied by the host (exports, queues, files it owns). No LIS01 handshakes,
+/// directory watchers, file moves or disk buffers. When the medium can answer, the host passes <c>respond</c>;
+/// otherwise query answers are traced and not transmitted. A transport write is not a business acknowledgement.</summary>
+public sealed class WholeMessageInstrumentSession(AstmMessageProcessor processor, AstmProfile profile, ITraceSink trace)
 {
     public Action<AstmProcessingResult>? Processed { get; init; }
 
-    public async Task RunAsync(CancellationToken token)
+    public async Task RunAsync(IAsyncEnumerable<ReadOnlyMemory<byte>> messages, Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask>? respond,
+        CancellationToken token)
     {
         trace.EnsureReady();
-        if (!channel.Capabilities.MessageBoundaries) throw new InvalidOperationException("ATSM-CH-MESSAGE-BOUNDARIES-REQUIRED");
-        var lease = await channel.AcquireAsync(new(controllerId), token).ConfigureAwait(false);
-        try
+        await foreach (var message in messages.WithCancellation(token).ConfigureAwait(false))
         {
-            var admission = await channel.ConfirmTransferAsync(lease, lease.TransferId, token).ConfigureAwait(false);
-            if (admission.State != TransferAdmissionState.Open) throw new InvalidOperationException("ATSM-CH-TRANSFER-REJECTED");
-            using var message = new MemoryStream();
-            var buffer = new byte[4096];
-            long first = -1, last = -1;
-            while (true)
+            if (message.IsEmpty) continue;
+            if (message.Length > processor.MaxMessageBytes) throw new InvalidDataException("ATSM-MESSAGE-TOO-LARGE");
+            var sequence = trace.Write(TraceDirection.Received, message.Span);
+            var result = await processor.ProcessRecordedAsync(message.ToArray(), new(trace.TraceId, sequence, sequence), Guid.CreateVersion7(), token).ConfigureAwait(false);
+            foreach (var response in result.Responses)
             {
-                var read = await channel.ReadAsync(buffer, token).ConfigureAwait(false);
-                if (read.Count > 0)
+                if (respond is null)
                 {
-                    if (message.Length + read.Count > processor.MaxMessageBytes) throw new InvalidDataException("ATSM-MESSAGE-TOO-LARGE");
-                    last = trace.Write(TraceDirection.Received, buffer.AsSpan(0, read.Count));
-                    if (first < 0) first = last;
-                    message.Write(buffer, 0, read.Count);
+                    trace.Write(TraceDirection.Event, [], SessionCodes.TransmissionSuppressed, $"answer of {response.Count} records not transmitted: receive-only medium");
+                    continue;
                 }
-                if (read.IsMessageBoundary && message.Length > 0)
-                {
-                    var result = await processor.ProcessRecordedAsync(message.ToArray(), new(trace.TraceId, first, last), Guid.CreateVersion7(), token).ConfigureAwait(false);
-                    foreach (var response in result.Responses)
-                    {
-                        var payload = profile.Encoding.GetBytes(Lis02Codec.Serialize(response));
-                        trace.Write(TraceDirection.Transmitted, payload);
-                        var written = await channel.WriteAsync(payload, lease, token).ConfigureAwait(false);
-                        if (written.Progress != WriteProgress.Completed) throw new IOException(SessionCodes.WriteNotCompleted);
-                    }
-                    Processed?.Invoke(result);
-                    message.SetLength(0); first = last = -1;
-                }
-                if (read.EndOfStream)
-                {
-                    if (message.Length > 0) throw new InvalidDataException(SessionCodes.IncompleteTransmission);
-                    return;
-                }
+                var payload = profile.Encoding.GetBytes(Lis02Codec.Serialize(response));
+                trace.Write(TraceDirection.Transmitted, payload);
+                await respond(payload, token).ConfigureAwait(false);
             }
+            Processed?.Invoke(result);
         }
-        finally { await channel.ReleaseAsync(lease, CancellationToken.None).ConfigureAwait(false); }
     }
 }

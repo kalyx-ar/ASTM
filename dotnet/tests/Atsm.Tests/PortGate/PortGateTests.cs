@@ -2,16 +2,17 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using Atsm.Abstractions.Model;
-using Atsm.Channels;
-using Atsm.Channels.SerialTunnel;
+using Atsm.Abstractions.Transport;
 using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugins;
 using Atsm.Runtime.Sessions;
 using Atsm.Runtime.Tracing;
 using Atsm.Testing;
 using Atsm.Tests.Architect;
+using Atsm.Transport;
+using PortGate.Client;
 
-namespace Atsm.Tests.SerialTunnel;
+namespace Atsm.Tests.PortGate;
 
 /// <summary>Runs only when PortGate is built (PortGate/build/*/Release/portgate[.exe]) or PORTGATE_EXE points to it.</summary>
 public sealed class PortGateFactAttribute : FactAttribute
@@ -28,34 +29,31 @@ public class PortGateTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     [PortGateFact]
-    public async Task Instrument_results_and_host_query_cross_PortGate()
+    public async Task Instrument_results_and_host_query_cross_PortGate_as_the_session_transport()
     {
-        // The "serial" device of the agent is a TCP connection to this listener, where the simulator plays the instrument.
+        // The device of the agent is a TCP connection to this listener, where the simulator plays the instrument.
         using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
         instrumentListener.Start();
         await using var agent = await PortGateProcess.StartAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port);
         using var instrumentSocket = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
         await using var simulator = new InstrumentSimulator(instrumentSocket.GetStream(), encoding: new ArchitectPlugin().Profiles[0].Encoding);
 
-        var channel = await SerialTunnelChannel.ConnectAsync("tunnel", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None);
-        Assert.Equal(Atsm.Abstractions.Channels.OwnershipEnforcement.Enforced, channel.Capabilities.Ownership);
-        Assert.Equal("architect-01", channel.Descriptor.InstrumentId);
+        // The host chooses the transport; ATSM only receives the Stream of the held port.
+        var router = new TransportRouter([new LocalTransportProvider(), new PortGateTransportProvider()]);
+        await using var transport = await router.OpenAsync(new PortGateTarget("tunnel", new TcpEndpoint("127.0.0.1", agent.Port), "architect-port", "edc-test"), CancellationToken.None);
 
         var host = new InMemoryLabHost();
         host.OrdersBySpecimen["SID-TUNNEL"] = [new WorkOrder("ORD-T", new SpecimenRef("SID-TUNNEL"), null, [CodeSet.Of(new CodedValue("530", null, ArchitectDialect.VendorSystem))])];
         var plugin = new ArchitectPlugin(new ArchitectDialectOptions { InstrumentTimeZone = TimeZoneInfo.Utc });
         var profile = plugin.Profiles[0];
         var instrument = new InstrumentRef("architect-01");
-        var session = new AstmInstrumentSession(channel, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new AstmSessionOptions("edc-test"));
+        var session = new AstmInstrumentSession(transport, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new());
         using var stop = new CancellationTokenSource();
         var run = session.RunAsync(stop.Token);
-
         try
         {
-            await WaitUntilAsync(() => session.LinkState == Atsm.Protocol.Lis01.Lis01State.Idle && channel.AgentEpoch != Guid.Empty);
-            // Give the agent time to process ConfirmTransfer before the instrument starts talking.
-            await Task.Delay(300);
-
+            await WaitUntilAsync(() => session.LinkState == Atsm.Protocol.Lis01.Lis01State.Idle);
+            await Task.Delay(300);  // ConfirmTransfer reaches the agent before the instrument talks
             var sent = await simulator.SendAsync(ArchitectDialectTests.PatientUpload.Split('\r', StringSplitOptions.RemoveEmptyEntries)).WaitAsync(Timeout);
             Assert.Equal(Atsm.Protocol.Lis01.Lis01SendResult.Delivered, sent.Result);
             await WaitUntilAsync(() => host.Batches.Count == 1);
@@ -69,35 +67,33 @@ public class PortGateTests
         {
             await stop.CancelAsync();
             await run.ContinueWith(_ => { }, TaskScheduler.Default);
-            await channel.DisposeAsync();
         }
     }
 
     [PortGateFact]
-    public async Task Second_controller_is_queued_while_the_first_owns_the_port()
+    public async Task Second_controller_is_queued_and_the_stream_of_a_finished_tenure_cannot_write()
     {
         using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
         instrumentListener.Start();
         await using var agent = await PortGateProcess.StartAsync(((IPEndPoint)instrumentListener.LocalEndpoint).Port);
         using var instrumentSocket = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
 
-        await using var first = await SerialTunnelChannel.ConnectAsync("a", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-test", "architect-port"), CancellationToken.None);
-        await using var second = await SerialTunnelChannel.ConnectAsync("b", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None);
-        var lease = await first.AcquireAsync(new("edc-test"), CancellationToken.None);
-        await first.ConfirmTransferAsync(lease, lease.TransferId, CancellationToken.None);
+        await using var first = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await using var second = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-backup", "architect-port"), CancellationToken.None);
+        Assert.Equal("architect-01", first.Port.InstrumentId);
+        var lease = await first.AcquireAsync();
+        var stream = first.Stream!;
 
-        var waiting = second.AcquireAsync(new("edc-backup"), CancellationToken.None).AsTask();
+        var waiting = second.AcquireAsync();
         await Task.Delay(500);
         Assert.False(waiting.IsCompleted);
 
-        await first.ReleaseAsync(lease, CancellationToken.None);
+        await first.ReleaseAsync();
         var secondLease = await waiting.WaitAsync(Timeout);
         Assert.Equal(lease.Generation + 1, secondLease.Generation);
-        Assert.Equal(lease.AgentEpoch, secondLease.AgentEpoch);
-
-        // The old generation can no longer write, even from its original connection.
-        var stale = await first.WriteAsync(new byte[] { 0x05 }, lease, CancellationToken.None);
-        Assert.Equal(Atsm.Abstractions.Channels.WriteProgress.Rejected, stale.Progress);
+        // The stream of the finished tenure ends and cannot write anymore.
+        Assert.Equal(0, await stream.ReadAsync(new byte[1]));
+        Assert.Equal("PORTGATE-CH-NOT-OWNER", (await Assert.ThrowsAsync<PortGateException>(async () => await stream.WriteAsync(new byte[] { 0x05 }))).Code);
     }
 
     [PortGateFact]
@@ -109,20 +105,81 @@ public class PortGateTests
         using var instrumentSocket = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
 
         PortGateHandoverRequest? asked = null;
-        await using var owner = await SerialTunnelChannel.ConnectAsync("owner", new TcpEndpointOptions("127.0.0.1", agent.Port),
-            new SerialTunnelOptions("edc-test", "architect-port") { HandoverDecision = request => { asked = request; return true; } }, CancellationToken.None);
-        await using var requester = await SerialTunnelChannel.ConnectAsync("requester", new TcpEndpointOptions("127.0.0.1", agent.Port), new SerialTunnelOptions("edc-backup", "architect-port"), CancellationToken.None);
-        var lease = await owner.AcquireAsync(new("edc-test"), CancellationToken.None);
+        await using var owner = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port),
+            new PortGateOptions("edc-test", "architect-port") { HandoverDecision = request => { asked = request; return true; } }, CancellationToken.None);
+        await using var requester = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-backup", "architect-port"), CancellationToken.None);
+        var lease = await owner.AcquireAsync();
 
         // Only a queued controller may ask.
         Assert.Equal(new PortGateHandoverResult(false, "PORTGATE-HANDOVER-NOT-QUEUED"), await requester.RequestHandoverAsync("quality run", CancellationToken.None).WaitAsync(Timeout));
-        var waiting = requester.AcquireAsync(new("edc-backup"), CancellationToken.None).AsTask();
+        var waiting = requester.AcquireAsync();
         await Task.Delay(300);
         var result = await requester.RequestHandoverAsync("quality run", CancellationToken.None).WaitAsync(Timeout);
 
         Assert.True(result.Yielded);
         Assert.Equal(("edc-backup", "quality run"), (asked?.Requester, asked?.Reason));
         Assert.Equal(lease.Generation + 1, (await waiting.WaitAsync(Timeout)).Generation);
+    }
+
+    [PortGateFact]
+    public async Task The_same_serial_settings_are_applied_behind_the_tunnel_or_refused()
+    {
+        // The agent's serial port does not exist on this machine: settings are configuration, independent of the device.
+        await using var agent = await PortGateProcess.LaunchAsync();
+        var configuration = PortGateProcess.Configuration(0) with
+        {
+            Ports = [new PortGatePort("architect-port", "architect-01", PortGateDevice.Serial("COM250"), [new PortGateController("edc-test", 10)])],
+        };
+        await agent.ConfigureAsync(configuration);
+        var required = new SerialSettings(19200, Parity: SerialParity.Even) { Dtr = false };
+        var target = new PortGateTarget("tunnel", new TcpEndpoint("127.0.0.1", agent.Port), "architect-port", "edc-test") { Settings = required };
+
+        // Without administration the client never uses other settings than the ones required.
+        var refused = await Assert.ThrowsAsync<PortGateException>(async () => await new PortGateTransportProvider().OpenAsync(target, CancellationToken.None));
+        Assert.Equal("PORTGATE-CH-SETTINGS-MISMATCH", refused.Code);
+
+        // With administration they are routed to the agent and become effective behind the tunnel.
+        var provider = new PortGateTransportProvider((_, token) => agent.AdminAsync());
+        await using (var stream = await provider.OpenAsync(target, CancellationToken.None))
+            Assert.True(stream.CanWrite);
+        // Applying the configuration restarts the Link endpoint (ephemeral port in this test, fixed in production).
+        await using var admin = await agent.AdminAsync();
+        var linkPort = (int)(ulong)(await admin.GetStatusAsync())[8UL]!;
+        await using var check = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", linkPort), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        Assert.Equal(required, check.Port.Serial);
+        Assert.Equal("serial", check.Port.DeviceKind);
+    }
+
+    [PortGateFact]
+    public async Task Ethernet_instrument_that_connects_reaches_the_host_through_the_tunnel()
+    {
+        int devicePort;
+        using (var probe = new TcpListener(IPAddress.Loopback, 0))
+        {
+            probe.Start();
+            devicePort = ((IPEndPoint)probe.LocalEndpoint).Port;
+        }
+        await using var agent = await PortGateProcess.LaunchAsync();
+        await agent.ConfigureAsync(PortGateProcess.Configuration(0) with
+        {
+            Ports = [new PortGatePort("uwam", "uwam-01", PortGateDevice.TcpListen(devicePort, "127.0.0.1"), [new PortGateController("edc-test", 10)])],
+        });
+        await using var transport = await new PortGateTransportProvider().OpenAsync(
+            new PortGateTarget("tunnel", new TcpEndpoint("127.0.0.1", agent.Port), "uwam", "edc-test"), CancellationToken.None);
+        await Task.Delay(300);
+
+        // The instrument is the TCP client (U-WAM, XN-L, CS-2500 over Ethernet): it connects to the agent, not to the host.
+        using var instrument = new TcpClient();
+        await instrument.ConnectAsync(IPAddress.Loopback, devicePort).WaitAsync(Timeout);
+        await Task.Delay(300);
+        await instrument.GetStream().WriteAsync(new byte[] { 0x05 });
+        var received = new byte[1];
+        Assert.Equal(1, await transport.ReadAsync(received).AsTask().WaitAsync(Timeout));
+        Assert.Equal(0x05, received[0]);
+        await transport.WriteAsync(new byte[] { 0x06 });
+        var answer = new byte[1];
+        await instrument.GetStream().ReadExactlyAsync(answer).AsTask().WaitAsync(Timeout);
+        Assert.Equal(0x06, answer[0]);
     }
 
     [PortGateFact]

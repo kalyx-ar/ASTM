@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
@@ -60,73 +58,83 @@ public class CompleteMessageTests
     }
 
     [Fact]
-    public async Task Boundary_channel_reassembles_fragments_without_LIS01_handshakes()
+    public async Task Host_supplied_messages_are_processed_without_LIS01_handshakes()
     {
         var (processor, profile, host, trace) = Setup();
-        var channel = new SuppliedChannel(profile.Encoding.GetBytes(ArchitectDialectTests.PatientUpload), fragment: 7);
-        var session = new WholeMessageInstrumentSession(channel, processor, profile, trace, "host");
-        await session.RunAsync(CancellationToken.None);
+        var session = new WholeMessageInstrumentSession(processor, profile, trace);
+        await session.RunAsync(Messages(profile.Encoding.GetBytes(ArchitectDialectTests.PatientUpload)), respond: null, CancellationToken.None);
         Assert.Equal(4, Assert.Single(host.Batches).Observations.Count);
-        Assert.Empty(channel.Writes); Assert.Equal(1, channel.Releases);
+        Assert.DoesNotContain(trace.Snapshot(), e => e.Direction == TraceDirection.Transmitted);
     }
 
     [Fact]
-    public async Task End_of_stream_without_boundary_is_not_a_complete_message()
-    {
-        var (processor, profile, host, trace) = Setup();
-        var channel = new SuppliedChannel(profile.Encoding.GetBytes(ArchitectDialectTests.PatientUpload), boundary: false);
-        await Assert.ThrowsAsync<InvalidDataException>(() => new WholeMessageInstrumentSession(channel, processor, profile, trace, "host").RunAsync(CancellationToken.None));
-        Assert.Empty(host.Batches); Assert.Equal(1, channel.Releases);
-    }
-
-    [Fact]
-    public async Task Boundary_channel_query_response_is_unframed_LIS02_content()
+    public async Task Receive_only_medium_traces_the_answer_without_transmitting_it()
     {
         var (processor, profile, _, trace) = Setup();
-        var channel = new SuppliedChannel(profile.Encoding.GetBytes("H|\\^&\rQ|1|^SID-NONE||^^^ALL||||||||O\rL|1\r"), fragment: 5);
-        await new WholeMessageInstrumentSession(channel, processor, profile, trace, "host").RunAsync(CancellationToken.None);
-        var response = profile.Encoding.GetString(Assert.Single(channel.Writes));
+        await new WholeMessageInstrumentSession(processor, profile, trace)
+            .RunAsync(Messages(profile.Encoding.GetBytes("H|\\^&\rQ|1|^SID-NONE||^^^ALL||||||||O\rL|1\r")), respond: null, CancellationToken.None);
+        Assert.Contains(trace.Snapshot(), e => e.Code == SessionCodes.TransmissionSuppressed);
+        Assert.DoesNotContain(trace.Snapshot(), e => e.Direction == TraceDirection.Transmitted);
+    }
+
+    [Fact]
+    public async Task Query_response_is_unframed_LIS02_content()
+    {
+        var (processor, profile, _, trace) = Setup();
+        var writes = new List<byte[]>();
+        await new WholeMessageInstrumentSession(processor, profile, trace).RunAsync(Messages(profile.Encoding.GetBytes("H|\\^&\rQ|1|^SID-NONE||^^^ALL||||||||O\rL|1\r")),
+            (bytes, _) => { writes.Add(bytes.ToArray()); return ValueTask.CompletedTask; }, CancellationToken.None);
+        var response = profile.Encoding.GetString(Assert.Single(writes));
         Assert.StartsWith("H|", response); Assert.EndsWith("L|1\r", response);
         Assert.DoesNotContain('\x06', response); Assert.DoesNotContain('\x02', response);
         Assert.Single(Lis02Codec.Parse(response).Messages);
     }
 
     [Fact]
-    public async Task Trace_readiness_precedes_channel_factory_and_acquisition()
+    public async Task Trace_readiness_precedes_the_transport_factory()
     {
         var trace = new FailingTrace(ready: false);
         var called = false;
         await Assert.ThrowsAsync<IOException>(() => InstrumentCommunicationHost.RunAsync(trace, _ =>
-        { called = true; return ValueTask.FromResult<IInstrumentChannel>(new SuppliedChannel([])); }, (_, _) => Task.CompletedTask));
+        { called = true; return ValueTask.FromResult<Stream>(new SuppliedStream([])); }, (_, _) => Task.CompletedTask));
         Assert.False(called);
-        var channel = new SuppliedChannel([]);
+        var transport = new SuppliedStream([]);
         var plugin = new ArchitectPlugin(); var profile = plugin.Profiles[0]; var instrument = new InstrumentRef("a1");
-        var session = new AstmInstrumentSession(channel, plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
-            new InMemoryLabHost(), instrument, trace, new("host"));
+        var session = new AstmInstrumentSession(transport, plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
+            new InMemoryLabHost(), instrument, trace, new());
         await Assert.ThrowsAsync<IOException>(() => session.RunAsync(CancellationToken.None));
-        Assert.Equal(0, channel.Acquisitions);
+        Assert.Equal(0, transport.Reads);
     }
 
     [Fact]
     public async Task Live_LIS01_trace_failure_propagates_and_prevents_ACK()
     {
         var plugin = new ArchitectPlugin(); var profile = plugin.Profiles[0]; var instrument = new InstrumentRef("a1");
-        var channel = new SuppliedChannel([0x05]);
-        var session = new AstmInstrumentSession(channel, plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
-            new InMemoryLabHost(), instrument, new FailingTrace(ready: true), new("host"));
+        var transport = new SuppliedStream([0x05]);
+        var session = new AstmInstrumentSession(transport, plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
+            new InMemoryLabHost(), instrument, new FailingTrace(ready: true), new());
         await Assert.ThrowsAsync<IOException>(() => session.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2)));
-        Assert.Empty(channel.Writes); Assert.Equal(1, channel.Releases);
+        Assert.Empty(transport.Writes);
     }
 
     [Fact]
-    public async Task Rejected_transfer_releases_the_lease_without_communicating()
+    public async Task Transport_failure_ends_the_session_and_is_reported()
     {
         var plugin = new ArchitectPlugin(); var profile = plugin.Profiles[0]; var instrument = new InstrumentRef("a1");
-        var channel = new SuppliedChannel([0x05], admitted: false);
-        var session = new AstmInstrumentSession(channel, plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
-            new InMemoryLabHost(), instrument, new MemoryTraceSink(), new("host"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => session.RunAsync(CancellationToken.None));
-        Assert.Empty(channel.Writes); Assert.Equal(1, channel.Releases);
+        var trace = new MemoryTraceSink();
+        var session = new AstmInstrumentSession(new SuppliedStream([0x05], failAfterContent: true), plugin.CreateDialect(profile, new(instrument, TimeProvider.System)), profile,
+            new InMemoryLabHost(), instrument, trace, new());
+        await session.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Contains(trace.Snapshot(), e => e.Code == SessionCodes.TransportFailed);
+    }
+
+    private static async IAsyncEnumerable<ReadOnlyMemory<byte>> Messages(params byte[][] messages)
+    {
+        foreach (var message in messages)
+        {
+            await Task.Yield();
+            yield return message;
+        }
     }
 
     private static (AstmMessageProcessor, AstmProfile, InMemoryLabHost, MemoryTraceSink) Setup()
@@ -143,29 +151,38 @@ internal sealed class FailingTrace(bool ready) : TraceSinkBase(Guid.NewGuid(), n
     protected override void Append(TraceEntry entry) => throw new IOException("capture failed");
 }
 
-internal sealed class SuppliedChannel(byte[] content, int fragment = 4096, bool boundary = true, bool admitted = true) : IInstrumentChannel
+/// <summary>Transport with fixed content, recorded writes and an optional failure after the content.</summary>
+internal sealed class SuppliedStream(byte[] content, int fragment = 4096, bool failAfterContent = false) : Stream
 {
     private int _position;
-    public int Acquisitions { get; private set; }
-    public int Releases { get; private set; }
+    public int Reads { get; private set; }
     public List<byte[]> Writes { get; } = [];
-    public ChannelDescriptor Descriptor { get; } = new("supplied", ChannelKind.WholeMessage, "memory://supplied");
-    public ChannelCapabilities Capabilities { get; } = ChannelCapabilities.Stream(OwnershipEnforcement.Advisory) with { MessageBoundaries = true };
-    public ValueTask<ControlLease> AcquireAsync(ControlRequest request, CancellationToken token)
-    { Acquisitions++; return ValueTask.FromResult(new ControlLease("supplied", request.ControllerId, Guid.NewGuid(), 1, 1, Guid.NewGuid(), OwnershipEnforcement.Advisory, DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1))); }
-    public ValueTask<ControlLease> RenewAsync(ControlLease lease, CancellationToken token) => ValueTask.FromResult(lease);
-    public ValueTask<TransferAdmission> ConfirmTransferAsync(ControlLease lease, Guid transferId, CancellationToken token) => ValueTask.FromResult(new TransferAdmission(admitted ? TransferAdmissionState.Open : TransferAdmissionState.Rejected));
-    public ValueTask<ReleaseOutcome> ReleaseAsync(ControlLease lease, CancellationToken token) { Releases++; return ValueTask.FromResult(ReleaseOutcome.Released); }
-    public ValueTask<ReadOutcome> ReadAsync(Memory<byte> buffer, CancellationToken token)
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+    public override long Length => content.Length;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
-        if (_position == content.Length) return ValueTask.FromResult(ReadOutcome.End);
+        Reads++;
+        if (_position == content.Length)
+            return failAfterContent ? ValueTask.FromException<int>(new IOException("connection reset")) : ValueTask.FromResult(0);
         var count = Math.Min(fragment, Math.Min(buffer.Length, content.Length - _position));
         content.AsMemory(_position, count).CopyTo(buffer); _position += count;
-        return ValueTask.FromResult(new ReadOutcome(count, false, boundary && _position == content.Length));
+        return ValueTask.FromResult(count);
     }
-    public ValueTask<WriteOutcome> WriteAsync(ReadOnlyMemory<byte> bytes, ControlLease lease, CancellationToken token)
-    { Writes.Add(bytes.ToArray()); return ValueTask.FromResult(new WriteOutcome(Guid.NewGuid(), bytes.Length, bytes.Length, WriteProgress.Completed)); }
-    public async IAsyncEnumerable<ChannelEvent> EventsAsync([EnumeratorCancellation] CancellationToken token) { await Task.CompletedTask; yield break; }
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> bytes, CancellationToken token = default)
+    {
+        Writes.Add(bytes.ToArray());
+        return ValueTask.CompletedTask;
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+    public override void Write(byte[] buffer, int offset, int count) => Writes.Add(buffer.AsSpan(offset, count).ToArray());
+    public override void Flush() { }
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
 }

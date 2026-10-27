@@ -22,6 +22,21 @@ Registro de cada dependencia externa: origen, versión, licencia, consumidores, 
 
 ESP32: ESP-IDF trae su propia versión de Mbed TLS. El firmware del agente usará la de ESP-IDF; su versión se registrará cuando exista ese build.
 
+## System.IO.Ports 10.0.13 (Atsm.Transport)
+
+| Campo | Valor |
+|---|---|
+| Uso | COM local de `Atsm.Transport` (`LocalSerial`): la biblioteca opcional con la que el anfitrión abre el puerto y entrega el `Stream` a ATSM. El núcleo (`Abstractions`, `Protocol.*`, `Runtime`, `Plugins`) no lo referencia |
+| Versión | 10.0.13 (publicada el 13 de octubre de 2026; se descartó 10.0.14, publicada el día anterior al registro) |
+| Mantenedor / origen | Microsoft, paquete oficial `System.IO.Ports` de nuget.org; fuente en [dotnet/dotnet](https://github.com/dotnet/dotnet) |
+| Licencia | MIT |
+| Transitivas | `runtime.native.System.IO.Ports` 10.0.13 y sus paquetes por RID (`linux-*`, `linux-musl-*`, `linux-bionic-*`, `osx-*`, `maccatalyst-*`, `android-*`), todos de Microsoft con la misma versión y licencia: aportan `libSystem.IO.Ports.Native` para Linux y macOS. En Windows no hay biblioteca nativa |
+| Integridad | `system.io.ports.10.0.13.nupkg` SHA-256 `d3ffe6417b0e1989fa60650f73be49bc76bba410f7a86f7dd5afd096521e1554` |
+| Firma del paquete | `dotnet nuget verify --all`: firma de autor Microsoft Corporation (SHA-256 del certificado `9A1B131B…FEB630`) y de repositorio NuGet.org, ambas válidas |
+| Firma de los ensamblados | `lib/net10.0` y `runtimes/win/lib/net10.0/System.IO.Ports.dll`: Authenticode `Valid` (CN=.NET, Microsoft Corporation), Strong Name token `cc7b13ffcd2ddd51`; SHA-256 `da78e722…fe344` y `2be8a41e…e1e36` |
+| Pendiente | Verificar los binarios nativos de Linux/macOS cuando exista ese build (P-07) |
+| Aprobación | Responsable del proyecto, 26 de octubre de 2026: «Apruebo System.IO.Ports, tener en cuenta que también podría llevarse a Linux o MacOS en un futuro». Desbloquea P-10 |
+
 ## Microsoft (.NET, aprobación implícita)
 
 Las bibliotecas de ejecución .NET usan sólo la BCL de .NET 10: `System.Net.Security` (TLS del host), `System.Text.Json`, `System.Threading.Channels` y `System.Text.Encoding.CodePages`.

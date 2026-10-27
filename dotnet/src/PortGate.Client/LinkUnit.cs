@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace Atsm.Channels.SerialTunnel;
+namespace PortGate.Client;
 
 public enum LinkType : byte
 {

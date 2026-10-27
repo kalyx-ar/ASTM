@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
@@ -31,7 +30,7 @@ public sealed partial class CellDynRubyPlugin : IInstrumentPlugin, IInstrumentHe
             Encoding.Latin1,
             new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
             TimeSpan.FromSeconds(10),
-            OwnershipEnforcement.Advisory,
+           
             [
                 "Trace: the analyzer declares LIS2-A in H.13 and sends each whole message in one frame chain",
                 "Trace: idle link checks as empty transmissions (ENQ, EOT)",

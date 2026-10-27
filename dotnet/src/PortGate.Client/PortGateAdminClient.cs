@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Channels;
 
-namespace Atsm.Channels.SerialTunnel;
+namespace PortGate.Client;
 
 public sealed class PortGateAdminException(string code, string message) : Exception($"{code}: {message}")
 {
@@ -17,10 +17,10 @@ public sealed class PortGateAdminException(string code, string message) : Except
 /// <summary>Serial port reported by <see cref="PortGateAdminClient.ListDevicesAsync"/> with its physical identity.</summary>
 public sealed record PortGateDeviceInfo(string Name, string FriendlyName, string UsbVid, string UsbPid, string UsbSerial, string Location, string InstanceId, bool InUse);
 
-public sealed record PortGateEvent(ulong Id, DateTimeOffset Time, string Kind, string? PortId, string? Actor, string? Target, uint Generation, string? Reason,
+public sealed record PortGateAuditEvent(ulong Id, DateTimeOffset Time, string Kind, string? PortId, string? Actor, string? Target, uint Generation, string? Reason,
     DateTimeOffset? Until, bool Uncertain, string? Detail)
 {
-    internal static PortGateEvent From(SortedDictionary<ulong, object?> map) => new(
+    internal static PortGateAuditEvent From(SortedDictionary<ulong, object?> map) => new(
         map.GetValueOrDefault(0UL) as ulong? ?? 0,
         DateTimeOffset.FromUnixTimeMilliseconds((long)(map.GetValueOrDefault(1UL) as ulong? ?? 0)),
         map.GetValueOrDefault(2UL) as string ?? "",
@@ -46,7 +46,7 @@ public sealed class PortGateAdminClient : IAsyncDisposable
     private readonly Stream _stream;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _replies = new();
-    private readonly Channel<PortGateEvent> _events = Channel.CreateUnbounded<PortGateEvent>();
+    private readonly Channel<PortGateAuditEvent> _events = Channel.CreateUnbounded<PortGateAuditEvent>();
     private readonly CancellationTokenSource _stop = new();
     private Task _readLoop = Task.CompletedTask;
     private long _requestId;
@@ -149,10 +149,10 @@ public sealed class PortGateAdminClient : IAsyncDisposable
             d.GetValueOrDefault(6UL) as string ?? "", d.GetValueOrDefault(7UL) is true)).ToList();
     }
 
-    public async Task<IReadOnlyList<PortGateEvent>> ReadEventsAsync(ulong afterId = 0, int max = 200, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PortGateAuditEvent>> ReadEventsAsync(ulong afterId = 0, int max = 200, CancellationToken cancellationToken = default)
     {
         var body = await RequestAsync(LinkType.ReadEvents, LinkCbor.Map((1, afterId), (2, (ulong)max)), cancellationToken).ConfigureAwait(false);
-        return (body.GetValueOrDefault(0UL) as List<object?> ?? []).OfType<SortedDictionary<ulong, object?>>().Select(PortGateEvent.From).ToList();
+        return (body.GetValueOrDefault(0UL) as List<object?> ?? []).OfType<SortedDictionary<ulong, object?>>().Select(PortGateAuditEvent.From).ToList();
     }
 
     public Task RevokePortAsync(string portId, CancellationToken cancellationToken = default) => RequestAsync(LinkType.RevokePort, LinkCbor.Map((1, portId)), cancellationToken);
@@ -165,7 +165,7 @@ public sealed class PortGateAdminClient : IAsyncDisposable
     public Task RestartAsync(CancellationToken cancellationToken = default) => RequestAsync(LinkType.Restart, [], cancellationToken);
 
     /// <summary>Events pushed by the agent as they are recorded.</summary>
-    public async IAsyncEnumerable<PortGateEvent> EventsAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<PortGateAuditEvent> EventsAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         await foreach (var item in _events.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             yield return item;
@@ -199,6 +199,14 @@ public sealed class PortGateAdminClient : IAsyncDisposable
         {
             await _stream.WriteAsync(LinkUnit.Control(type, 0, fields).Encode(), cancellationToken).ConfigureAwait(false);
             await _stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The agent may have refused this connection and closed it: report its refusal, not the broken pipe.
+            await _readLoop.WaitAsync(TimeSpan.FromSeconds(2)).ContinueWith(_ => { }, TaskScheduler.Default).ConfigureAwait(false);
+            if (_refusal is not null)
+                throw _refusal;
+            throw;
         }
         finally
         {
@@ -252,7 +260,7 @@ public sealed class PortGateAdminClient : IAsyncDisposable
                 pending.TrySetException(_refusal);
         }
         else if (unit.Type == LinkType.AdminEvent)
-            _events.Writer.TryWrite(PortGateEvent.From(map));
+            _events.Writer.TryWrite(PortGateAuditEvent.From(map));
     }
 
     private static async Task<LinkUnit> ReceiveAsync(Stream stream, LinkDecoder decoder, List<LinkUnit> units, LinkType type, CancellationToken cancellationToken)

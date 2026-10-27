@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
@@ -55,8 +54,13 @@ internal sealed partial class UwamInterpreter(IInstrumentKnowledge knowledge) : 
         Encoding.Latin1,
         new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
         budget,
-        OwnershipEnforcement.Advisory,
-        Evidence);
+        Evidence) { Transport = Transport };
+
+    /// <summary>R315168 rev. 22 §5.1.1 and Appendix A: only TCP/IP; the host is the server and U-WAM the client, port 6001 by default (two ports possible).</summary>
+    private static readonly Atsm.Abstractions.Transport.TransportKnowledge Transport = new(Atsm.Abstractions.Transport.TransportDirection.Bidirectional, ["Sysmex R315168 U-WAM Host Interface Specifications rev. 22 §5.1.1 and Appendix A"])
+    {
+        Network = new(Atsm.Abstractions.Transport.NetworkRole.InstrumentIsClient, 6001),
+    };
 }
 
 /// <summary>

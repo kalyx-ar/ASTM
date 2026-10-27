@@ -1,5 +1,4 @@
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Model;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
@@ -12,10 +11,16 @@ public sealed partial class XnLPlugin : IInstrumentPlugin, IInstrumentHeaderProb
     // 1273-MKT rev.3, pp.34-38: H.5.1 carries the sender model.
     public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().ToUpperInvariant() is "XN-350" or "XN-450" or "XN-550";
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.xnl.astm02.results", "1.1.0", Lis01Options.Default,
-        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
+        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero,
         ["Sysmex XN-L LIS Interface Implementation Guide 1273-MKT rev.3 (2020), §7/8: ASTM1381-02/1394-97; R.3 parameter in component 5, dilution 6, R.9 instrument judgement, R.13 analysis time.",
          "§5/p.14 and pp.37-38: O.12=Q; QC-Lot Number or QC file identifier; no lot/level inferred from file numbers or XbarM identifiers.",
-         "CLSI LIS01-A2 defaults for the declared link; non-ASCII encoding and device-specific timer changes are unconfirmed. Receive-only, no hardware qualification."])];
+         "CLSI LIS01-A2 defaults for the declared link; non-ASCII encoding and device-specific timer changes are unconfirmed. Receive-only, no hardware qualification."]) { Transport = Transport }];
+
+    /// <summary>XN-L LIS Interface Implementation Guide rev. 3, XN-L-IPU Settings for TCP/IP: the LIS must be the server and the XN-L the client; the port is supplied by the LIS vendor.</summary>
+    private static readonly Atsm.Abstractions.Transport.TransportKnowledge Transport = new(Atsm.Abstractions.Transport.TransportDirection.Bidirectional, ["XN-L LIS Interface Implementation Guide rev. 3, XN-L-IPU Settings for TCP/IP"])
+    {
+        Network = new(Atsm.Abstractions.Transport.NetworkRole.InstrumentIsClient),
+    };
     public PluginDescriptor Describe() => new("sysmex.xnl", "0.1.0", PluginApi.Version, "Sysmex", ["XN-L series (XN-350/450/550 interface profile)"], Profiles[0].Evidence);
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => profile.Id == Profiles[0].Id ? new XnLDialect(context) : throw new ArgumentException("Unknown profile.", nameof(profile));
 }

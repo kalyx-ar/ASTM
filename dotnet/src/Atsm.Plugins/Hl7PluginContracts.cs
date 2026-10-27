@@ -11,6 +11,9 @@ public sealed record Hl7Profile(string Id, string Version, Encoding Encoding, Ti
 {
     public string Hl7Version { get; init; } = "2.5.1";
     public string CharacterSet { get; init; } = "UNICODE UTF-8";
+
+    /// <summary>Theoretical transport of the instrument (network role, port, MLLP) with its evidence.</summary>
+    public Atsm.Abstractions.Transport.TransportKnowledge? Transport { get; init; }
 }
 
 public sealed record Hl7Interpretation(IReadOnlyList<InstrumentObservation> Observations, OrderQuery? Query,

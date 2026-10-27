@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>PortGate client: Link (semaphore, handover, kill switch, contest), administration, and an Atsm.Transport provider that hands an ATSM session the Stream of a port behind the tunnel with the same serial settings as a local COM.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Atsm.Transport\Atsm.Transport.csproj" />
+  </ItemGroup>
+</Project>

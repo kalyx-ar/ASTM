@@ -78,7 +78,7 @@ ATSM/
   spec/                  link-v1.cddl, agent-config.schema.json, profile.schema.json, model-v1, trace-v1
   PortGate/                agente C++17 (core, platform/win32|posix|esp32, tls, tools) — CMake
   dotnet/
-    src/                 Atsm.Abstractions, Atsm.Channels, Atsm.Protocol.*, Atsm.Runtime, Atsm.Fhir, Atsm.Testing
+    src/                 Atsm.Abstractions, Atsm.Protocol.*, Atsm.Runtime, Atsm.Transport (opcional), PortGate.Client, Atsm.Testing
     plugins/             Atsm.Plugin.Abbott.Architect, Atsm.Plugin.Abbott.CellDynRuby, Atsm.Plugin.Sysmex.Uwam, …
     tools/               atsm-trace (importar, anonimizar, ver, comparar), atsm-sim (simulador de instrumento)
     tests/

@@ -1,14 +1,13 @@
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
-using Atsm.Channels;
 using Atsm.Plugin.Abbott.Architect;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
 using Atsm.Runtime.Sessions;
 using Atsm.Runtime.Tracing;
 using Atsm.Testing;
+using Atsm.Tracing;
 using Atsm.Tests.Architect;
 
 namespace Atsm.Tests.Runtime;
@@ -110,8 +109,8 @@ public class AstmSessionTests
         var plugin = new ArchitectPlugin(new ArchitectDialectOptions { InstrumentTimeZone = TimeZoneInfo.Utc });
         var profile = plugin.Profiles[0];
         var instrument = new InstrumentRef("architect-01");
-        var replay = new ReplayChannel("replay", entries);
-        var session = new AstmInstrumentSession(replay, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new AstmSessionOptions("replayer") { TransmitHostMessages = false });
+        var replay = new ReplayStream(entries);
+        var session = new AstmInstrumentSession(replay, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, host, instrument, new MemoryTraceSink(), new AstmSessionOptions { TransmitHostMessages = false });
 
         await session.RunAsync(CancellationToken.None).WaitAsync(Timeout);
 
@@ -134,9 +133,9 @@ public class AstmSessionTests
             var plugin = new ArchitectPlugin(new ArchitectDialectOptions { InstrumentTimeZone = TimeZoneInfo.Utc });
             var profile = plugin.Profiles[0] with { QueryAnswerBudget = budget ?? TimeSpan.FromSeconds(5) };
             var instrument = new InstrumentRef("architect-01");
-            var channel = new StreamInstrumentChannel(new ChannelDescriptor("ch-1", ChannelKind.Simulated, "memory://1", "architect-01"), hostSide);
-            Session = new AstmInstrumentSession(channel, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, Host, instrument, Trace,
-                new AstmSessionOptions("test-host") { Diagnostics = d => { lock (Diagnostics) Diagnostics.Add(d); } });
+
+            Session = new AstmInstrumentSession(hostSide, plugin.CreateDialect(profile, new DialectContext(instrument, TimeProvider.System)), profile, Host, instrument, Trace,
+                new AstmSessionOptions { Diagnostics = d => { lock (Diagnostics) Diagnostics.Add(d); } });
             Simulator = new InstrumentSimulator(instrumentSide, encoding: profile.Encoding);
             _run = Session.RunAsync(_stop.Token);
         }

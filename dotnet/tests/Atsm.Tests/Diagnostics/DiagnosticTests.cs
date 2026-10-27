@@ -3,10 +3,8 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
-using Atsm.Channels;
 using Atsm.Diagnostics;
 using Atsm.Plugin.BioRad.Cfx;
 using Atsm.Plugins;
@@ -169,12 +167,12 @@ public class DiagnosticTests
     public async Task Capture_mode_never_sends_protocol_bytes_and_requires_a_ready_store_before_connecting()
     {
         var profile = new DiagnosticCatalog().Resolve("abbott.architect.asi-rs232");
-        var header = Header(profile.Id); var trace = new DiagnosticTraceSink(header); var channel = new SuppliedChannel([5, 4]);
-        await LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<IInstrumentChannel>(channel), false, "test", CancellationToken.None);
-        Assert.Empty(channel.Writes); Assert.Single(trace.Snapshot()); Assert.Equal(1, channel.Releases);
+        var header = Header(profile.Id); var trace = new DiagnosticTraceSink(header); var channel = new SuppliedStream([5, 4]);
+        await LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<Stream>(channel), false, CancellationToken.None);
+        Assert.Empty(channel.Writes); Assert.Single(trace.Snapshot());
         using var buffer = new MemoryStream(); var journal = new ProtectedCaseJournal(buffer, Protector, header); var unavailable = new DiagnosticTraceSink(header, journal); journal.Dispose();
         var connected = false;
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => LiveDiagnostic.RunAsync(profile, Timing, unavailable, _ => { connected = true; return ValueTask.FromResult<IInstrumentChannel>(channel); }, false, "test", CancellationToken.None));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => LiveDiagnostic.RunAsync(profile, Timing, unavailable, _ => { connected = true; return ValueTask.FromResult<Stream>(channel); }, false, CancellationToken.None));
         Assert.False(connected);
     }
 
@@ -199,9 +197,9 @@ public class DiagnosticTests
         var journal = new ProtectedCaseJournal(storage, Protector, header); var trace = new DiagnosticTraceSink(header, journal);
         var (hostSide, instrumentSide) = DuplexStream.CreatePair();
         await using var simulator = new InstrumentSimulator(instrumentSide, encoding: profile.AstmProfile!.Encoding);
-        var channel = new StreamInstrumentChannel(new("maintenance", ChannelKind.Simulated, "memory://diagnostic", "SYN-I"), hostSide);
+        Stream channel = hostSide;
         using var stop = new CancellationTokenSource();
-        var run = LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<IInstrumentChannel>(channel), true, "test", stop.Token);
+        var run = LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<Stream>(channel), true, stop.Token);
         try
         {
             var sent = await simulator.SendAsync("H|\\^&", "P|1", "O|1||2^3^SYN-XNL", "R|1|^^^^WBC^1^^^W|1.19|10*3/uL||L||P||||20261024120000", "L|1").WaitAsync(TimeSpan.FromSeconds(5));

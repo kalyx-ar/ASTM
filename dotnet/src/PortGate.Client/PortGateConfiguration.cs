@@ -1,4 +1,6 @@
-namespace Atsm.Channels.SerialTunnel;
+using Atsm.Abstractions.Transport;
+
+namespace PortGate.Client;
 
 /// <summary>Rights of a controller on a port besides using it (spec/admin-v1.md).</summary>
 [Flags]
@@ -6,27 +8,35 @@ public enum PortGateRights : ulong { None = 0, KillSwitch = 1, Contest = 2 }
 
 public sealed record PortGateController(string Id, int Priority = 0, string? CertificateSha256 = null, PortGateRights Rights = PortGateRights.None);
 
-/// <summary>Serial device (<see cref="Path"/>) or serial-over-TCP endpoint (<see cref="Host"/>, <see cref="TcpPort"/>).</summary>
+/// <summary>
+/// Device of a port: a local serial port of the agent with the same <see cref="SerialSettings"/> a local COM would use,
+/// an Ethernet instrument (or terminal server) the agent connects to, or one that connects to the agent.
+/// </summary>
 public sealed record PortGateDevice
 {
     public string? Path { get; init; }
-    public int BaudRate { get; init; } = 9600;
-    public int DataBits { get; init; } = 8;
-    /// <summary>0 None, 1 Odd, 2 Even, 3 Mark, 4 Space.</summary>
-    public int Parity { get; init; }
-    public int StopBits { get; init; } = 1;
-    /// <summary>0 None, 1 RtsCts, 2 XonXoff.</summary>
-    public int FlowControl { get; init; }
+    public SerialSettings Settings { get; init; } = new();
     public string? Host { get; init; }
     public int TcpPort { get; init; }
+    /// <summary>The instrument connects to the agent (it is a TCP client) on <see cref="Host"/>:<see cref="TcpPort"/>.</summary>
+    public bool Listen { get; init; }
 
-    public static PortGateDevice Serial(string path, int baudRate = 9600) => new() { Path = path, BaudRate = baudRate };
+    public static PortGateDevice Serial(string path, SerialSettings? settings = null) => new() { Path = path, Settings = settings ?? new() };
 
     public static PortGateDevice Tcp(string host, int port) => new() { Host = host, TcpPort = port };
 
-    internal SortedDictionary<ulong, object?> ToMap() => Path is not null
-        ? LinkCbor.Map((0, 0UL), (1, Path), (2, (ulong)BaudRate), (3, (ulong)DataBits), (4, (ulong)Parity), (5, (ulong)StopBits), (6, (ulong)FlowControl))
-        : LinkCbor.Map((0, 1UL), (7, Host ?? throw new InvalidOperationException("Device needs a serial path or a TCP host.")), (8, (ulong)TcpPort));
+    public static PortGateDevice TcpListen(int port, string host = "0.0.0.0") => new() { Host = host, TcpPort = port, Listen = true };
+
+    internal SortedDictionary<ulong, object?> ToMap()
+    {
+        if (Path is not null)
+        {
+            var map = LinkCbor.Map((0, 0UL), (1, Path));
+            PortGateDevices.Apply(map, Settings);
+            return map;
+        }
+        return LinkCbor.Map((0, Listen ? 2UL : 1UL), (7, Host ?? throw new InvalidOperationException("Device needs a serial path or a TCP host.")), (8, (ulong)TcpPort));
+    }
 }
 
 public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDevice Device, IReadOnlyList<PortGateController> Controllers)

@@ -1,5 +1,4 @@
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Model;
 using Atsm.Abstractions.Tracing;
@@ -12,9 +11,15 @@ namespace Atsm.Plugin.Diagast.Qwalys;
 public sealed partial class QwalysPlugin : IInstrumentPlugin
 {
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("diagast.qwalys3.astm.results", "1.0.0", Lis01Options.Default,
-        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
+        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero,
         ["DIAGAST QWALYS 3 Connection Manual, §2.2 E1381-95, §4.5 O.4, §4.6 R.3/R.4.7 and R.9, §4.7 C.3.",
-         "Receive-only ASCII subset; extended encoding is unconfirmed. Native files are append-based and owned by the host; no hardware qualification."])];
+         "Receive-only ASCII subset; extended encoding is unconfirmed. Native files are append-based and owned by the host; no hardware qualification."]) { Transport = SerialTransport }];
+
+    /// <summary>QWALYS 3 Connection Manual §2.2.1: 9600 8N1 by default; 300-38400 baud, parity none/even/odd, 1 or 2 stop bits, 8 data bits.</summary>
+    private static readonly Atsm.Abstractions.Transport.TransportKnowledge SerialTransport = new(Atsm.Abstractions.Transport.TransportDirection.Bidirectional, ["DIAGAST QWALYS 3 Connection Manual §2.2.1 COM link parameters"])
+    {
+        Serial = new(new Atsm.Abstractions.Transport.SerialSettings(9600), [300, 1200, 2400, 4800, 9600, 19200, 38400]),
+    };
     public PluginDescriptor Describe() => new("diagast.qwalys3", "0.1.0", PluginApi.Version, "DIAGAST", ["QWALYS 3"], Profiles[0].Evidence);
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => profile.Id == Profiles[0].Id ? new QwalysDialect(context) : throw new ArgumentException("Unknown profile.", nameof(profile));
 }

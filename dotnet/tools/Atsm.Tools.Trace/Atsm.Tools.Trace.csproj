@@ -13,7 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Atsm.Diagnostics.Core\Atsm.Diagnostics.Core.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Tracing\Atsm.Tracing.csproj" />
-    <ProjectReference Include="..\..\src\Atsm.Channels\Atsm.Channels.csproj" />
     <ProjectReference Include="..\..\src\Atsm.Testing\Atsm.Testing.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Abbott.Architect\Atsm.Plugin.Abbott.Architect.csproj" />
     <ProjectReference Include="..\..\plugins\Atsm.Plugin.Sysmex.Urinalysis\Atsm.Plugin.Sysmex.Urinalysis.csproj" />

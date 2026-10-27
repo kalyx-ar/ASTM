@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
@@ -13,13 +12,14 @@ namespace Atsm.Runtime.Sessions;
 public sealed record Hl7SendOutcome(OrderDeliveryState State, string? AcknowledgementCode = null, string? Code = null);
 
 /// <summary>Original-mode HL7 over MLLP. Message acceptance never proves assay acceptance or
-/// execution. Uncertain sends are reported to the host and are never retried automatically.</summary>
-public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect dialect, Hl7Profile profile,
-    ILabWorkflowHost host, InstrumentRef instrument, ITraceSink trace, string controllerId)
+/// execution. Uncertain sends are reported to the host and are never retried automatically.
+/// The host supplies the open transport; its end or failure ends the session.</summary>
+public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, Hl7Profile profile,
+    ILabWorkflowHost host, InstrumentRef instrument, ITraceSink trace)
 {
     private readonly SemaphoreSlim _send = new(1, 1);
     private readonly ConcurrentDictionary<string, Pending> _pending = new(StringComparer.Ordinal);
-    private ControlLease? _lease;
+    private volatile bool _running;
     private int _started;
     public Action<AtsmDiagnostic>? Diagnostics { get; init; }
     public int MaxMessageBytes { get; init; } = 1024 * 1024;
@@ -28,12 +28,9 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
     {
         trace.EnsureReady();
         if (Interlocked.Exchange(ref _started, 1) != 0) throw new InvalidOperationException("HL7 session already started.");
-        var lease = await channel.AcquireAsync(new(controllerId), token).ConfigureAwait(false);
         try
         {
-            var admission = await channel.ConfirmTransferAsync(lease, lease.TransferId, token).ConfigureAwait(false);
-            if (admission.State != TransferAdmissionState.Open) throw new InvalidOperationException("ATSM-CH-TRANSFER-REJECTED");
-            _lease = lease;
+            _running = true;
             var processor = new Hl7MessageProcessor(dialect, profile, host, instrument, trace, Diagnostics) { MaxMessageBytes = MaxMessageBytes };
             var decoder = new MllpDecoder(MaxMessageBytes);
             var events = new List<MllpEvent>();
@@ -41,13 +38,13 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
             long first = -1;
             while (true)
             {
-                var read = await channel.ReadAsync(buffer, token).ConfigureAwait(false);
+                var count = await transport.ReadAsync(buffer, token).ConfigureAwait(false);
                 long last = -1;
-                if (read.Count > 0)
+                if (count > 0)
                 {
-                    last = trace.Write(TraceDirection.Received, buffer.AsSpan(0, read.Count));
+                    last = trace.Write(TraceDirection.Received, buffer.AsSpan(0, count));
                     if (first < 0) first = last;
-                    events.Clear(); decoder.Feed(buffer.AsSpan(0, read.Count), events);
+                    events.Clear(); decoder.Feed(buffer.AsSpan(0, count), events);
                     foreach (var item in events)
                     {
                         if (item.Kind != MllpEventKind.Message) { Report("ATSM-MLLP-" + item.Kind.ToString().ToUpperInvariant()); continue; }
@@ -74,7 +71,7 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
                     // If a following block is split across reads, retain the earliest supporting entry.
                     if (!decoder.HasIncompleteBlock) first = -1;
                 }
-                if (read.EndOfStream)
+                if (count == 0)
                 {
                     if (decoder.HasIncompleteBlock) throw new InvalidDataException("ATSM-MLLP-INCOMPLETE-BLOCK");
                     return;
@@ -83,9 +80,8 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
         }
         finally
         {
-            _lease = null;
+            _running = false;
             foreach (var waiting in _pending.Values) waiting.Completion.TrySetResult(new(OrderDeliveryState.Uncertain, Code: "ATSM-HL7-CONNECTION-CLOSED"));
-            await channel.ReleaseAsync(lease, CancellationToken.None).ConfigureAwait(false);
         }
     }
 
@@ -93,7 +89,7 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
     {
         var message = dialect.BuildOrders(orders, Guid.CreateVersion7().ToString());
         var waiting = new Pending("ORL", "O34", new(TaskCreationOptions.RunContinuationsAsynchronously));
-        if (_lease is null) throw new InvalidOperationException("ATSM-HL7-SESSION-NOT-RUNNING");
+        if (!_running) throw new InvalidOperationException("ATSM-HL7-SESSION-NOT-RUNNING");
         if (!_pending.TryAdd(message.ControlId, waiting)) throw new InvalidOperationException("ATSM-HL7-DUPLICATE-CONTROL-ID");
         try
         {
@@ -110,13 +106,15 @@ public sealed class Hl7InstrumentSession(IInstrumentChannel channel, IHl7Dialect
         await _send.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            var lease = _lease ?? throw new IOException("ATSM-HL7-CONNECTION-CLOSED");
             var bytes = MllpFraming.Wrap(profile.Encoding.GetBytes(message.Serialize()));
             trace.Write(TraceDirection.Transmitted, bytes);
-            WriteOutcome result;
-            try { result = await channel.WriteAsync(bytes, lease, token).ConfigureAwait(false); }
-            catch (IOException error) { throw new ChannelWriteException(error); }
-            if (result.Progress != WriteProgress.Completed) throw new ChannelWriteException();
+            if (!_running) throw new ChannelWriteException(new IOException("ATSM-HL7-CONNECTION-CLOSED"));
+            try
+            {
+                await transport.WriteAsync(bytes, token).ConfigureAwait(false);
+                await transport.FlushAsync(token).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is IOException or ObjectDisposedException or NotSupportedException) { throw new ChannelWriteException(error); }
         }
         finally { _send.Release(); }
     }

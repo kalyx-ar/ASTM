@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Hosting;
-using Atsm.Channels;
 using Atsm.Protocol.Hl7v2;
 using Atsm.Protocol.Mllp;
 using Atsm.Runtime.Sessions;
@@ -88,19 +86,18 @@ public class Hl7SessionTests
     public async Task Trace_capture_failure_escapes_the_receive_loop()
     {
         var plugin = Hl7Data.Plugin();
-        var channel = new SuppliedChannel(MllpFraming.Wrap(Encoding.UTF8.GetBytes(Hl7Data.Result())));
-        var session = new Hl7InstrumentSession(channel, Hl7Data.Dialect(), plugin.Profiles[0], new ControlledHost(), new("a1"), new FailingTrace(true), "host");
+        var channel = new SuppliedStream(MllpFraming.Wrap(Encoding.UTF8.GetBytes(Hl7Data.Result())));
+        var session = new Hl7InstrumentSession(channel, Hl7Data.Dialect(), plugin.Profiles[0], new ControlledHost(), new("a1"), new FailingTrace(true));
         await Assert.ThrowsAsync<IOException>(() => session.RunAsync(CancellationToken.None));
-        Assert.Empty(channel.Writes); Assert.Equal(1, channel.Releases);
+        Assert.Empty(channel.Writes);
     }
 
     [Fact]
     public async Task Trace_failure_before_outgoing_order_is_not_hidden_as_a_transport_timeout()
     {
         var (local, peer) = DuplexStream.CreatePair();
-        await using var channel = new StreamInstrumentChannel(new("hl7", ChannelKind.Simulated, "memory://hl7"), local);
         using var stop = new CancellationTokenSource();
-        var session = new Hl7InstrumentSession(channel, Hl7Data.Dialect(), Hl7Data.Plugin().Profiles[0], new ControlledHost(), new("a1"), new FailingTrace(true), "host");
+        var session = new Hl7InstrumentSession(local, Hl7Data.Dialect(), Hl7Data.Plugin().Profiles[0], new ControlledHost(), new("a1"), new FailingTrace(true));
         var run = session.RunAsync(stop.Token);
         await Assert.ThrowsAsync<IOException>(() => session.SendOrdersAsync([Hl7Data.Order()]));
         stop.Cancel();
@@ -117,8 +114,7 @@ public class Hl7SessionTests
         public Rig()
         {
             (_local, Peer) = DuplexStream.CreatePair();
-            var channel = new StreamInstrumentChannel(new("hl7", ChannelKind.Simulated, "memory://hl7"), _local);
-            Session = new(channel, Hl7Data.Dialect(), Hl7Data.Plugin().Profiles[0], Host, new("a1"), Trace, "host")
+            Session = new(_local, Hl7Data.Dialect(), Hl7Data.Plugin().Profiles[0], Host, new("a1"), Trace)
             { Diagnostics = d => { Findings.Enqueue(d.Code); if (d.Code == "ATSM-HL7-UNMATCHED-ACK") Unmatched.TrySetResult(); } };
             Run = Session.RunAsync(_stop.Token);
         }

@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 
-namespace Atsm.Channels.SerialTunnel;
+namespace PortGate.Client;
 
 /// <summary>
 /// Deterministic CBOR subset of PortGate Link v1, mirroring PortGate/core/src/cbor.cpp: unsigned and negative integers,

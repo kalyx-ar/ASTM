@@ -1,5 +1,4 @@
 using System.Text;
-using Atsm.Abstractions.Channels;
 using Atsm.Protocol.Lis01;
 
 namespace Atsm.Plugins;
@@ -19,7 +18,7 @@ public sealed partial class StandardAstmPlugin : IInstrumentPlugin
             Encoding.Latin1,
             new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
             TimeSpan.FromSeconds(10),
-            OwnershipEnforcement.Advisory,
+           
             ["CLSI LIS01-A2 default timers", "CLSI LIS02-A2 field positions"]),
     ];
 

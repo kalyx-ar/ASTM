@@ -1,6 +1,5 @@
 using System.Text;
 using Atsm.Abstractions.Model;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Tracing;
 using Atsm.Diagnostics;
 using Atsm.Plugin.Sysmex.Urinalysis;
@@ -160,13 +159,13 @@ public sealed class Uc3500Tests
     {
         var profile = new DiagnosticCatalog().Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         var header = new TraceHeader(Guid.NewGuid(), "synthetic", "test", profile.Id, DateTimeOffset.UnixEpoch);
-        var trace = new DiagnosticTraceSink(header); var channel = new SuppliedChannel(Frame(Result()), fragment: 3);
-        await LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<IInstrumentChannel>(channel), false, "test", CancellationToken.None);
-        Assert.Empty(channel.Writes); Assert.Equal(1, channel.Releases);
+        var trace = new DiagnosticTraceSink(header); var channel = new SuppliedStream(Frame(Result()), fragment: 3);
+        await LiveDiagnostic.RunAsync(profile, Timing, trace, _ => ValueTask.FromResult<Stream>(channel), false, CancellationToken.None);
+        Assert.Empty(channel.Writes);
         Assert.NotEmpty(DiagnosticReader.Analyze(new(header, trace.Snapshot()), profile, Timing).Observations);
         var connected = false;
         await Assert.ThrowsAsync<NotSupportedException>(() => LiveDiagnostic.RunAsync(profile, Timing, trace,
-            _ => { connected = true; return ValueTask.FromResult<IInstrumentChannel>(channel); }, true, "test", CancellationToken.None));
+            _ => { connected = true; return ValueTask.FromResult<Stream>(channel); }, true, CancellationToken.None));
         Assert.False(connected);
     }
 

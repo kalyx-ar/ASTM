@@ -1,5 +1,4 @@
 using System.Threading.Channels;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
@@ -10,7 +9,7 @@ using Atsm.Protocol.Lis02;
 
 namespace Atsm.Runtime.Sessions;
 
-public sealed record AstmSessionOptions(string ControllerId, Lis01Role Role = Lis01Role.Host)
+public sealed record AstmSessionOptions(Lis01Role Role = Lis01Role.Host)
 {
     public int ReadBufferBytes { get; init; } = 4096;
 
@@ -33,18 +32,20 @@ public static class SessionCodes
     public const string HostQueryTimeout = "ATSM-RT-HOST-QUERY-TIMEOUT";
     public const string SendNotDelivered = "ATSM-RT-SEND-NOT-DELIVERED";
     public const string WriteNotCompleted = "ATSM-RT-WRITE-NOT-COMPLETED";
+    public const string TransportFailed = "ATSM-RT-TRANSPORT-FAILED";
     public const string DialectFailed = "ATSM-RT-DIALECT-FAILED";
     public const string TransmissionSuppressed = "ATSM-RT-TRANSMISSION-SUPPRESSED";
 }
 
 /// <summary>
-/// Drives one instrument over ASTM: channel bytes -> LIS01-A2 link -> LIS02-A2 codec -> dialect -> host.
+/// Drives one instrument over ASTM: transport bytes -> LIS01-A2 link -> LIS02-A2 codec -> dialect -> host.
 /// The link runs on a single loop so frame acknowledgements never wait for the host; interpretation and
-/// host calls run on a second, ordered loop.
+/// host calls run on a second, ordered loop. The host supplies the open transport (COM, socket, TLS, PortGate);
+/// its end or failure ends the session.
 /// </summary>
 public sealed class AstmInstrumentSession
 {
-    private readonly IInstrumentChannel _channel;
+    private readonly Stream _transport;
     private readonly IAstmDialect _dialect;
     private readonly AstmProfile _profile;
     private readonly ITraceSink _trace;
@@ -61,7 +62,7 @@ public sealed class AstmInstrumentSession
     private volatile bool _channelEnded;
 
     public AstmInstrumentSession(
-        IInstrumentChannel channel,
+        Stream transport,
         IAstmDialect dialect,
         AstmProfile profile,
         ILabWorkflowHost host,
@@ -70,7 +71,7 @@ public sealed class AstmInstrumentSession
         AstmSessionOptions options,
         TimeProvider? clock = null)
     {
-        _channel = channel;
+        _transport = transport;
         _dialect = dialect;
         _profile = profile;
         _instrument = instrument;
@@ -85,24 +86,12 @@ public sealed class AstmInstrumentSession
 
     public Lis01State LinkState => _link.State;
 
-    /// <summary>Runs until the channel ends or <paramref name="cancellationToken"/> is cancelled.</summary>
+    /// <summary>Runs until the transport ends or <paramref name="cancellationToken"/> is cancelled.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         _trace.EnsureReady();
-        var lease = await _channel.AcquireAsync(new ControlRequest(_options.ControllerId), cancellationToken).ConfigureAwait(false);
-        // A new session starts a fresh conversation: the low-level link begins neutral, so the technical
-        // transfer state is accepted as is. Operation-level recovery is decided by the dialect and the host.
-        try
-        {
-            var admission = await _channel.ConfirmTransferAsync(lease, lease.TransferId, cancellationToken).ConfigureAwait(false);
-            if (admission.State != TransferAdmissionState.Open)
-                throw new InvalidOperationException($"Channel refused the transfer: {admission.Code}");
-        }
-        catch
-        {
-            await _channel.ReleaseAsync(lease, CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
+        // A new session starts a fresh conversation: the low-level link begins neutral. Operation-level recovery is
+        // decided by the dialect and the host, which also owns the transport and its tenure.
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var start = _clock.GetTimestamp();
         using var timer = _clock.CreateTimer(_ => _inputs.Writer.TryWrite(Input.Tick), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -110,7 +99,7 @@ public sealed class AstmInstrumentSession
         var business = Task.Run(() => BusinessLoopAsync(stop.Token), CancellationToken.None);
         try
         {
-            var link = LinkLoopAsync(lease, start, timer, stop.Token);
+            var link = LinkLoopAsync(start, timer, stop.Token);
             var first = await Task.WhenAny(link, reader, business).ConfigureAwait(false);
             if (first.IsFaulted) await first.ConfigureAwait(false);
             await link.ConfigureAwait(false);
@@ -131,7 +120,6 @@ public sealed class AstmInstrumentSession
             finally
             {
                 foreach (var pending in _pendingSends.Values) pending.TrySetCanceled(CancellationToken.None);
-                await _channel.ReleaseAsync(lease, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }
@@ -152,7 +140,7 @@ public sealed class AstmInstrumentSession
         return completion.Task.WaitAsync(cancellationToken);
     }
 
-    private async Task LinkLoopAsync(ControlLease lease, long start, ITimer timer, CancellationToken cancellationToken)
+    private async Task LinkLoopAsync(long start, ITimer timer, CancellationToken cancellationToken)
     {
         var actions = new List<Lis01Action>();
         await foreach (var input in _inputs.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -195,7 +183,7 @@ public sealed class AstmInstrumentSession
             }
 
             foreach (var action in actions)
-                await ExecuteAsync(action, lease, cancellationToken).ConfigureAwait(false);
+                await ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
 
             if (_link.NextDeadline is { } deadline)
             {
@@ -209,15 +197,22 @@ public sealed class AstmInstrumentSession
         }
     }
 
-    private async ValueTask ExecuteAsync(Lis01Action action, ControlLease lease, CancellationToken cancellationToken)
+    private async ValueTask ExecuteAsync(Lis01Action action, CancellationToken cancellationToken)
     {
         switch (action)
         {
             case Lis01Write write:
                 _trace.Write(TraceDirection.Transmitted, write.Bytes);
-                var outcome = await _channel.WriteAsync(write.Bytes, lease, cancellationToken).ConfigureAwait(false);
-                if (outcome.Progress != WriteProgress.Completed)
-                    Report(SessionCodes.WriteNotCompleted, AtsmSeverity.Error, $"{outcome.Progress}: {outcome.Accepted}/{outcome.Requested} bytes ({outcome.Code})");
+                try
+                {
+                    await _transport.WriteAsync(write.Bytes, cancellationToken).ConfigureAwait(false);
+                    await _transport.FlushAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception error) when (error is IOException or ObjectDisposedException or NotSupportedException)
+                {
+                    // The link times out and retransmits or aborts as LIS01 prescribes; the host owns reconnection.
+                    Report(SessionCodes.WriteNotCompleted, AtsmSeverity.Error, $"{write.Bytes.Length} bytes: {error.Message}");
+                }
                 break;
             case Lis01Received received:
                 var trace = new TraceRef(_trace.TraceId, _receptionStart ?? _lastReceivedSequence, _lastReceivedSequence);
@@ -243,14 +238,20 @@ public sealed class AstmInstrumentSession
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var outcome = await _channel.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-                if (outcome.Count > 0)
+                int count;
+                try { count = await _transport.ReadAsync(buffer, cancellationToken).ConfigureAwait(false); }
+                catch (Exception error) when (error is IOException or ObjectDisposedException)
                 {
-                    var data = buffer.AsSpan(0, outcome.Count).ToArray();
+                    Report(SessionCodes.TransportFailed, AtsmSeverity.Warning, error.Message);
+                    break;
+                }
+                if (count > 0)
+                {
+                    var data = buffer.AsSpan(0, count).ToArray();
                     var sequence = _trace.Write(TraceDirection.Received, data);
                     _inputs.Writer.TryWrite(new Input(InputKind.Bytes, data, sequence, null, null));
                 }
-                if (outcome.EndOfStream)
+                if (count == 0)
                     break;
             }
         }

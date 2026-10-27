@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Atsm.Abstractions.Channels;
 using Atsm.Abstractions.Model;
 using Atsm.Plugins;
 using Atsm.Protocol.Lis01;
@@ -14,9 +13,17 @@ public sealed partial class Cs2500Plugin : IInstrumentPlugin, IInstrumentHeaderP
     // Host Interface Specifications rev.2.04, §5.3.3.1: H.5.1 sender name.
     public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().Equals("CS-2500", StringComparison.OrdinalIgnoreCase);
     public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.cs2500.astm02.results", "1.1.0", Lis01Options.Default,
-        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero, OwnershipEnforcement.Advisory,
+        Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero,
         ["Sysmex CS-2500 ASTM Host Interface Specifications for US rev.2.04 (2019), §5.2.2/5.2.5: 15/15/30 s, busy 10 s; §5.3.3.4 O.4, §5.3.3.5 R.3/R.7.",
-         "rev.2.04 p.28/30: QC control identifier QC + name(7) + lot(6), O.12=Q; unknown level remains absent. Receive-only; no E1381-95 mode, orders, external-path dereferencing or hardware qualification."])];
+         "rev.2.04 p.28/30: QC control identifier QC + name(7) + lot(6), O.12=Q; unknown level remains absent. Receive-only; no E1381-95 mode, orders, external-path dereferencing or hardware qualification."]) { Transport = Transport }];
+
+    /// <summary>rev. 2.04 §5.1.1.4 Table 3: 9600 baud conforms to ASTM (600-19200 selectable); Appendix A: over TCP/IP the host is the server and the IPU the client, port 5000 by default.</summary>
+    private static readonly Atsm.Abstractions.Transport.TransportKnowledge Transport = new(Atsm.Abstractions.Transport.TransportDirection.Bidirectional,
+        ["Sysmex CS-2500 ASTM Host Interface Specifications rev. 2.04 §5.1.1.4 Table 3", "rev. 2.04 Appendix A TCP/IP communication"])
+    {
+        Serial = new(new Atsm.Abstractions.Transport.SerialSettings(9600), [600, 1200, 2400, 4800, 9600, 14400, 19200]),
+        Network = new(Atsm.Abstractions.Transport.NetworkRole.InstrumentIsClient, 5000),
+    };
     public PluginDescriptor Describe() => new("sysmex.cs2500", "0.1.0", PluginApi.Version, "Sysmex", ["CS-2500"], Profiles[0].Evidence);
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => profile.Id == Profiles[0].Id ? new Cs2500Dialect(context) : throw new ArgumentException("Unknown profile.", nameof(profile));
 }

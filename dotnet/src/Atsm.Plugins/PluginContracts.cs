@@ -1,5 +1,5 @@
 using System.Text;
-using Atsm.Abstractions.Channels;
+using Atsm.Abstractions.Transport;
 using Atsm.Abstractions.Diagnostics;
 using Atsm.Abstractions.Hosting;
 using Atsm.Abstractions.Model;
@@ -31,10 +31,12 @@ public sealed record AstmProfile(
     Encoding Encoding,
     IReadOnlySet<AstmWorkflow> Workflows,
     TimeSpan QueryAnswerBudget,
-    OwnershipEnforcement RequiredOwnership,
     IReadOnlyList<string> Evidence)
 {
     /// <summary>How the host frames the messages it sends. Most instruments expect one record per ETX-terminated frame chain.</summary>
+    /// <summary>Theoretical transport of the instrument (serial settings, network role) with its evidence; never an open connection.</summary>
+    public TransportKnowledge? Transport { get; init; }
+
     public AstmFraming HostFraming { get; init; } = AstmFraming.FramePerRecord;
 
     /// <summary>How the instrument frames what it sends; used to build theoretical traces that match the device.</summary>
