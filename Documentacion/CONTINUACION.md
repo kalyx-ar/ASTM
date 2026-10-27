@@ -75,7 +75,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | ID | Tema | Bloqueo |
 |---|---|---|
 | P-02 | Parcial: HL7/MLLP y ARCHITECT implementados; completar actor LAW/AWOS y conformidad | Requiere el alcance restante de perfiles/equipo |
-| P-03 | Kits de conformidad por plugin y corpus anonimizado | Revisión humana del corpus antes de publicarlo |
+| P-03 | Kits de conformidad por plugin y corpus anonimizado. Base sintética disponible desde 2026-10-27: analizador rígido/aleatorizado y plugin de prueba (`Astm.Plugin.Testing.Synthetic`, ver PRUEBAS-SERIE) verifican el circuito completo sin datos reales; los kits por fabricante siguen pendientes | Revisión humana del corpus antes de publicarlo |
 | P-04 | Outbox durable del runtime | Ninguno |
 | P-05 | Retirado: catálogo compilado ASTM/Diagnostics (decisión 2026-10-25); carga en caliente sólo EDC | No corresponde implementar ALC en ASTM |
 | P-06 | Build Windows XP | Instalar toolset `v141_xp`; equipo o VM XP |

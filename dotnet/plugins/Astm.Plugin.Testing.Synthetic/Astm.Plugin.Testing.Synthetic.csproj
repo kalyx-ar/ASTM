@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Test-only plugin: synthetic ASTM analyzer (invented menu and values) and its simulated instrument, rigid or randomized, to verify the whole host ↔ instrument circuit. Not part of the neutral engine and never a real device profile.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Astm.Plugins\Astm.Plugins.csproj" />
+    <ProjectReference Include="..\..\src\Astm.Testing\Astm.Testing.csproj" />
+  </ItemGroup>
+</Project>

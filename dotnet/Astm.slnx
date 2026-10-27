@@ -8,6 +8,7 @@
     <Project Path="plugins/Astm.Plugin.Abbott.Architect/Astm.Plugin.Abbott.Architect.csproj" />
     <Project Path="plugins/Astm.Plugin.Abbott.CellDynRuby/Astm.Plugin.Abbott.CellDynRuby.csproj" />
     <Project Path="plugins/Astm.Plugin.Legacy.Testing/Astm.Plugin.Legacy.Testing.csproj" />
+    <Project Path="plugins/Astm.Plugin.Testing.Synthetic/Astm.Plugin.Testing.Synthetic.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Astm.Abstractions/Astm.Abstractions.csproj" />

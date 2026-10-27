@@ -54,6 +54,7 @@ Revisión UF-5000 (2026-10-25): reanálisis de casos antes marcados como incompa
 | Plugin Sysmex U-WAM (LIS2-A2 / E1381-02) y adaptador del monitor de puertos de Sysmex | `dotnet/plugins/Astm.Plugin.Sysmex.Urinalysis` | Mensajes sintéticos según R315168 rev. 22 y trazas reales locales |
 | Plugin Abbott CELL-DYN Ruby (LIS2-A, derivado de trazas) | `dotnet/plugins/Astm.Plugin.Abbott.CellDynRuby` | Mensajes sintéticos con la estructura de las trazas y trazas reales locales |
 | Plugin de pruebas legacy (sólo adaptador de log, fuera del motor neutral) | `dotnet/plugins/Astm.Plugin.Legacy.Testing` | Log sintético y logs reales locales |
+| Analizador ASTM sintético rígido y aleatorizado (sólo pruebas) | `dotnet/plugins/Astm.Plugin.Testing.Synthetic` | Circuito host ↔ sesión ↔ PortGate (COM de prueba) ↔ analizador con libro de resultados; 8 pruebas, ver [PRUEBAS-SERIE](PRUEBAS-SERIE.md#instrumento-simulado-rígido-y-aleatorizado) |
 | Bio-Rad CFX Maestro, CSV/RDML 1.0/1.1 | `dotnet/plugins/Astm.Plugin.BioRad.Cfx` | Exportaciones sintéticas; referencias/exclusiones/Cq original, sin control directo ni homologación de modelos |
 | Sysmex XN-L y CS-2500 | `dotnet/plugins/Astm.Plugin.Sysmex.XnL`, `Astm.Plugin.Sysmex.Cs2500` | Perfiles de recepción según manual; componentes de prueba/muestra y estados crudos; consultas/órdenes sin implementar |
 | DIAGAST QWALYS 3 | `dotnet/plugins/Astm.Plugin.Diagast.Qwalys` | Recepción ASCII, reacción R.4.7, comentarios C.3, soporte/estados preservados; sin homologación en equipo |

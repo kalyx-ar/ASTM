@@ -134,3 +134,4 @@ Architect primero: es el único con manual, trazas abundantes y plugin productiv
 | `biorad.cfx` | `IInstrumentContentPlugin`: cuantificación CSV/RDML 1.0/1.1; recibe contenido, sin archivos/control directo ni clasificación clínica |
 | `sysmex.xnl`, `sysmex.cs2500`, `diagast.qwalys3` | Recepción según manual con pruebas sintéticas; sin consultas/órdenes, hardware o corpus real verificado |
 | `Astm.Plugin.Legacy.Testing` | Sólo pruebas: adaptador `legacy.interface-log` para los logs del LIMS legacy. Un plugin de integración con el sistema legacy (pedidos desde su interfaz o su log) sería un trabajo aparte |
+| `Astm.Plugin.Testing.Synthetic` | Sólo pruebas: analizador ASTM sintético (menú y valores inventados, CLSI LIS01-A2/LIS02-A2 con los tres flujos) y `SimulatedAnalyzer` rígido o aleatorizado con semilla para verificar el circuito completo. Ver [PRUEBAS-SERIE](PRUEBAS-SERIE.md#instrumento-simulado-rígido-y-aleatorizado) |

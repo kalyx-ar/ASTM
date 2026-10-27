@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\Astm.Tracing\Astm.Tracing.csproj" />
     <ProjectReference Include="..\..\plugins\Astm.Plugin.Sysmex.Urinalysis\Astm.Plugin.Sysmex.Urinalysis.csproj" />
     <ProjectReference Include="..\..\plugins\Astm.Plugin.Legacy.Testing\Astm.Plugin.Legacy.Testing.csproj" />
+    <ProjectReference Include="..\..\plugins\Astm.Plugin.Testing.Synthetic\Astm.Plugin.Testing.Synthetic.csproj" />
     <ProjectReference Include="..\..\plugins\Astm.Plugin.Abbott.CellDynRuby\Astm.Plugin.Abbott.CellDynRuby.csproj" />
   </ItemGroup>
 </Project>

@@ -34,6 +34,15 @@ public sealed class InstrumentSimulator : IAsyncDisposable
 
     public List<Lis01Notice> Notices { get; } = [];
 
+    /// <summary>Asked before each frame is written; true sends it once with a wrong checksum, so the host must NAK and the link
+    /// retransmit the correct frame. Never corrupt two writes in a row or the link runs out of retransmissions.</summary>
+    public Func<bool>? FrameFault { get; init; }
+
+    /// <summary>Frames sent with a wrong checksum through <see cref="FrameFault"/>.</summary>
+    public int CorruptedFrames => Volatile.Read(ref _corruptedFrames);
+
+    private int _corruptedFrames;
+
     public Task<Lis01SendCompleted> SendAsync(params string[] records)
         => SendMessagesAsync(records.Select(r => (ReadOnlyMemory<byte>)_encoding.GetBytes(r.EndsWith('\r') ? r : r + "\r")).ToArray());
 
@@ -98,6 +107,12 @@ public sealed class InstrumentSimulator : IAsyncDisposable
                 {
                     switch (action)
                     {
+                        case Lis01Write write when write.Bytes.Length > 6 && write.Bytes[0] == 0x02 && FrameFault?.Invoke() == true:
+                            var corrupted = write.Bytes.ToArray();
+                            corrupted[^3] = corrupted[^3] == (byte)'0' ? (byte)'1' : (byte)'0';
+                            Interlocked.Increment(ref _corruptedFrames);
+                            await _stream.WriteAsync(corrupted, _stop.Token).ConfigureAwait(false);
+                            break;
                         case Lis01Write write:
                             await _stream.WriteAsync(write.Bytes, _stop.Token).ConfigureAwait(false);
                             break;
