@@ -32,6 +32,9 @@ struct AgentState {
     AdminAccess admin;
     TlsMaterial link_tls;
     TlsMaterial admin_tls;
+    /// Key the server provisioned to seal the durable capture (AES-256). Only the current one: the server keeps old keys.
+    std::uint32_t capture_key_id = 0;
+    std::vector<std::uint8_t> capture_key;
 };
 
 class StateStore {

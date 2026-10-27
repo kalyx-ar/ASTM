@@ -36,10 +36,11 @@ CBOR (RFC 8949) with deterministic encoding: definite lengths, shortest integer 
 | 0x20 | SerialData | both | binary, not CBOR: seq u64, offset u64, generation u32, then raw bytes |
 | 0x21 | WriteStatus | agent → host | 0 seq uint, 1 accepted uint, 2 written uint, 3 result uint (0 completed, 1 partial, 2 unknown, 3 rejected), 4 code tstr |
 | 0x22 | PortEvent | agent → host | 0 kind uint (0 opened, 1 closed, 2 faulted, 3 overflow, 4 discontinuity), 1 code tstr, 2 detail tstr |
+| 0x24 | ObservedData | agent → observer | binary, not CBOR: seq u64, offset u64, generation u32, direction u8 (0 instrument → host, 1 host → instrument), then raw bytes |
 | 0x7E | Heartbeat | both | 0 monotonicMs uint |
 | 0x7F | Error | both | 0 code tstr, 1 requestId uint, 2 detail tstr |
 
-`TraceRead`/`TraceChunk` (0x30/0x31) and observers are reserved for later versions. Agents of v1 announce `traceCapture = 0`. Connections opened by the agent toward the server (agent-initiated mode) carry the same units: see spec/admin-v1.md § Agent-initiated connections.
+Observers enable themselves with `Observe`/`ObserveResult` (0x30/0x31, spec/admin-v1.md § Semaphore extensions) and receive `ObservedData`. `traceCapture` is 2 on ports with sealed capture and 0 otherwise; the capture is read through administration (spec/admin-v1.md § Sealed capture). Connections opened by the agent toward the server (agent-initiated mode) carry the same units: see spec/admin-v1.md § Agent-initiated connections.
 
 ## Rules
 

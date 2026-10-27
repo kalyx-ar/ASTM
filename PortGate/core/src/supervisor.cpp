@@ -49,7 +49,8 @@ bool same_device(const std::string& a, const std::string& b) {
 }  // namespace
 
 Supervisor::Supervisor(SupervisorOptions options, Logger logger)
-    : options_(std::move(options)), logger_(std::move(logger)), store_(options_.state_directory), events_(options_.state_directory) {}
+    : options_(std::move(options)), logger_(std::move(logger)), store_(options_.state_directory), events_(options_.state_directory),
+      capture_(options_.state_directory) {}
 
 Supervisor::~Supervisor() { shutdown(); }
 
@@ -85,6 +86,7 @@ bool Supervisor::start(std::string& error) {
         dirty = true;
     }
     if (dirty && !store_.save(state_, error)) return false;
+    if (!state_.capture_key.empty()) capture_.set_key(state_.capture_key_id, state_.capture_key);
     if (!rebuild_admin_tls(error)) return false;
     if (!listener_.open(options_.admin_host, options_.admin_port, error)) return false;
     logger_(LogLevel::Info, "administration on " + options_.admin_host + ":" + std::to_string(listener_.port()) +
@@ -175,6 +177,8 @@ bool Supervisor::rebuild_admin_tls(std::string& error) {
 bool Supervisor::apply(const AgentConfig& config, const TlsMaterial& link_tls, std::string& error) {
     stop_agent();
     auto agent = std::make_shared<Agent>(config, logger_, link_tls, [this](Event event) { return record(std::move(event)); });
+    capture_.configure(config.agent_id, config.ports);
+    agent->set_capture_sink([this](const std::string& port_id, const Value& captured) { capture_.append(port_id, captured); });
     if (!agent->start(error)) {
         link_error_ = error;
         return false;
@@ -458,6 +462,11 @@ void Supervisor::handle(const std::shared_ptr<AdminConnection>& connection, cons
             else refuse(connection, request_id, "PORTGATE-PORT", error);
             break;
         }
+        case link::Type::SetCaptureKey:
+        case link::Type::ReadCapture:
+        case link::Type::AckCapture:
+            capture_request(connection, unit.type, request_id, *map);
+            break;
         case link::Type::UnblockController: {
             std::lock_guard<std::mutex> lock(agent_mutex_);
             if (agent_ && agent_->unblock(text_or(*map, 1), connection->server_id)) reply(connection, request_id, Value::map({}));
@@ -518,6 +527,8 @@ void Supervisor::set_config(const std::shared_ptr<AdminConnection>& connection, 
     // Outbound TLS authenticates the server by its pinned certificate or by the administration PSK: never blindly.
     if (outbound && config->mode.outbound_tls && config->mode.server_certificate_sha256.empty() && !previous.admin_tls.has_psk())
         return refuse(connection, request_id, "PORTGATE-OUTBOUND-IDENTITY", "outbound TLS needs the server certificate fingerprint or an administration PSK");
+    if (std::any_of(config->ports.begin(), config->ports.end(), [](const PortConfig& p) { return p.capture.enabled; }) && previous.capture_key.empty())
+        return refuse(connection, request_id, "PORTGATE-CAPTURE-KEY-MISSING", "send SetCaptureKey before enabling the durable capture");
     // Inbound Link TLS material is irrelevant when the agent opens the connections (it uses its own certificate).
     if (!outbound && config->tls == TlsMode::Tls && !link_tls.has_certificate() && !link_tls.has_psk())
         return refuse(connection, request_id, "PORTGATE-TLS-MATERIAL-MISSING", "send SetTls for the Link endpoint before enabling TLS");
@@ -616,6 +627,66 @@ void Supervisor::set_tls(const std::shared_ptr<AdminConnection>& connection, std
                      (material.has_psk() ? ", psk identity " + material.psk_identity : "");
     record(updated);
     reply(connection, request_id, Value::map({{0, Value::text(fingerprint)}}));
+}
+
+void Supervisor::capture_request(const std::shared_ptr<AdminConnection>& connection, link::Type type, std::uint64_t request_id, const Value& map) {
+    if (type == link::Type::SetCaptureKey) {
+        const Value* key = map.get(2);
+        const auto key_id = static_cast<std::uint32_t>(uint_or(map, 1, 0));
+        if (!connection->transport->encrypted())
+            return refuse(connection, request_id, "PORTGATE-INSECURE-CHANNEL", "the capture key is accepted only over TLS");
+        if (key_id == 0 || !key || !key->as_bytes() || key->as_bytes()->size() != 32)
+            return refuse(connection, request_id, "PORTGATE-BAD-CAPTURE-KEY", "send a key id > 0 and a 32-byte AES-256 key");
+        std::string error;
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            state_.capture_key_id = key_id;
+            state_.capture_key = *key->as_bytes();
+            if (!store_.save(state_, error)) return refuse(connection, request_id, "PORTGATE-STATE-NOT-SAVED", error);
+        }
+        capture_.set_key(key_id, *key->as_bytes());
+        Event event;
+        event.kind = "capture-key";
+        event.actor = connection->server_id;
+        event.detail = "key id " + std::to_string(key_id);  // never the key
+        record(event);
+        return reply(connection, request_id, Value::map({}));
+    }
+    const auto port_id = text_or(map, 1);
+    bool known;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        known = state_.configured && std::any_of(state_.config.ports.begin(), state_.config.ports.end(), [&](const PortConfig& p) { return p.port_id == port_id; });
+    }
+    if (!known) return refuse(connection, request_id, "PORTGATE-PORT", "unknown port " + port_id);
+    if (type == link::Type::AckCapture) {
+        std::string error;
+        if (!capture_.ack(port_id, uint_or(map, 2, 0), error)) return refuse(connection, request_id, "PORTGATE-CAPTURE-ACK", error);
+        Event event;
+        event.kind = "capture-ack";
+        event.port_id = port_id;
+        event.actor = connection->server_id;
+        event.detail = "up to " + std::to_string(uint_or(map, 2, 0));
+        record(event);
+        return reply(connection, request_id, Value::map({}));
+    }
+    // Records leave sealed: the agent never decrypts its capture, the server holds the key.
+    const auto page = capture_.read(port_id, uint_or(map, 2, 0), static_cast<std::size_t>(std::min<std::uint64_t>(uint_or(map, 3, 200), 1000)));
+    std::vector<Value> records;
+    for (const auto& r : page.records)
+        records.push_back(Value::map({{0, Value::uint(r.seq)}, {1, Value::uint(r.key_id)}, {2, Value::uint(r.time_ms)}, {3, Value::bytes(r.nonce)}, {4, Value::bytes(r.sealed)}}));
+    std::vector<Value> gaps;
+    for (const auto& g : page.gaps) gaps.push_back(Value::array({Value::uint(g.from), Value::uint(g.to), Value::text(g.reason)}));
+    std::string agent_id;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        agent_id = state_.config.agent_id;
+    }
+    reply(connection, request_id, Value::map({{0, Value::array(std::move(records))},
+                                              {1, Value::uint(page.first)},
+                                              {2, Value::uint(page.last)},
+                                              {3, Value::array(std::move(gaps))},
+                                              {4, Value::text(agent_id)}}));
 }
 
 Value Supervisor::status_body() {

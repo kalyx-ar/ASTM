@@ -18,7 +18,7 @@ enum class FlowControl { None, RtsCts, XonXoff };
 enum class TlsMode { Plain, Tls };
 
 /// Rights a controller may hold on a port besides using it (bit mask).
-enum ControllerRight : std::uint32_t { RightKillSwitch = 1, RightContest = 2 };
+enum ControllerRight : std::uint32_t { RightKillSwitch = 1, RightContest = 2, RightObserve = 4 };
 
 struct DeviceConfig {
     /// Serial: local port. Tcp: the agent connects to an instrument (or terminal server) that listens. TcpListen: the agent
@@ -53,6 +53,12 @@ struct PortConfig {
     std::map<std::string, std::string> controller_certificates;
     std::map<std::string, std::uint32_t> controller_rights;
     std::size_t max_write_bytes = 16 * 1024;
+    /// Durable capture of the port traffic, sealed with the key the server provisions (spec/admin-v1.md § Capture).
+    struct Capture {
+        bool enabled = false;
+        std::uint64_t max_bytes = 16ull * 1024 * 1024;
+        std::uint64_t retention_ms = 7ull * 24 * 3600 * 1000;
+    } capture;
 };
 
 /// Who opens the connection and who may administer the agent (decided by the server).

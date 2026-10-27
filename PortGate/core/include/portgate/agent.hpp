@@ -26,6 +26,8 @@ enum class LogLevel { Debug, Info, Warning, Error };
 using Logger = std::function<void(LogLevel, const std::string&)>;
 /// Receives every semaphore and security event; returns it with the id and time assigned by the event log.
 using EventSink = std::function<Event(Event)>;
+/// Receives each captured record (plain CBOR) of a port with capture enabled; the supervisor seals and stores it.
+using CaptureSink = std::function<void(const std::string& port_id, const cbor::Value& record)>;
 
 struct PortStatus {
     std::string port_id;
@@ -60,6 +62,8 @@ public:
     bool revoke_port(const std::string& port_id, const std::string& actor, std::string& error);
     bool reopen_port(const std::string& port_id, const std::string& actor, std::string& error);
     bool unblock(const std::string& controller_id, const std::string& actor);
+    /// Must be set before start(): durable capture of the ports that enable it.
+    void set_capture_sink(CaptureSink sink) { capture_sink_ = std::move(sink); }
     /// Applies a configuration that differs only in devices (serial settings, path, endpoint) without restarting the
     /// Link endpoint: each changed port is reopened by its own thread. Returns false when a restart is required.
     bool reconfigure(const AgentConfig& next);
@@ -105,6 +109,9 @@ private:
         std::map<std::string, std::uint64_t> last_handover;  // controller -> monotonic ms
         std::uint32_t logged_generation = 0;
         std::optional<DeviceConfig> pending_device;  // hot reconfiguration applied by the port thread
+        std::uint64_t capture_offset[2] = {0, 0};  // all bytes per direction (0 instrument→agent, 1 agent→instrument)
+        std::uint64_t observe_seq = 0;
+        std::vector<ConnectionId> observers;
     };
 
     struct KillRecord {
@@ -127,6 +134,9 @@ private:
     void request_handover(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map, std::uint64_t now);
     void answer_handover(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map, std::uint64_t now);
     void kill_switch(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map, std::uint64_t now);
+    void observe(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map);
+    /// Copies traffic to the capture and to the observers of the port (called without mutex_).
+    void tap(Port& port, std::uint8_t direction, const std::uint8_t* data, std::size_t size);
     void contest(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map, std::uint64_t now,
                  std::vector<std::shared_ptr<Connection>>& to_drop);
     void finish_handover(Port& port, bool yielded, const std::string& code);
@@ -153,6 +163,7 @@ private:
     Logger logger_;
     TlsMaterial tls_material_;
     EventSink sink_;
+    CaptureSink capture_sink_;
     Id128 epoch_{};
     platform::Listener listener_;
     std::atomic<bool> stopping_{false};

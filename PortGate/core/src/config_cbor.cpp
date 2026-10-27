@@ -108,7 +108,7 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
 }
 
 bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& port) {
-    const auto* m = r.map(v, path, 7);
+    const auto* m = r.map(v, path, 8);
     if (!m) return false;
     port.port_id = r.text(*m, path, 0, true);
     port.instrument_id = r.text(*m, path, 1, false);
@@ -120,6 +120,13 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
     port.max_hold_ms = static_cast<std::uint32_t>(r.number(*m, path, 5, 0, 0, 86400000));
     if (port.max_hold_ms != 0 && port.max_hold_ms < port.lease_ms) return r.fail(path + "/5", "must be 0 or at least the lease");
     port.max_write_bytes = static_cast<std::size_t>(r.number(*m, path, 7, 16 * 1024, 1, 1024 * 1024));
+    if (auto capture = m->find(8); capture != m->end() && r.ok()) {
+        const auto* cm = r.map(capture->second, path + "/8", 2);
+        if (!cm) return false;
+        port.capture.enabled = r.flag(*cm, path + "/8", 0, false);
+        port.capture.max_bytes = r.number(*cm, path + "/8", 1, port.capture.max_bytes, 64 * 1024, 1024ull * 1024 * 1024);
+        port.capture.retention_ms = r.number(*cm, path + "/8", 2, port.capture.retention_ms, 60000, 90ull * 24 * 3600 * 1000);
+    }
     auto controllers = m->find(6);
     if (controllers != m->end()) {
         const auto* list = controllers->second.as_array();
@@ -141,7 +148,7 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
                     return r.fail(cp + "/2", "expected 64 hex digits");
                 port.controller_certificates[id] = fingerprint;
             }
-            const auto rights = static_cast<std::uint32_t>(r.number(*c, cp, 3, 0, 0, RightKillSwitch | RightContest));
+            const auto rights = static_cast<std::uint32_t>(r.number(*c, cp, 3, 0, 0, RightKillSwitch | RightContest | RightObserve));
             if (rights != 0) port.controller_rights[id] = rights;
         }
     }
@@ -188,7 +195,8 @@ Value encode_config(const AgentConfig& config) {
                                     {4, Value::uint(port.max_queued_requests)},
                                     {5, Value::uint(port.max_hold_ms)},
                                     {6, Value::array(std::move(controllers))},
-                                    {7, Value::uint(port.max_write_bytes)}}));
+                                    {7, Value::uint(port.max_write_bytes)},
+                                    {8, Value::map({{0, Value::boolean(port.capture.enabled)}, {1, Value::uint(port.capture.max_bytes)}, {2, Value::uint(port.capture.retention_ms)}})}}));
     }
     std::map<std::uint64_t, Value> mode{{0, Value::uint(config.mode.initiator == ModeConfig::Initiator::Server ? 0 : 1)},
                                         {3, Value::boolean(config.mode.restricted)},

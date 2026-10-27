@@ -31,3 +31,19 @@ std::unique_ptr<Transport> connect_client(platform::Socket, const std::string&, 
 }
 
 }  // namespace portgate::tls
+
+namespace portgate::tls {
+
+bool seal(const std::vector<std::uint8_t>&, const std::vector<std::uint8_t>&, const std::vector<std::uint8_t>&, std::vector<std::uint8_t>&, std::vector<std::uint8_t>&,
+          std::string& error) {
+    error = "this agent was built without cryptography (PORTGATE_ENABLE_TLS=OFF): capture is unavailable";
+    return false;
+}
+
+bool open(const std::vector<std::uint8_t>&, const std::vector<std::uint8_t>&, const std::vector<std::uint8_t>&, const std::vector<std::uint8_t>&,
+          std::vector<std::uint8_t>&, std::string& error) {
+    error = "this agent was built without cryptography (PORTGATE_ENABLE_TLS=OFF)";
+    return false;
+}
+
+}  // namespace portgate::tls

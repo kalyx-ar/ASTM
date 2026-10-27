@@ -175,6 +175,64 @@ public sealed class PortGateAdminClient : IAsyncDisposable
         return (body.GetValueOrDefault(0UL) as List<object?> ?? []).OfType<SortedDictionary<ulong, object?>>().Select(PortGateAuditEvent.From).ToList();
     }
 
+    /// <summary>Provisions the AES-256 key that seals the durable capture (TLS only). Keep previous keys: older records keep their key id.</summary>
+    public Task SetCaptureKeyAsync(uint keyId, byte[] key, CancellationToken cancellationToken = default) =>
+        RequestAsync(LinkType.SetCaptureKey, LinkCbor.Map((1, (ulong)keyId), (2, key)), cancellationToken);
+
+    /// <summary>
+    /// Reads sealed capture records after <paramref name="afterSeq"/> and opens them with the keys of <paramref name="keys"/>
+    /// (by key id). A record that does not authenticate is reported, never returned as data.
+    /// </summary>
+    public async Task<PortGateCapturePage> ReadCaptureAsync(string portId, Func<uint, byte[]?> keys, ulong afterSeq = 0, int max = 200, CancellationToken cancellationToken = default)
+    {
+        var body = await RequestAsync(LinkType.ReadCapture, LinkCbor.Map((1, portId), (2, afterSeq), (3, (ulong)max)), cancellationToken).ConfigureAwait(false);
+        var agentId = body.GetValueOrDefault(4UL) as string ?? AgentId;
+        var records = new List<PortGateCaptured>();
+        var rejected = new List<ulong>();
+        foreach (var record in (body.GetValueOrDefault(0UL) as List<object?> ?? []).OfType<SortedDictionary<ulong, object?>>())
+        {
+            var seq = record.GetValueOrDefault(0UL) as ulong? ?? 0;
+            var keyId = (uint)(record.GetValueOrDefault(1UL) as ulong? ?? 0);
+            var nonce = record.GetValueOrDefault(3UL) as byte[] ?? [];
+            var sealedBytes = record.GetValueOrDefault(4UL) as byte[] ?? [];
+            var key = keys(keyId);
+            if (key is null || sealedBytes.Length < 16 || nonce.Length != 12)
+            {
+                rejected.Add(seq);
+                continue;
+            }
+            var aad = LinkCbor.Encode(new List<object?> { "portgate-capture/1", agentId, portId, seq, (ulong)keyId });
+            var plain = new byte[sealedBytes.Length - 16];
+            try
+            {
+                using var gcm = new AesGcm(key, 16);
+                gcm.Decrypt(nonce, sealedBytes.AsSpan(0, plain.Length), sealedBytes.AsSpan(plain.Length), plain, aad);
+            }
+            catch (CryptographicException)
+            {
+                rejected.Add(seq);
+                continue;
+            }
+            if (!LinkCbor.TryDecode(plain, out var value) || value is not SortedDictionary<ulong, object?> map)
+            {
+                rejected.Add(seq);
+                continue;
+            }
+            records.Add(new PortGateCaptured(seq, keyId,
+                map.GetValueOrDefault(0UL) is byte[] { Length: 16 } epoch ? new Guid(epoch) : Guid.Empty,
+                (int)(map.GetValueOrDefault(2UL) as ulong? ?? 0), (uint)(map.GetValueOrDefault(3UL) as ulong? ?? 0), map.GetValueOrDefault(4UL) as ulong? ?? 0,
+                DateTimeOffset.FromUnixTimeMilliseconds((long)(map.GetValueOrDefault(5UL) as ulong? ?? 0)), map.GetValueOrDefault(6UL) as byte[] ?? [],
+                map.GetValueOrDefault(7UL) as string));
+        }
+        var gaps = (body.GetValueOrDefault(3UL) as List<object?> ?? []).OfType<List<object?>>()
+            .Select(g => new PortGateCaptureGap(g[0] as ulong? ?? 0, g[1] as ulong? ?? 0, g[2] as string ?? "")).ToList();
+        return new PortGateCapturePage(records, body.GetValueOrDefault(1UL) as ulong? ?? 0, body.GetValueOrDefault(2UL) as ulong? ?? 0, gaps, rejected);
+    }
+
+    /// <summary>Confirms custody up to <paramref name="uptoSeq"/>: the agent deletes those records.</summary>
+    public Task AckCaptureAsync(string portId, ulong uptoSeq, CancellationToken cancellationToken = default) =>
+        RequestAsync(LinkType.AckCapture, LinkCbor.Map((1, portId), (2, uptoSeq)), cancellationToken);
+
     public Task RevokePortAsync(string portId, CancellationToken cancellationToken = default) => RequestAsync(LinkType.RevokePort, LinkCbor.Map((1, portId)), cancellationToken);
 
     public Task ReopenPortAsync(string portId, CancellationToken cancellationToken = default) => RequestAsync(LinkType.ReopenPort, LinkCbor.Map((1, portId)), cancellationToken);
@@ -303,3 +361,11 @@ public sealed class PortGateAdminClient : IAsyncDisposable
         }
     }
 }
+
+/// <summary>Opened capture record: epoch, direction (0 instrument→agent, 1 agent→instrument), generation, offset per direction, owner at that moment.</summary>
+public sealed record PortGateCaptured(ulong Seq, uint KeyId, Guid Epoch, int Direction, uint Generation, ulong Offset, DateTimeOffset CapturedAt, byte[] Data, string? Owner);
+
+public sealed record PortGateCaptureGap(ulong From, ulong To, string Reason);
+
+/// <param name="Rejected">Sequences that did not authenticate or whose key is unknown: evidence of tampering or a missing key.</param>
+public sealed record PortGateCapturePage(IReadOnlyList<PortGateCaptured> Records, ulong First, ulong Last, IReadOnlyList<PortGateCaptureGap> Gaps, IReadOnlyList<ulong> Rejected);

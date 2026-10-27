@@ -388,6 +388,57 @@ std::unique_ptr<Transport> connect_client(platform::Socket socket, const std::st
     return transport;
 }
 
+namespace {
+
+bool aes_gcm(bool seal, const std::vector<std::uint8_t>& key, const std::vector<std::uint8_t>& nonce, const std::vector<std::uint8_t>& aad,
+             const std::vector<std::uint8_t>& input, std::vector<std::uint8_t>& output, std::string& error) {
+    if (!global_init(error)) return false;
+    if (key.size() != 32 || nonce.size() != 12) {
+        error = "AES-256-GCM needs a 32-byte key and a 12-byte nonce";
+        return false;
+    }
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attributes, 256);
+    psa_set_key_usage_flags(&attributes, seal ? PSA_KEY_USAGE_ENCRYPT : PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&attributes, PSA_ALG_GCM);
+    mbedtls_svc_key_id_t id = MBEDTLS_SVC_KEY_ID_INIT;
+    if (psa_import_key(&attributes, key.data(), key.size(), &id) != PSA_SUCCESS) {
+        error = "cannot import the capture key";
+        return false;
+    }
+    output.resize(seal ? input.size() + 16 : input.size());
+    std::size_t length = 0;
+    const auto status = seal ? psa_aead_encrypt(id, PSA_ALG_GCM, nonce.data(), nonce.size(), aad.data(), aad.size(), input.data(), input.size(), output.data(), output.size(), &length)
+                             : psa_aead_decrypt(id, PSA_ALG_GCM, nonce.data(), nonce.size(), aad.data(), aad.size(), input.data(), input.size(), output.data(), output.size(), &length);
+    psa_destroy_key(id);
+    if (status != PSA_SUCCESS) {
+        error = seal ? "capture encryption failed" : "capture record does not authenticate";
+        output.clear();
+        return false;
+    }
+    output.resize(length);
+    return true;
+}
+
+}  // namespace
+
+bool seal(const std::vector<std::uint8_t>& key, const std::vector<std::uint8_t>& aad, const std::vector<std::uint8_t>& plain,
+          std::vector<std::uint8_t>& nonce, std::vector<std::uint8_t>& sealed, std::string& error) {
+    if (!global_init(error)) return false;
+    nonce.resize(12);
+    if (psa_generate_random(nonce.data(), nonce.size()) != PSA_SUCCESS) {
+        error = "no random nonce";
+        return false;
+    }
+    return aes_gcm(true, key, nonce, aad, plain, sealed, error);
+}
+
+bool open(const std::vector<std::uint8_t>& key, const std::vector<std::uint8_t>& aad, const std::vector<std::uint8_t>& nonce,
+          const std::vector<std::uint8_t>& sealed, std::vector<std::uint8_t>& plain, std::string& error) {
+    return aes_gcm(false, key, nonce, aad, sealed, plain, error);
+}
+
 bool generate_self_signed(const std::string& common_name, TlsMaterial& out, std::string& error) {
     if (!global_init(error)) return false;
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;

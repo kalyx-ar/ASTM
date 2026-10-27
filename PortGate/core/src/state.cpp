@@ -77,6 +77,8 @@ std::optional<AgentState> StateStore::load(std::string& error) const {
     }
     state.link_tls = decode_tls(value->get(5));
     state.admin_tls = decode_tls(value->get(6));
+    if (const Value* id = value->get(7); id && id->as_uint()) state.capture_key_id = static_cast<std::uint32_t>(*id->as_uint());
+    if (const Value* key = value->get(8); key && key->as_bytes()) state.capture_key = *key->as_bytes();
     return state;
 }
 
@@ -93,7 +95,9 @@ bool StateStore::save(const AgentState& state, std::string& error) const {
                                                      {5, Value::text(state.admin.server_host)},
                                                      {6, Value::uint(state.admin.server_port)}})},
                                      {5, encode_tls(state.link_tls)},
-                                     {6, encode_tls(state.admin_tls)}};
+                                     {6, encode_tls(state.admin_tls)},
+                                     {7, Value::uint(state.capture_key_id)},
+                                     {8, Value::bytes(state.capture_key)}};
     if (state.configured) m.emplace(2, encode_config(state.config));
     platform::Bytes sealed;
     if (!platform::protect(cbor::encode(Value::map(std::move(m))), sealed, error)) return false;

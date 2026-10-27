@@ -71,6 +71,31 @@ std::optional<SerialData> parse_serial_data(const Unit& unit) {
     return data;
 }
 
+Unit observed_data(std::uint16_t channel, const ObservedData& data) {
+    Unit unit;
+    unit.type = Type::ObservedData;
+    unit.channel = channel;
+    unit.payload.reserve(kObservedDataHeader + data.data.size());
+    put64(unit.payload, data.seq);
+    put64(unit.payload, data.offset);
+    put32(unit.payload, data.generation);
+    unit.payload.push_back(data.direction);
+    unit.payload.insert(unit.payload.end(), data.data.begin(), data.data.end());
+    return unit;
+}
+
+std::optional<ObservedData> parse_observed_data(const Unit& unit) {
+    if (unit.type != Type::ObservedData || unit.is_cbor() || unit.payload.size() < kObservedDataHeader) return std::nullopt;
+    const auto* p = unit.payload.data();
+    ObservedData data;
+    data.seq = get(p, 8);
+    data.offset = get(p + 8, 8);
+    data.generation = static_cast<std::uint32_t>(get(p + 16, 4));
+    data.direction = p[20];
+    data.data.assign(unit.payload.begin() + kObservedDataHeader, unit.payload.end());
+    return data;
+}
+
 std::optional<cbor::Value> parse_map(const Unit& unit) {
     if (!unit.is_cbor()) return std::nullopt;
     auto value = cbor::decode(unit.payload.data(), unit.payload.size());

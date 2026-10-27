@@ -65,6 +65,13 @@ bool generate_self_signed(const std::string& common_name, TlsMaterial& out, std:
 std::unique_ptr<Transport> connect_client(platform::Socket socket, const std::string& host, const TlsMaterial& own, const std::string& server_sha256,
                                           int timeout_ms, std::string& error);
 
+/// AES-256-GCM with a random 12-byte nonce; `sealed` is ciphertext followed by the 16-byte tag. Used for the durable
+/// capture with the key the server provisions; `open` exists for verification (the agent never decrypts its capture).
+bool seal(const std::vector<std::uint8_t>& key, const std::vector<std::uint8_t>& aad, const std::vector<std::uint8_t>& plain,
+          std::vector<std::uint8_t>& nonce, std::vector<std::uint8_t>& sealed, std::string& error);
+bool open(const std::vector<std::uint8_t>& key, const std::vector<std::uint8_t>& aad, const std::vector<std::uint8_t>& nonce,
+          const std::vector<std::uint8_t>& sealed, std::vector<std::uint8_t>& plain, std::string& error);
+
 /// Lower-case hex SHA-256 of the first certificate (DER) of a PEM chain; empty when it does not parse.
 std::string certificate_sha256(const std::string& pem);
 

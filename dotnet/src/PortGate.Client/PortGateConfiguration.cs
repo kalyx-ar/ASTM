@@ -4,7 +4,7 @@ namespace PortGate.Client;
 
 /// <summary>Rights of a controller on a port besides using it (spec/admin-v1.md).</summary>
 [Flags]
-public enum PortGateRights : ulong { None = 0, KillSwitch = 1, Contest = 2 }
+public enum PortGateRights : ulong { None = 0, KillSwitch = 1, Contest = 2, Observe = 4 }
 
 public sealed record PortGateController(string Id, int Priority = 0, string? CertificateSha256 = null, PortGateRights Rights = PortGateRights.None);
 
@@ -46,6 +46,8 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
     /// <summary>Maximum continuous tenure while others wait; <see cref="TimeSpan.Zero"/> disables it.</summary>
     public TimeSpan MaxHold { get; init; }
     public int MaxWriteBytes { get; init; } = 16 * 1024;
+    /// <summary>Durable capture sealed with the key of <see cref="PortGateAdminClient.SetCaptureKeyAsync"/>; null disables it.</summary>
+    public PortGateCapture? Capture { get; init; }
 
     internal SortedDictionary<ulong, object?> ToMap() => LinkCbor.Map(
         (0, PortId), (1, InstrumentId), (2, Device.ToMap()), (3, (ulong)Lease.TotalMilliseconds), (4, (ulong)MaxQueuedRequests),
@@ -59,7 +61,8 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
                 map[3] = (ulong)c.Rights;
             return (object?)map;
         }).ToList()),
-        (7, (ulong)MaxWriteBytes));
+        (7, (ulong)MaxWriteBytes),
+        (8, Capture is null ? LinkCbor.Map((0, false)) : LinkCbor.Map((0, true), (1, (ulong)Capture.MaxBytes), (2, (ulong)Capture.Retention.TotalMilliseconds))));
 }
 
 public sealed record PortGateSecurity
@@ -127,4 +130,11 @@ public sealed record PortGateOutbound(string Host, int Port)
     public string? ServerCertificateSha256 { get; init; }
     public bool Tls { get; init; }
     public int Connections { get; init; } = 2;
+}
+
+/// <summary>Quota and retention of the durable capture of a port (spec/admin-v1.md § Capture).</summary>
+public sealed record PortGateCapture
+{
+    public long MaxBytes { get; init; } = 16L * 1024 * 1024;
+    public TimeSpan Retention { get; init; } = TimeSpan.FromDays(7);
 }

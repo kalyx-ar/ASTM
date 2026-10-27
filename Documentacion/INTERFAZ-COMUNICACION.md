@@ -101,7 +101,8 @@ offset  tamaño  campo
 | 0x21 | `WriteStatus` | agente → host | `writeId`, aceptados, escritos al driver, resultado |
 | 0x22 | `PortEvent` | agente → host | apertura, señales DSR/CTS/DCD, error de paridad/framing, overrun, discontinuidad |
 | 0x23 | `PortControl` | host → agente | RTS/DTR, break, purge (requiere lease y permiso explícito) |
-| 0x30 | `TraceRead` / 0x31 `TraceChunk` | ambos | rango solicitado/entregado y huecos |
+| 0x24 | `ObservedData` | agente → observador | copia de sólo lectura con dirección (P-09) |
+| 0x30 | `Observe` / 0x31 `ObserveResult` | ambos | alta/baja de observador con derecho explícito; la captura sellada se lee por administración (`ReadCapture`/`AckCapture`) |
 | 0x7E | `Heartbeat` | ambos | marca monotónica, carga de buffers |
 | 0x7F | `Error` | ambos | código estable, `requestId` relacionado |
 
@@ -128,7 +129,7 @@ PortGate/
 
 - Un proceso, varios puertos. Cada puerto tiene su máquina de estados Puerto/Propiedad de CONTRATOS.
 - Lectura serial con entrega inmediata de lo disponible (sin esperar trama); latencia acotada por `forwardDelayMs` configurable (0 por defecto).
-- Captura remota RAM/durable: propuesta pendiente. El agente v1 anuncia `traceCapture = 0`; cualquier persistencia sensible exige cifrado y custodia del anfitrión, no sólo hash encadenado.
+- Captura durable: implementada en PortGate como captura sellada AES-256-GCM con clave del anfitrión, borrado por custodia y huecos explícitos (`traceCapture = 2` en esos puertos; ver `spec/admin-v1.md` § Sealed capture). No hay anillo RAM ni spool plano.
 - Configuración CBOR instalada por el servidor ([spec/admin-v1.md](../spec/admin-v1.md)); el agente rechaza claves desconocidas y conserva sólo la configuración vigente.
 - Sin intérprete ASTM: el agente no conoce ENQ ni ACK.
 

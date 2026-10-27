@@ -185,6 +185,53 @@ public class PortGateTests
     }
 
     [PortGateFact]
+    public async Task Observers_see_the_traffic_and_the_sealed_capture_is_read_by_the_key_holder_until_custody()
+    {
+        using var instrumentListener = new TcpListener(IPAddress.Loopback, 0);
+        instrumentListener.Start();
+        var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        await using var agent = await PortGateProcess.LaunchAsync();
+        await using (var plain = await agent.AdminAsync())
+            Assert.Equal("PORTGATE-INSECURE-CHANNEL", (await Assert.ThrowsAsync<PortGateAdminException>(() => plain.SetCaptureKeyAsync(1, key))).Code);
+        var configuration = PortGateProcess.Configuration(((IPEndPoint)instrumentListener.LocalEndpoint).Port) with
+        {
+            Ports = [new PortGatePort("architect-port", "architect-01", PortGateDevice.Tcp("127.0.0.1", ((IPEndPoint)instrumentListener.LocalEndpoint).Port),
+                [new PortGateController("edc-test", 10), new PortGateController("edc-quality", 30, Rights: PortGateRights.Observe)])
+                { Capture = new PortGateCapture { MaxBytes = 1024 * 1024 } }],
+        };
+        await agent.ConfigureAsync(configuration, admin => admin.SetCaptureKeyAsync(1, key), tls: true);
+        using var instrument = await instrumentListener.AcceptTcpClientAsync().WaitAsync(Timeout);
+
+        // A quality server observes without holding the port.
+        await using var observer = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-quality", "architect-port"), CancellationToken.None);
+        Assert.True(await observer.ObserveAsync(true, CancellationToken.None).WaitAsync(Timeout));
+        using var watching = new CancellationTokenSource(Timeout);
+        var observations = observer.ObservationsAsync(watching.Token).GetAsyncEnumerator(watching.Token);
+        await instrument.GetStream().WriteAsync(new byte[] { 0x05 });  // nobody owns the port yet
+        Assert.True(await observations.MoveNextAsync());
+        Assert.Equal((0, (byte)0x05), (observations.Current.Direction, observations.Current.Data.Span[0]));
+
+        await using var owner = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        await owner.AcquireAsync();
+        await Task.Delay(200);
+        await owner.Stream!.WriteAsync(new byte[] { 0x06 });
+        Assert.True(await observations.MoveNextAsync());
+        Assert.Equal((1, (byte)0x06), (observations.Current.Direction, observations.Current.Data.Span[0]));
+
+        // The capture leaves the agent sealed; only the key holder opens it, and custody deletes it.
+        await using var admin = await agent.AdminAsync(tls: true);
+        var page = await admin.ReadCaptureAsync("architect-port", id => id == 1 ? key : null);
+        Assert.Empty(page.Rejected);
+        Assert.Equal([(0, (byte)0x05, (string?)null), (1, (byte)0x06, "edc-test")], page.Records.Select(r => (r.Direction, r.Data[0], r.Owner)));
+        var wrong = await admin.ReadCaptureAsync("architect-port", _ => new byte[32]);
+        Assert.Empty(wrong.Records);
+        Assert.Equal(page.Records.Select(r => r.Seq), wrong.Rejected);
+        await admin.AckCaptureAsync("architect-port", page.Last);
+        Assert.Empty((await admin.ReadCaptureAsync("architect-port", _ => key)).Records);
+        Assert.Contains(await admin.ReadEventsAsync(), e => e.Kind == "observe-start" && e.Actor == "edc-quality");
+    }
+
+    [PortGateFact]
     public async Task Administration_never_accepts_private_keys_over_plain_text_and_reports_the_devices()
     {
         await using var agent = await PortGateProcess.LaunchAsync();

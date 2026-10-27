@@ -75,7 +75,7 @@ Orden sugerido por valor y por dependencias. Cada uno debe terminar con pruebas,
 | P-06 | Build Windows XP | Instalar toolset `v141_xp`; equipo o VM XP |
 | P-07 | Build Linux / Raspberry Pi | Distro WSL o equipo Linux/ARM |
 | P-08 | Firmware ESP32 | ESP-IDF y hardware con interfaz RS232 |
-| P-09 | Parcial: rol cliente TLS resuelto en P-16 (modo iniciado por el agente); faltan captura protegida, lectura de traza y observadores | Definir custodia/cifrado antes de persistencia sensible |
+| P-09 | Resuelto el 2026-10-26 en PortGate: rol cliente TLS (P-16), captura sellada AES-256-GCM con clave del anfitrión y borrado por custodia, y observadores de sólo lectura con derecho explícito | Falta integrar la custodia en EDC/SQLCipher (P-13) y la rotación de claves con reencriptado de lo pendiente |
 | P-10 | Resuelto: COM local en `Atsm.Transport` (`System.IO.Ports` aprobado 2026-10-26); falta prueba con hardware | Adaptador USB-serie real |
 | P-11 | Confirmación del CELL-DYN Ruby | Manual LIS del equipo o analizador de prueba |
 | P-12 | Robustez del agente | Ninguno |
@@ -140,10 +140,12 @@ Crear `PortGate/platform/esp32` (UART, lwIP, NVS y tarea FreeRTOS). ESP-IDF trae
 
 ### P-09 Agente: lo reservado en Link v1
 
-- **Rol cliente TLS:** el agente conecta hacia el host, para sitios sin puertos entrantes. La configuración y la autorización se mantienen iguales.
-- **Traza en el agente:** extensión pendiente; evaluar custodia cifrada, sin spool plano. Ver análisis en MENSAJES-TRAZAS-HL7. Captura RAM/disco por puerto, `TraceRead`/`TraceChunk` (0x30/0x31) y `traceCapture` real en `Capabilities`.
-- **Observadores:** copias de diagnóstico para candidatos en espera, sin capacidad de escribir.
-- Actualizar `spec/link-v1.md`, los vectores y ambas implementaciones.
+Resuelto el 2026-10-26 (`spec/admin-v1.md` § Sealed capture y § Semaphore extensions):
+
+- **Rol cliente TLS:** el agente conecta hacia el host, para sitios sin puertos entrantes (P-16).
+- **Captura sellada:** opcional por puerto (`capture`), AES-256-GCM con clave de 32 bytes entregada por el anfitrión sólo por TLS (`SetCaptureKey`) y guardada en el estado sellado de máquina. AAD con agente, puerto, secuencia y clave; el agente nunca descifra ni guarda texto plano. `ReadCapture` entrega registros sellados, `AckCapture` borra tras la custodia; cuota, retención y huecos explícitos (`no-key`, `seal-failed`, `write-failed`, `quota`, `retention`). `Capabilities` anuncia `traceCapture = 2` en esos puertos. Cliente: `PortGateAdminClient.ReadCaptureAsync` descifra con `AesGcm`.
+- **Observadores:** `Observe` con el derecho 4 del controlador; reciben `ObservedData` (copia de lectura y escritura con dirección), sin poder escribir ni tomar el puerto. Inicio y fin se anuncian como SecurityEvent y quedan en el registro. Cliente: `PortGateChannel.ObserveAsync`/`ObservationsAsync`.
+- Pendiente: custodia en EDC/SQLCipher (P-13), rotación de clave con registros pendientes de la clave anterior y cola de envío por observador (hoy un observador lento demora el puerto, P-12).
 
 ### P-10 Canal LocalSerial .NET
 
@@ -173,7 +175,7 @@ Pendiente:
 
 ### P-12 Robustez del agente
 
-- `dispatch()` envía con `mutex_` tomado: un controlador que no lee puede frenar la arbitración. Conviene pasar los envíos a una cola por conexión.
+- `dispatch()` envía con `mutex_` tomado: un controlador que no lee puede frenar la arbitración. Conviene pasar los envíos a una cola por conexión. Lo mismo vale para `ObservedData`: se envía fuera del mutex pero en el hilo del puerto, de modo que un observador lento demora la lectura.
 - Falta un límite de conexiones simultáneas y de handshakes TLS en curso (un hilo por conexión).
 - `pendingTxBytes` en `Granted` siempre es 0; `uncertainTx` sólo detecta escrituras en curso.
 - Faltan pruebas de estrés: muchos controladores, desconexiones durante escrituras y reinicio del agente con controladores conectados (T05–T09 de IMPLEMENTACION).

@@ -52,6 +52,7 @@ public sealed class PortGateChannel : IAsyncDisposable
     private readonly SemaphoreSlim _sendGate = new(1, 1);
     private readonly Channel<PortGateEvent> _events = Channel.CreateUnbounded<PortGateEvent>();
     private readonly Channel<PortGateAuditEvent> _securityEvents = Channel.CreateUnbounded<PortGateAuditEvent>();
+    private readonly Channel<PortGateObservation> _observations = Channel.CreateUnbounded<PortGateObservation>();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _controlReplies = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _writeReplies = new();
     private readonly CancellationTokenSource _stop = new();
@@ -191,6 +192,22 @@ public sealed class PortGateChannel : IAsyncDisposable
             yield return item;
     }
 
+    /// <summary>Starts or stops the read-only copy of the port traffic (needs the Observe right; announced to everyone on the port).</summary>
+    public async Task<bool> ObserveAsync(bool enable, CancellationToken cancellationToken)
+    {
+        var map = await ControlRequestAsync(LinkType.Observe, LinkCbor.Map((1, enable)), cancellationToken).ConfigureAwait(false);
+        if (map.GetValueOrDefault(2UL) is string code)
+            throw new PortGateException(code, "observation refused by the agent");
+        return map.GetValueOrDefault(1UL) is true;
+    }
+
+    /// <summary>Observed traffic of the port, both directions, whoever owns it.</summary>
+    public async IAsyncEnumerable<PortGateObservation> ObservationsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var item in _observations.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            yield return item;
+    }
+
     /// <summary>Semaphore and security events of this port (handover, kill switch, contest, secure close).</summary>
     public async IAsyncEnumerable<PortGateAuditEvent> SecurityEventsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -285,6 +302,7 @@ public sealed class PortGateChannel : IAsyncDisposable
             Publish(PortGateEventKind.Closed, null, _closeReason ?? "agent connection closed");
             _events.Writer.TryComplete();
             _securityEvents.Writer.TryComplete();
+            _observations.Writer.TryComplete();
             foreach (var reply in _controlReplies.Values.Concat(_writeReplies.Values))
                 reply.TrySetException(new IOException(_closeReason ?? "Agent connection closed."));
         }
@@ -296,6 +314,12 @@ public sealed class PortGateChannel : IAsyncDisposable
         {
             if (unit.Channel == _port && unit.SerialPayload() is { } data && _tenure is { } tenure && data.Generation == tenure.Lease.Generation)
                 tenure.Received.Writer.TryWrite(data.Data);
+            return;
+        }
+        if (unit.Type == LinkType.ObservedData)
+        {
+            if (unit.Channel == _port && unit.ObservedPayload() is { } observed)
+                _observations.Writer.TryWrite(new PortGateObservation(observed.Sequence, observed.Offset, observed.Generation, observed.Direction, observed.Data));
             return;
         }
         var map = unit.Map();
@@ -325,7 +349,7 @@ public sealed class PortGateChannel : IAsyncDisposable
             case LinkType.PortEvent:
                 Publish(PortGateEventKind.Faulted, map.GetValueOrDefault(1UL) as string, map.GetValueOrDefault(2UL) as string);
                 break;
-            case LinkType.HandoverResult or LinkType.SecurityResult when _controlReplies.TryRemove(requestId, out var result):
+            case LinkType.HandoverResult or LinkType.SecurityResult or LinkType.ObserveResult when _controlReplies.TryRemove(requestId, out var result):
                 result.TrySetResult(map);
                 break;
             case LinkType.HandoverAsked when unit.Channel == _port:
@@ -507,3 +531,6 @@ public sealed class PortGateChannel : IAsyncDisposable
     }
 }
 
+
+/// <summary>Read-only copy of the port traffic. <paramref name="Direction"/>: 0 instrument→agent, 1 agent→instrument.</summary>
+public sealed record PortGateObservation(ulong Sequence, ulong Offset, uint Generation, int Direction, ReadOnlyMemory<byte> Data);

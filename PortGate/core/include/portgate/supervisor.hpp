@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "portgate/agent.hpp"
+#include "portgate/capture.hpp"
 #include "portgate/events.hpp"
 #include "portgate/state.hpp"
 #include "portgate/transport.hpp"
@@ -91,6 +92,7 @@ private:
     cbor::Value devices_body();
     void set_config(const std::shared_ptr<AdminConnection>& connection, std::uint64_t request_id, const cbor::Value& map);
     void set_tls(const std::shared_ptr<AdminConnection>& connection, std::uint64_t request_id, const cbor::Value& map);
+    void capture_request(const std::shared_ptr<AdminConnection>& connection, link::Type type, std::uint64_t request_id, const cbor::Value& map);
 
     /// Replaces the running Link agent; on failure the previous one keeps running. Called with agent_mutex_ held.
     bool apply(const AgentConfig& config, const TlsMaterial& link_tls, std::string& error);
@@ -104,6 +106,7 @@ private:
     Logger logger_;
     StateStore store_;
     EventLog events_;
+    CaptureStore capture_;
     std::mutex state_mutex_;  // state_ and the admin TLS server
     AgentState state_;
     std::shared_ptr<TlsServer> admin_tls_;

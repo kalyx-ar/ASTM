@@ -40,6 +40,7 @@ add_library(portgate_core STATIC
     core/src/cbor.cpp
     core/src/link.cpp
     core/src/arbiter.cpp
+    core/src/capture.cpp
     core/src/config_cbor.cpp
     core/src/events.cpp
     core/src/state.cpp

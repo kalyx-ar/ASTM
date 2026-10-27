@@ -44,6 +44,9 @@ enum class Type : std::uint8_t {
     WriteStatus = 0x21,
     PortEvent = 0x22,
     SecurityEvent = 0x23,
+    ObservedData = 0x24,
+    Observe = 0x30,
+    ObserveResult = 0x31,
     // Administration endpoint (spec/admin-v1.md)
     GetStatus = 0x40,
     GetConfig = 0x41,
@@ -55,6 +58,9 @@ enum class Type : std::uint8_t {
     ReadEvents = 0x47,
     Restart = 0x48,
     UnblockController = 0x49,
+    SetCaptureKey = 0x4A,
+    ReadCapture = 0x4B,
+    AckCapture = 0x4C,
     AdminEvent = 0x4E,
     AdminResult = 0x4F,
     Heartbeat = 0x7E,
@@ -82,10 +88,23 @@ struct SerialData {
 
 constexpr std::size_t kSerialDataHeader = 20;
 
+/// Copy of the port traffic for a read-only observer: seq, offset, generation, direction (0 instrument→agent, 1 agent→instrument).
+struct ObservedData {
+    std::uint64_t seq = 0;
+    std::uint64_t offset = 0;
+    std::uint32_t generation = 0;
+    std::uint8_t direction = 0;
+    Bytes data;
+};
+
+constexpr std::size_t kObservedDataHeader = 21;
+
 Bytes encode(const Unit& unit);
 Unit control(Type type, std::uint16_t channel, const cbor::Value& map, bool critical = false);
 Unit serial_data(std::uint16_t channel, const SerialData& data);
 std::optional<SerialData> parse_serial_data(const Unit& unit);
+Unit observed_data(std::uint16_t channel, const ObservedData& data);
+std::optional<ObservedData> parse_observed_data(const Unit& unit);
 std::optional<cbor::Value> parse_map(const Unit& unit);
 
 enum class DecodeError { None, BadMagic, BadVersion, TooLarge };

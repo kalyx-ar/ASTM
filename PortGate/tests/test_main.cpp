@@ -16,6 +16,7 @@
 #include "portgate/agent.hpp"
 #include "portgate/arbiter.hpp"
 #include "portgate/cbor.hpp"
+#include "portgate/capture.hpp"
 #include "portgate/config.hpp"
 #include "portgate/link.hpp"
 #include "portgate/state.hpp"
@@ -966,6 +967,135 @@ void test_agent_initiated_connections() {
     std::filesystem::remove_all(directory, ignored);
 }
 
+void test_sealed_capture_store() {
+    const auto directory = temporary_directory("capture");
+    std::string error;
+    CHECK(platform::ensure_directory(directory, error));
+    std::vector<std::uint8_t> key(32, 0x11);
+    PortConfig port;
+    port.port_id = "p1";
+    port.capture.enabled = true;
+    port.capture.max_bytes = 64 * 1024;
+    {
+        CaptureStore store(directory);
+        store.configure("agent-1", {port});
+        store.append("p1", Value::map({{2, Value::uint(0)}}));  // no key yet: a gap, never plain data
+        store.set_key(7, key);
+        for (int i = 0; i < 3; ++i) store.append("p1", Value::map({{2, Value::uint(0)}, {6, Value::bytes({0x05, static_cast<std::uint8_t>(i)})}}));
+        auto page = store.read("p1", 0, 100);
+        CHECK(page.records.size() == 3 && page.first == 2 && page.last == 4);
+        CHECK(page.gaps.size() == 1 && page.gaps[0].reason == "no-key" && page.gaps[0].from == 1);
+        // Each record authenticates only at its position: the server decrypts with its key and the agent/port/seq AAD.
+        std::vector<std::uint8_t> plain;
+        const auto& r = page.records[1];
+        CHECK(tls::open(key, CaptureStore::aad("agent-1", "p1", r.seq, r.key_id), r.nonce, r.sealed, plain, error));
+        auto decoded = cbor::decode(plain.data(), plain.size());
+        CHECK(decoded && (*decoded->get(6)->as_bytes())[1] == 1);
+        CHECK(!tls::open(key, CaptureStore::aad("agent-1", "p1", r.seq + 1, r.key_id), r.nonce, r.sealed, plain, error));
+        // The file never holds the clear bytes.
+        platform::Bytes raw;
+        CHECK(platform::read_file(platform::join_path(directory, "capture-7031.bin"), raw));
+        const std::vector<std::uint8_t> needle{0x42, 0x05, 0x01};
+        CHECK(std::search(raw.begin(), raw.end(), needle.begin(), needle.end()) == raw.end());
+        CHECK(store.ack("p1", 3, error));
+        CHECK(!store.ack("p1", 99, error));
+    }
+    {
+        // After a restart the sequence continues and acknowledged records stay deleted.
+        CaptureStore store(directory);
+        store.configure("agent-1", {port});
+        store.set_key(7, key);
+        store.append("p1", Value::map({{2, Value::uint(1)}}));
+        auto page = store.read("p1", 0, 100);
+        CHECK(page.records.size() == 2 && page.records.front().seq == 4 && page.records.back().seq == 5);
+        // Quota: the oldest records are evicted and reported as a gap.
+        std::vector<std::uint8_t> big(4096, 0x30);
+        for (int i = 0; i < 40; ++i) store.append("p1", Value::map({{6, Value::bytes(big)}}));
+        page = store.read("p1", 0, 1000);
+        CHECK(!page.records.empty() && page.records.front().seq > 5);
+        CHECK(std::any_of(page.gaps.begin(), page.gaps.end(), [](const CaptureGap& g) { return g.reason == "quota"; }));
+        CHECK(platform::file_size(platform::join_path(directory, "capture-7031.bin")) <= port.capture.max_bytes);
+    }
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+}
+
+void test_observers_and_capture_tap() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    FakeInstrument instrument;
+    CHECK(instrument.start(error));
+    auto config = sample_config(instrument.listener.port());
+    config.ports[0].controller_rights["server-c"] = RightObserve;
+    config.ports[0].capture.enabled = true;
+    std::vector<Value> captured;
+    std::mutex captured_mutex;
+    Agent agent(config, [](LogLevel, const std::string&) {});
+    agent.set_capture_sink([&](const std::string&, const Value& record) {
+        std::lock_guard<std::mutex> lock(captured_mutex);
+        captured.push_back(record);
+    });
+    CHECK(agent.start(error));
+    std::atomic<bool> stop{false};
+    std::thread housekeeping([&] { agent.run(stop); });
+    CHECK(instrument.accept(3000));
+
+    Client b = hello_client(agent.listen_port(), "controller", "server-b");
+    b.send(link::control(link::Type::Observe, 1, Value::map({{0, Value::uint(1)}, {1, Value::boolean(true)}})));
+    auto refused = b.next(link::Type::ObserveResult);
+    CHECK(refused && *link::parse_map(*refused)->get(2)->as_text() == "PORTGATE-OBSERVE-NOT-ALLOWED");
+
+    Client c = hello_client(agent.listen_port(), "controller", "server-c");
+    auto capabilities = c.next(link::Type::Capabilities);
+    CHECK(capabilities && (*link::parse_map(*capabilities)->get(0)->as_array())[0].get(3)->as_uint() == std::optional<std::uint64_t>(2));
+    c.send(link::control(link::Type::Observe, 1, Value::map({{0, Value::uint(2)}, {1, Value::boolean(true)}})));
+    auto accepted = c.next(link::Type::ObserveResult);
+    CHECK(accepted && *link::parse_map(*accepted)->get(1)->as_bool());
+
+    // Bytes of the instrument reach the observer and the capture even with no owner.
+    const std::uint8_t enq[] = {0x05};
+    instrument.socket.send_all(enq, sizeof(enq));
+    auto rx = c.next(link::Type::ObservedData);
+    auto rx_data = rx ? link::parse_observed_data(*rx) : std::nullopt;
+    CHECK(rx_data && rx_data->direction == 0 && rx_data->data.size() == 1 && rx_data->data[0] == 0x05);
+
+    // What the owner writes is observed too; the observer cannot write.
+    Client a = hello_client(agent.listen_port(), "controller", "server-a");
+    a.send(link::control(link::Type::Acquire, 1, Value::map({{0, Value::uint(3)}, {1, Value::integer(0)}, {2, Value::uint(0)}})));
+    auto granted = a.next(link::Type::Granted);
+    CHECK(granted.has_value());
+    if (granted) {
+        auto grant = *link::parse_map(*granted);
+        const auto generation = static_cast<std::uint32_t>(*grant.get(1)->as_uint());
+        a.send(link::control(link::Type::ConfirmTransfer, 1, Value::map({{1, Value::uint(generation)}, {2, *grant.get(2)}})));
+        link::SerialData ack;
+        ack.seq = 1;
+        ack.generation = generation;
+        ack.data = {0x06};
+        a.send(link::serial_data(1, ack));
+        auto tx = c.next(link::Type::ObservedData);
+        auto tx_data = tx ? link::parse_observed_data(*tx) : std::nullopt;
+        CHECK(tx_data && tx_data->direction == 1 && tx_data->data[0] == 0x06 && tx_data->generation == generation);
+        c.send(link::serial_data(1, ack));
+        auto denied = c.next(link::Type::WriteStatus);
+        CHECK(denied && *link::parse_map(*denied)->get(3)->as_uint() == static_cast<std::uint64_t>(link::WriteResult::Rejected));
+    }
+    auto notice = b.next(link::Type::SecurityEvent);  // everyone on the port learned that server-c observes
+    CHECK(notice && *link::parse_map(*notice)->get(1)->as_text() == "observe-start" && *link::parse_map(*notice)->get(3)->as_text() == "server-c");
+    {
+        std::lock_guard<std::mutex> lock(captured_mutex);
+        CHECK(captured.size() >= 2);
+        if (captured.size() >= 2) {
+            CHECK(captured[0].get(2)->as_uint() == std::optional<std::uint64_t>(0) && !captured[0].get(7));  // received while unowned
+            CHECK(captured[1].get(2)->as_uint() == std::optional<std::uint64_t>(1) && *captured[1].get(7)->as_text() == "server-a");
+        }
+    }
+    stop = true;
+    housekeeping.join();
+    agent.shutdown();
+    platform::network_cleanup();
+}
+
 void test_handover_and_plain_security() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -1071,6 +1201,8 @@ int main(int argc, char** argv) {
     test_ethernet_instrument_connects_to_the_agent();
     test_hot_device_reconfiguration();
     test_agent_initiated_connections();
+    test_sealed_capture_store();
+    test_observers_and_capture_tap();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

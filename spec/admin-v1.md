@@ -37,6 +37,9 @@ Every request carries `0 requestId`. The answer is `AdminResult` (0x4F) {0 reque
 | 0x47 ReadEvents | 1 afterId, 2 max (≤ 1000) | 0 events [Event], 1 lastId |
 | 0x48 Restart | — (restarts Link with the configuration in force) | 1 linkPort |
 | 0x49 UnblockController | 1 controllerId | — |
+| 0x4A SetCaptureKey | 1 keyId uint (> 0), 2 key bstr (32 bytes); TLS only, else `PORTGATE-INSECURE-CHANNEL` | — |
+| 0x4B ReadCapture | 1 portId, 2 afterSeq, 3 max (≤ 1000) | 0 records [{0 seq, 1 keyId, 2 timeMs, 3 nonce, 4 sealed}], 1 first, 2 last, 3 gaps [[from, to, reason]], 4 agentId |
+| 0x4C AckCapture | 1 portId, 2 uptoSeq (custody confirmed: deletes up to it) | — |
 
 `AdminEvent` (0x4E, agent → every authorized admin connection) carries one Event as it is recorded.
 
@@ -62,7 +65,7 @@ Rules:
 | 6 | security {0 killSwitch bool, 1 contest bool, 2 quarantineMs, 3 killCooldownMs, 4 contestBlockMs, 5 handoverIntervalMs, 6 handoverTimeoutMs} |
 | 7 | ports [Port] |
 
-Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest)}], 7 maxWriteBytes}.
+Port: {0 portId, 1 instrumentId, 2 device {0 kind (0 serial, 1 tcp: the agent connects to the instrument, 2 tcp-listen: the instrument connects to the agent), 1 path, 2 baudRate, 3 dataBits, 4 parity (0 None, 1 Odd, 2 Even, 3 Mark, 4 Space), 5 stopBits, 6 flowControl (0 None, 1 RtsCts, 2 XonXoff), 7 host (tcp-listen: local address, default 0.0.0.0), 8 port, 9 dtr bool (default true), 10 rts bool (default true; ignored with RtsCts)}, 3 leaseMs [1000, 3600000], 4 maxQueuedRequests, 5 maxHoldMs (0 or ≥ leaseMs), 6 controllers [{0 id, 1 priority, 2 certificateSha256, 3 rights (1 kill switch, 2 contest, 4 observe)}], 7 maxWriteBytes, 8 capture {0 enabled bool, 1 maxBytes [65536, 1 GiB] (default 16 MiB), 2 retentionMs [60000, 90 days] (default 7 days)}}.
 
 Unknown keys and out-of-range values are rejected with the path of the field.
 
@@ -88,6 +91,8 @@ Server side (.NET): `PortGateListener` accepts the agent connections; `PortGateA
 | 0x1C KillSwitch | controller → agent | 0 requestId, 1 reason |
 | 0x1D Contest | controller → agent | 0 requestId, 1 killEventId, 2 reason, 3 secureClose bool |
 | 0x1E SecurityResult | agent → requester | 0 requestId, 1 eventId (kill switch or contest accepted; refusals are `Error` with the requestId) |
+| 0x30 Observe | controller → agent | 0 requestId, 1 enable bool (needs right 4, else `PORTGATE-OBSERVE-NOT-ALLOWED`) |
+| 0x31 ObserveResult | agent → requester | 0 requestId, 1 observing bool, 2 code |
 | 0x23 SecurityEvent | agent → every controller of the port | 0 eventId, 1 kind, 2 portId, 3 actor, 4 target, 5 generation, 6 reason, 7 untilUtcMs, 8 uncertain, 9 timeUtcMs |
 
 Cooperative handover request:
@@ -109,8 +114,19 @@ Contest (optional, `security.contest`):
 
 `maxHoldMs` (per port): while other controllers wait, an owner whose continuous tenure reached the limit gets `Revoked` `PORTGATE-MAX-HOLD` instead of a renewal.
 
+Observers receive a read-only copy of every byte of the port, owned or not, as `ObservedData` (spec/link-v1.md). Observing never grants writing or ownership. `observe-start`/`observe-stop` go as SecurityEvent to the controllers of the port and to the event log: there is no hidden tap.
+
+## Sealed capture
+
+Per port and optional (`capture.enabled`). The agent seals each read and each successful write with AES-256-GCM, using the key the host provisions with `SetCaptureKey`. The key is kept in the machine-sealed state, never leaves the agent and never appears in events. AAD = CBOR array ["portgate-capture/1", agentId, portId, seq, keyId], so a record cannot be moved to another agent, port or position. Plaintext: CBOR {0 epoch, 1 portId, 2 direction (0 instrument → host, 1 host → instrument), 3 generation, 4 offset, 5 timeUtcMs, 6 data, 7 owner}.
+
+1. `SetConfig` enabling capture without a key is refused with `PORTGATE-CAPTURE-KEY-MISSING`.
+2. The agent never decrypts and keeps no plaintext on disk. `ReadCapture` returns sealed records; the host opens them and deduplicates by (agentId, portId, seq).
+3. Records are deleted only by `AckCapture` (event `capture-ack`), by retention or by quota (keeping the newest within three quarters of `maxBytes`). Every loss is an explicit gap with reason `no-key`, `seal-failed`, `write-failed`, `quota` or `retention`.
+4. Capture is evidence for diagnosis and reconciliation; the agent stays transparent and never answers the instrument.
+
 ## Events
 
-Event map: {0 id, 1 timeUtcMs, 2 kind, 3 portId, 4 actor, 5 target, 6 generation, 7 reason, 8 untilUtcMs, 9 uncertain, 10 detail}. Kinds: `agent-start`, `config-applied`, `tls-updated`, `tls-cleared`, `restart`, `admin-denied`, `granted`, `revoked`, `admin-revoke`, `reopen`, `unblock`, `handover-requested`, `handover-yielded`, `handover-kept`, `kill-switch`, `kill-switch-denied`, `contest`, `secure-close`, `device-arrived`, `device-removed`.
+Event map: {0 id, 1 timeUtcMs, 2 kind, 3 portId, 4 actor, 5 target, 6 generation, 7 reason, 8 untilUtcMs, 9 uncertain, 10 detail}. Kinds: `agent-start`, `config-applied`, `tls-updated`, `tls-cleared`, `restart`, `admin-denied`, `granted`, `revoked`, `admin-revoke`, `reopen`, `unblock`, `handover-requested`, `handover-yielded`, `handover-kept`, `kill-switch`, `kill-switch-denied`, `contest`, `secure-close`, `device-arrived`, `device-removed`, `observe-start`, `observe-stop`, `capture-key`, `capture-ack`.
 
 The log is persistent (sealed records, size-bounded with one rotated file). Configuration changes are recorded as who, when and revision — never their content.

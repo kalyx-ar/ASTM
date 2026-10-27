@@ -1,5 +1,6 @@
 #include "portgate/agent.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <random>
 
@@ -366,7 +367,7 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
     if (!map) {
         const bool known = unit.type == link::Type::Hello || unit.type == link::Type::Acquire || unit.type == link::Type::Renew ||
                            unit.type == link::Type::Release || unit.type == link::Type::ConfirmTransfer || unit.type == link::Type::RequestHandover ||
-                           unit.type == link::Type::HandoverAnswer || unit.type == link::Type::KillSwitch || unit.type == link::Type::Contest ||
+                           unit.type == link::Type::HandoverAnswer || unit.type == link::Type::KillSwitch || unit.type == link::Type::Contest || unit.type == link::Type::Observe ||
                            unit.type == link::Type::Heartbeat || unit.type == link::Type::Error;
         if (known || (unit.flags & link::kFlagCritical) != 0) {
             send_error(connection, "PORTGATE-BAD-PAYLOAD", 0, "unit " + std::to_string(static_cast<int>(unit.type)) + " without a valid CBOR map");
@@ -450,6 +451,9 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
                 break;
             case link::Type::KillSwitch:
                 kill_switch(connection, *port, *map, now);
+                break;
+            case link::Type::Observe:
+                observe(connection, *port, *map);
                 break;
             case link::Type::Contest:
                 contest(connection, *port, *map, now, to_drop);
@@ -632,6 +636,68 @@ void Agent::contest(const std::shared_ptr<Connection>& connection, Port& port, c
     }
 }
 
+void Agent::observe(const std::shared_ptr<Connection>& connection, Port& port, const Value& map) {
+    const auto request_id = uint_or(map, 0, 0);
+    const bool enable = bool_or(map, 1);
+    auto reply = [&](bool observing, const std::string& code) {
+        std::map<std::uint64_t, Value> fields{{0, Value::uint(request_id)}, {1, Value::boolean(observing)}};
+        if (!code.empty()) fields.emplace(2, Value::text(code));
+        send(connection, link::control(link::Type::ObserveResult, port.index, Value::map(std::move(fields))));
+    };
+    auto it = std::find(port.observers.begin(), port.observers.end(), connection->id);
+    if (enable && !has_right(port, connection->controller_id, RightObserve)) return reply(false, "PORTGATE-OBSERVE-NOT-ALLOWED");
+    if (enable == (it != port.observers.end())) return reply(enable, {});
+    if (enable) port.observers.push_back(connection->id);
+    else port.observers.erase(it);
+    // Observation is visible to everyone on the port: a silent read-only copy would be a hidden tap.
+    Event event;
+    event.kind = enable ? "observe-start" : "observe-stop";
+    event.port_id = port.config.port_id;
+    event.actor = connection->controller_id;
+    event.detail = connection->peer;
+    broadcast(port, emit(event));
+    reply(enable, {});
+}
+
+void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, std::size_t size) {
+    std::vector<std::shared_ptr<Connection>> observers;
+    link::ObservedData copy;
+    std::string owner;
+    std::uint64_t offset;
+    std::uint32_t generation;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        offset = port.capture_offset[direction];
+        port.capture_offset[direction] += size;
+        generation = port.arbiter->generation();
+        if (auto id = port.arbiter->owner()) owner = controller_of(*id);
+        for (auto id : port.observers)
+            if (auto observer = connection_by_id(id)) observers.push_back(observer);
+        if (!observers.empty()) {
+            copy.seq = port.observe_seq++;
+            copy.offset = offset;
+            copy.generation = generation;
+            copy.direction = direction;
+            copy.data.assign(data, data + size);
+        }
+    }
+    if (!observers.empty()) {
+        const auto unit = link::observed_data(port.index, copy);
+        for (auto& observer : observers) send(observer, unit);
+    }
+    if (port.config.capture.enabled && capture_sink_) {
+        std::map<std::uint64_t, Value> record{{0, id_value(epoch_)},
+                                              {1, Value::text(port.config.port_id)},
+                                              {2, Value::uint(direction)},
+                                              {3, Value::uint(generation)},
+                                              {4, Value::uint(offset)},
+                                              {5, Value::uint(platform::utc_ms())},
+                                              {6, Value::bytes(cbor::Bytes(data, data + size))}};
+        if (!owner.empty()) record.emplace(7, Value::text(owner));
+        capture_sink_(port.config.port_id, Value::map(std::move(record)));
+    }
+}
+
 Event Agent::emit(Event event) {
     if (sink_) return sink_(std::move(event));
     event.id = next_local_event_++;
@@ -693,6 +759,7 @@ void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Po
         written = port.device->write(data->data.data(), data->data.size());
         port.last_write_unknown = written < 0;
     }
+    if (written > 0) tap(port, 1, data->data.data(), static_cast<std::size_t>(written));
     if (written < 0) status(0, link::WriteResult::Unknown, "PORTGATE-WRITE-FAILED");
     else if (static_cast<std::size_t>(written) < data->data.size()) status(static_cast<std::uint64_t>(written), link::WriteResult::Partial, "PORTGATE-WRITE-PARTIAL");
     else status(static_cast<std::uint64_t>(written), link::WriteResult::Completed, {});
@@ -762,6 +829,7 @@ void Agent::port_loop(Port& port) {
             continue;
         }
 
+        tap(port, 0, buffer.data(), static_cast<std::size_t>(n));  // capture and observers see every byte, owned or not
         std::shared_ptr<Connection> target;
         link::SerialData data;
         {
@@ -843,6 +911,7 @@ void Agent::drop(const std::shared_ptr<Connection>& connection, const std::strin
         for (auto& port : ports_) {
             std::vector<ArbiterEvent> events;
             port->arbiter->disconnect(connection->id, now, events);
+            port->observers.erase(std::remove(port->observers.begin(), port->observers.end(), connection->id), port->observers.end());
             dispatch(*port, events);
         }
     }
@@ -878,7 +947,7 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
         ports.push_back(Value::map({{0, Value::text(port->config.port_id)},
                                     {1, Value::text(port->config.instrument_id)},
                                     {2, Value::uint(2)},
-                                    {3, Value::uint(0)},
+                                    {3, Value::uint(port->config.capture.enabled ? 2 : 0)},
                                     {4, Value::boolean(false)},
                                     {5, Value::uint(port->config.max_write_bytes)},
                                     {6, Value::boolean(port->config.max_queued_requests > 0)},

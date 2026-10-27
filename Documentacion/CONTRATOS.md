@@ -117,7 +117,7 @@ La primera versión implementa un endpoint TCP gestionado por puerto, configurab
 | `SerialData` | Dirección, secuencia, offset, vínculo de propiedad y bytes binarios |
 | `WriteStatus` | writeId, progreso conocido y resultado técnico |
 | `PortEvent` | Apertura, señales, error, saturación o discontinuidad |
-| `TraceRead` / `TraceChunk` | Rangos solicitados/disponibles y modo de diagnóstico |
+| `Observe` / `ObservedData` | Observación de sólo lectura con derecho explícito; la captura sellada se lee por administración (`ReadCapture`/`AckCapture`) |
 | `Heartbeat` / `Error` | Salud técnica y fallo correlacionado |
 
 Los contadores de datos son independientes por dirección y arranque/puerto. Las respuestas se correlacionan con `requestId`. Un `SerialData` hacia el instrumento se vincula al permiso actual. Los bytes recibidos sin propietario quedan identificados como no asignados dentro de los límites anunciados; no se mezclan silenciosamente con datos nuevos.

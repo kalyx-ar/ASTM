@@ -25,6 +25,9 @@ public enum LinkType : byte
     WriteStatus = 0x21,
     PortEvent = 0x22,
     SecurityEvent = 0x23,
+    ObservedData = 0x24,
+    Observe = 0x30,
+    ObserveResult = 0x31,
     GetStatus = 0x40,
     GetConfig = 0x41,
     SetConfig = 0x42,
@@ -35,6 +38,9 @@ public enum LinkType : byte
     ReadEvents = 0x47,
     Restart = 0x48,
     UnblockController = 0x49,
+    SetCaptureKey = 0x4A,
+    ReadCapture = 0x4B,
+    AckCapture = 0x4C,
     AdminEvent = 0x4E,
     AdminResult = 0x4F,
     Heartbeat = 0x7E,
@@ -89,6 +95,18 @@ public sealed record LinkUnit(LinkType Type, ushort Flags, ushort Channel, byte[
             BinaryPrimitives.ReadUInt64BigEndian(Payload.AsSpan(8)),
             BinaryPrimitives.ReadUInt32BigEndian(Payload.AsSpan(16)),
             Payload.AsMemory(SerialDataHeader));
+    }
+
+    /// <summary>Observed copy of the port traffic: sequence, offset, generation, direction (0 instrument→agent, 1 agent→instrument) and bytes.</summary>
+    public (ulong Sequence, ulong Offset, uint Generation, int Direction, ReadOnlyMemory<byte> Data)? ObservedPayload()
+    {
+        if (Type != LinkType.ObservedData || IsCbor || Payload.Length < SerialDataHeader + 1)
+            return null;
+        return (BinaryPrimitives.ReadUInt64BigEndian(Payload),
+            BinaryPrimitives.ReadUInt64BigEndian(Payload.AsSpan(8)),
+            BinaryPrimitives.ReadUInt32BigEndian(Payload.AsSpan(16)),
+            Payload[SerialDataHeader],
+            Payload.AsMemory(SerialDataHeader + 1));
     }
 }
 
