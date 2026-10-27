@@ -197,6 +197,26 @@ bool Agent::reopen_port(const std::string& port_id, const std::string& actor, st
     return true;
 }
 
+bool Agent::reconfigure(const AgentConfig& next) {
+    // Hot path only when nothing but devices changed: same Link endpoint, ports, controllers, leases and security.
+    auto without_devices = [](AgentConfig config) {
+        config.mode = {};
+        for (auto& port : config.ports) port.device = {};
+        return cbor::encode(encode_config(config));
+    };
+    std::lock_guard<std::mutex> lock(mutex_);
+    AgentConfig current = config_;
+    for (std::size_t i = 0; i < ports_.size() && i < current.ports.size(); ++i) current.ports[i].device = ports_[i]->config.device;
+    if (without_devices(current) != without_devices(next)) return false;
+    for (std::size_t i = 0; i < ports_.size(); ++i) {
+        const auto& device = next.ports[i].device;
+        if (cbor::encode(encode_device(device)) != cbor::encode(encode_device(ports_[i]->config.device))) ports_[i]->pending_device = device;
+        config_.ports[i].device = device;
+    }
+    config_.mode = next.mode;
+    return true;
+}
+
 bool Agent::unblock(const std::string& controller_id, const std::string& actor) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (blocked_.erase(controller_id) == 0) return false;
@@ -647,6 +667,36 @@ void Agent::port_loop(Port& port) {
     std::vector<std::uint8_t> buffer(4096);
     std::uint64_t retry_at = 0;
     while (!stopping_) {
+        std::optional<DeviceConfig> next;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            next.swap(port.pending_device);
+        }
+        if (next) {
+            // Hot reconfiguration of this port only: the Link endpoint, the other ports and every connection stay up.
+            {
+                std::lock_guard<std::mutex> write_lock(port.write_mutex);
+                port.device->close();
+                port.device = platform::make_device(*next);
+                port.open = false;
+                port.last_write_unknown = true;  // bytes in flight during the switch have an unknown outcome
+            }
+            retry_at = 0;
+            std::lock_guard<std::mutex> lock(mutex_);
+            port.config.device = *next;
+            log(LogLevel::Info, "port " + port.config.port_id + " reconfigured: " + port.device->describe());
+            Event event;
+            event.kind = "port-reconfigured";
+            event.port_id = port.config.port_id;
+            event.generation = port.arbiter->generation();
+            event.detail = port.device->describe();
+            emit(event);
+            if (auto owner = port.arbiter->owner())
+                if (auto connection = connection_by_id(*owner))
+                    send(connection, link::control(link::Type::PortEvent, port.index,
+                                                   Value::map({{0, Value::uint(4)}, {1, Value::text("PORTGATE-PORT-RECONFIGURED")}, {2, Value::text(port.device->describe())}})));
+            continue;
+        }
         if (!port.open) {
             if (now_ms() < retry_at) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(kPollMs));
@@ -786,7 +836,10 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
                                                {4, Value::text(config_.platform_profile)},
                                                {5, Value::uint(config_.max_unit_bytes)}})));
     std::vector<Value> ports;
+    std::unique_lock<std::mutex> lock(mutex_);
     for (const auto& port : ports_) {
+        // A pending hot reconfiguration is announced as the settings in force: it is applied before any new tenure writes.
+        const DeviceConfig& device = port->pending_device ? *port->pending_device : port->config.device;
         ports.push_back(Value::map({{0, Value::text(port->config.port_id)},
                                     {1, Value::text(port->config.instrument_id)},
                                     {2, Value::uint(2)},
@@ -794,8 +847,9 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
                                     {4, Value::boolean(false)},
                                     {5, Value::uint(port->config.max_write_bytes)},
                                     {6, Value::boolean(port->config.max_queued_requests > 0)},
-                                    {7, encode_device(port->config.device)}}));
+                                    {7, encode_device(device)}}));
     }
+    lock.unlock();
     send(connection, link::control(link::Type::Capabilities, 0, Value::map({{0, Value::array(std::move(ports))}})));
 }
 

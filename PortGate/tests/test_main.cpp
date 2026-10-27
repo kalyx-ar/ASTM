@@ -845,6 +845,63 @@ void test_ethernet_instrument_connects_to_the_agent() {
     platform::network_cleanup();
 }
 
+void test_hot_device_reconfiguration() {
+    std::string error;
+    CHECK(platform::network_startup(error));
+    FakeInstrument first;
+    FakeInstrument second;
+    CHECK(first.start(error) && second.start(error));
+    auto config = sample_config(first.listener.port());
+    Agent agent(config, [](LogLevel, const std::string&) {});
+    CHECK(agent.start(error));
+    std::atomic<bool> stop{false};
+    std::thread housekeeping([&] { agent.run(stop); });
+    CHECK(first.accept(3000));
+    const auto link_port = agent.listen_port();
+
+    Client a = hello_client(link_port, "controller", "server-a");
+    a.send(link::control(link::Type::Acquire, 1, Value::map({{0, Value::uint(1)}, {1, Value::integer(0)}, {2, Value::uint(0)}})));
+    auto granted = a.next(link::Type::Granted);
+    CHECK(granted.has_value());
+
+    // A lease or controller change needs a restart; a device change does not.
+    auto restart = config;
+    restart.ports[0].lease_ms = 9000;
+    CHECK(!agent.reconfigure(restart));
+    auto hot = config;
+    hot.ports[0].device.port = second.listener.port();
+    CHECK(agent.reconfigure(hot));
+
+    auto event = a.next(link::Type::PortEvent);
+    CHECK(event && *link::parse_map(*event)->get(1)->as_text() == "PORTGATE-PORT-RECONFIGURED");
+    CHECK(second.accept(3000));  // the port reopened on the new device
+    CHECK(agent.listen_port() == link_port);
+    if (granted) {
+        auto grant = *link::parse_map(*granted);
+        const auto generation = static_cast<std::uint32_t>(*grant.get(1)->as_uint());
+        a.send(link::control(link::Type::ConfirmTransfer, 1, Value::map({{1, Value::uint(generation)}, {2, *grant.get(2)}})));
+        link::SerialData write;
+        write.seq = 1;
+        write.generation = generation;
+        write.data = {0x05};
+        a.send(link::serial_data(1, write));
+        auto status = a.next(link::Type::WriteStatus);
+        CHECK(status && *link::parse_map(*status)->get(3)->as_uint() == static_cast<std::uint64_t>(link::WriteResult::Completed));
+        std::uint8_t received = 0;
+        CHECK(second.socket.receive(&received, 1, 2000) == 1 && received == 0x05);  // same tenure, new device
+    }
+    // New controllers see the settings in force.
+    Client b = hello_client(link_port, "controller", "server-b");
+    auto capabilities = b.next(link::Type::Capabilities);
+    const auto* device = capabilities ? (*link::parse_map(*capabilities)->get(0)->as_array())[0].get(7) : nullptr;
+    CHECK(device && device->get(8)->as_uint() == std::optional<std::uint64_t>(second.listener.port()));
+
+    stop = true;
+    housekeeping.join();
+    agent.shutdown();
+    platform::network_cleanup();
+}
+
 void test_handover_and_plain_security() {
     std::string error;
     CHECK(platform::network_startup(error));
@@ -948,6 +1005,7 @@ int main(int argc, char** argv) {
     test_handover_and_plain_security();
     test_admin_psk_fixed_at_installation();
     test_ethernet_instrument_connects_to_the_agent();
+    test_hot_device_reconfiguration();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

@@ -29,7 +29,7 @@ Every request carries `0 requestId`. The answer is `AdminResult` (0x4F) {0 reque
 |---|---|---|
 | 0x40 GetStatus | — | 0 agentId, 1 platform, 2 version, 4 revision, 5 configured, 6 claimed, 7 restricted, 8 linkPort, 9 adminCertificateSha256, 10 ports [{0 portId, 1 instrumentId, 2 device, 3 open, 4 owner, 5 generation, 6 queued, 7 closed, 8 quarantineMs}], 11 linkTls, 12 linkError |
 | 0x41 GetConfig | — | 0 revision, 1 config (when configured) |
-| 0x42 SetConfig | 1 revision (assigned by the server), 2 config | 0 revision, 1 linkPort |
+| 0x42 SetConfig | 1 revision (assigned by the server), 2 config | 0 revision, 1 linkPort, 2 hot bool |
 | 0x43 SetTls | 1 target (0 Link, 1 administration), 2 certificatePem, 3 privateKeyPem, 4 caPem, 5 pskIdentity, 6 psk bstr, 7 clear bool | 0 certificateSha256 |
 | 0x44 ListDevices | — | array of {0 name, 1 friendlyName, 2 usbVid, 3 usbPid, 4 usbSerial, 5 location, 6 instanceId, 7 inUse} |
 | 0x45 RevokePort | 1 portId | — |
@@ -43,6 +43,7 @@ Every request carries `0 requestId`. The answer is `AdminResult` (0x4F) {0 reque
 Rules:
 
 1. `SetConfig` validates the whole configuration, starts the new Link endpoint and only then saves it. If the new configuration cannot start, the previous one keeps running and the answer is `PORTGATE-APPLY-FAILED`. Nothing is half-applied.
+   When the new configuration differs only in devices (serial settings, path, TCP endpoint), it is applied **hot**: each changed port is reopened by its own thread, the Link endpoint and every connection stay up, the owner keeps its tenure and receives `PortEvent` kind 4 `PORTGATE-PORT-RECONFIGURED` (bytes in flight have an unknown outcome), and new connections see the new device in `Capabilities`. Any other change (ports, controllers, leases, security, Link endpoint) restarts Link.
 2. The agent keeps only the configuration in force; versions and rollback are the server's. To roll back, the server sends a complete previous configuration.
 3. The agent always starts with the last installed configuration. It never returns to "not configured" by itself; a damaged state stops the service with an error (recovery: reinstall with operating-system administrator rights).
 4. `SetTls` with a private key or PSK over a plain channel is refused (`PORTGATE-INSECURE-CHANNEL`). PSKs shorter than 16 bytes are refused (`PORTGATE-WEAK-PSK`). Material is validated by building a TLS server before it is saved; it is never returned by `GetConfig`.

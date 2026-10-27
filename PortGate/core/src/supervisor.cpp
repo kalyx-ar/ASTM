@@ -404,9 +404,12 @@ void Supervisor::set_config(const std::shared_ptr<AdminConnection>& connection, 
         return refuse(connection, request_id, "PORTGATE-TLS-MATERIAL-MISSING", "send SetTls for the Link endpoint before enabling TLS");
 
     std::uint16_t port = 0;
+    bool hot = false;
     {
         std::lock_guard<std::mutex> lock(agent_mutex_);
-        if (!apply(*config, link_tls, error)) {
+        // Only devices changed: reopen those ports without restarting Link or dropping any controller.
+        hot = previous.configured && agent_ && agent_->reconfigure(*config);
+        if (!hot && !apply(*config, link_tls, error)) {
             std::string ignored;
             if (previous.configured) apply(previous.config, previous.link_tls, ignored);
             return refuse(connection, request_id, "PORTGATE-APPLY-FAILED", error);
@@ -433,8 +436,9 @@ void Supervisor::set_config(const std::shared_ptr<AdminConnection>& connection, 
     applied.kind = "config-applied";
     applied.actor = connection->server_id;
     applied.detail = "revision " + std::to_string(revision) + ", " + std::to_string(config->ports.size()) + " port(s), " + connection->identity;
+    if (hot) applied.detail += ", devices applied without restarting Link";
     record(applied);
-    reply(connection, request_id, Value::map({{0, Value::uint(revision)}, {1, Value::uint(port)}}));
+    reply(connection, request_id, Value::map({{0, Value::uint(revision)}, {1, Value::uint(port)}, {2, Value::boolean(hot)}}));
 }
 
 void Supervisor::set_tls(const std::shared_ptr<AdminConnection>& connection, std::uint64_t request_id, const Value& map) {

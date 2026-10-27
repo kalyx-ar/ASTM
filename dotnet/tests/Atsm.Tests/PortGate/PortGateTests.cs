@@ -138,16 +138,18 @@ public class PortGateTests
         var refused = await Assert.ThrowsAsync<PortGateException>(async () => await new PortGateTransportProvider().OpenAsync(target, CancellationToken.None));
         Assert.Equal("PORTGATE-CH-SETTINGS-MISMATCH", refused.Code);
 
-        // With administration they are routed to the agent and become effective behind the tunnel.
+        // With administration they are routed to the agent and applied hot: only that port reopens, the Link endpoint
+        // and every other connection stay up.
+        await using var bystander = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
         var provider = new PortGateTransportProvider((_, token) => agent.AdminAsync());
         await using (var stream = await provider.OpenAsync(target, CancellationToken.None))
             Assert.True(stream.CanWrite);
-        // Applying the configuration restarts the Link endpoint (ephemeral port in this test, fixed in production).
-        await using var admin = await agent.AdminAsync();
-        var linkPort = (int)(ulong)(await admin.GetStatusAsync())[8UL]!;
-        await using var check = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", linkPort), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
+        Assert.Equal("PORTGATE-HANDOVER-NO-OWNER", (await bystander.RequestHandoverAsync(null, CancellationToken.None).WaitAsync(Timeout)).Code);
+        await using var check = await PortGateChannel.ConnectAsync(new TcpEndpoint("127.0.0.1", agent.Port), new PortGateOptions("edc-test", "architect-port"), CancellationToken.None);
         Assert.Equal(required, check.Port.Serial);
         Assert.Equal("serial", check.Port.DeviceKind);
+        await using var admin = await agent.AdminAsync();
+        Assert.Contains(await admin.ReadEventsAsync(), e => e.Kind == "config-applied" && e.Detail!.Contains("without restarting Link", StringComparison.Ordinal));
     }
 
     [PortGateFact]

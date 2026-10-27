@@ -60,6 +60,9 @@ public:
     bool revoke_port(const std::string& port_id, const std::string& actor, std::string& error);
     bool reopen_port(const std::string& port_id, const std::string& actor, std::string& error);
     bool unblock(const std::string& controller_id, const std::string& actor);
+    /// Applies a configuration that differs only in devices (serial settings, path, endpoint) without restarting the
+    /// Link endpoint: each changed port is reopened by its own thread. Returns false when a restart is required.
+    bool reconfigure(const AgentConfig& next);
 
 private:
     struct Connection {
@@ -97,6 +100,7 @@ private:
         std::optional<Handover> handover;
         std::map<std::string, std::uint64_t> last_handover;  // controller -> monotonic ms
         std::uint32_t logged_generation = 0;
+        std::optional<DeviceConfig> pending_device;  // hot reconfiguration applied by the port thread
     };
 
     struct KillRecord {
