@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Astm.Abstractions.Diagnostics;
 using Astm.Abstractions.Model;
+using Astm.Abstractions.Tracing;
 
 namespace Astm.Runtime.Tracing;
 
@@ -13,4 +14,5 @@ namespace Astm.Runtime.Tracing;
 [JsonSerializable(typeof(InstrumentObservation))]
 [JsonSerializable(typeof(QualityResourceReference))]
 [JsonSerializable(typeof(AstmDiagnostic))]
+[JsonSerializable(typeof(TraceOperationSnapshot))]
 public partial class AstmJsonContext : JsonSerializerContext;

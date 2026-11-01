@@ -4,8 +4,22 @@ using Astm.Protocol.Lis01;
 namespace Astm.Plugins;
 
 /// <summary>Plugin for instruments that follow CLSI LIS01-A2 / LIS02-A2 without known deviations.</summary>
-public sealed partial class StandardAstmPlugin : IInstrumentPlugin, IInstrumentCommandPlugin
+public sealed partial class StandardAstmPlugin : IInstrumentPlugin, IInstrumentCommandPlugin, IInstrumentOperationPolicyProvider
 {
+    public IReadOnlyList<InstrumentOperationProfile> OperationProfiles(string instrumentProfileId)
+    {
+        if (instrumentProfileId != ProfileId) throw new ArgumentException("Unknown instrument profile.", nameof(instrumentProfileId));
+        var policy = new AstmResultsMessageOperationPolicy();
+        return [new(policy.Id, "One unsolicited LIS02 results message; queries require a correlated workflow policy", policy.Evidence)];
+    }
+
+    public IAstmOperationPolicy CreateOperationPolicy(string instrumentProfileId, string operationProfileId)
+    {
+        if (!OperationProfiles(instrumentProfileId).Any(p => p.Id == operationProfileId))
+            throw new ArgumentException("Unknown operation profile.", nameof(operationProfileId));
+        return new AstmResultsMessageOperationPolicy();
+    }
+
     public IReadOnlyList<InstrumentCommandDescriptor> Commands(string profileId) => AstmOrderCommands.Describe(this, profileId);
     public IReadOnlyList<Astm.Protocol.Lis02.Lis02Record> BuildAstmCommand(string profileId, InstrumentCommandRequest request, DialectContext context) => AstmOrderCommands.Build(this, profileId, request, context);
     public const string PluginId = "clsi.lis02";

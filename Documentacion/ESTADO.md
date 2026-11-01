@@ -1,5 +1,9 @@
 # Estado de la implementación
 
+Incremento 2026-11-01, EDC #414: `AstmOperationObserver` incremental con `Current.OperationInProgress` nullable, `NoPendingOperations`, estado del enlace separado y evidencia sin payload clínico. Políticas opcionales por plugin; StandardAstmPlugin ofrece explícitamente un mensaje de resultados como operación. Queries/flujo desconocido no se liberan con resultados ajenos; pérdidas/corrupción exigen resincronización. Contratos y bibliotecas afectadas 0.4.0 en fuente, sin actualizar paquetes del host. [Uso y límites](OPERACION-OBSERVADA.md).
+
+Evidencia #414: 25 pruebas nuevas; suite .NET repetida 449 correctas/una omitida (13 s), CTest repetido 855 + 33 sin fallos (7,71/7,69 s). Release con Strong Name obligatorio correcto, cinco DLL afectadas 0.4.0.0/token 066190a23251f202, Authenticode NotSigned pendiente de release. Sin publicación ni cambios de confianza.
+
 Cierre posterior 2026-11-01: por instrucción humana explícita se resuelve EDC #404 con la implementación corregida ASTM c47e630 / EDC 657c2b85. EDC #408 sigue abierto con firma y validación instalada pendientes. La revocación del cierre original que figura debajo pertenece al historial anterior a esta aceptación.
 
 Corrección 2026-11-01, EDC #404: agente/SDK fuente 0.5 y driver experimental 0.2. El observador declara protocolo/preparación/no_pending_operations; guarda opcional de 5000 ms elegida por el usuario, cancelación ante RX/TX y entrega al solicitante exacto después de desconectar sólo el VCOM. Se retiraron el intérprete LIS01 y los IOCTL propietarios del legacy. Disponibilidad posterior según semáforo. [Contrato y límites](COM-VIRTUAL.md). Firma y ensayo instalado/Glyms pendientes #408; el cierre previo de creación fue revocado. Las entradas anteriores conservan evidencia histórica, no describen el diseño vigente.

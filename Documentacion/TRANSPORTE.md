@@ -2,6 +2,8 @@
 
 Pruebas sin hardware ni driver y acciones definidas por los plugins: [Pruebas de comunicación con PortGate](PRUEBAS-SERIE.md).
 
+Estado pasivo por traza para consumidores de flujo: [snapshot, perfiles y ejemplo PortGate](OPERACION-OBSERVADA.md) (EDC #414). ASTM interpreta; el túnel conserva transporte/arbitraje.
+
 Decisiones humanas del 2026-10-26:
 
 1. **ASTM es un protocolo de nivel lenguaje.** El anfitrión entrega el transporte final ya abierto como un `Stream` bidireccional; ASTM interpreta y comunica en ambos sentidos sobre él. Quien usa ASTM mantiene la infraestructura (COM, red, TLS, reconexión, archivos).

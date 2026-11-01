@@ -52,6 +52,10 @@ public sealed class Lis01Observer
 
     public Lis01Role? Sender => _sender;
 
+    /// <summary>Live operation observation rejects restricted control characters inside frame text.
+    /// Forensic reconstruction keeps the historical permissive default to retain damaged recordings.</summary>
+    public bool ValidateRestrictedCharacters { get; init; }
+
     public void Feed(Lis01Role side, ReadOnlySpan<byte> data, long sequence, List<Lis01Observation> output)
     {
         var noise = 0;
@@ -86,7 +90,7 @@ public sealed class Lis01Observer
             if (value != Lf && frame.Count <= 64 * 1024)
                 return true;
             _inFrame[side] = false;
-            OnFrame(side, Lis01Frame.Parse(frame.ToArray(), acceptLowercaseChecksum: true, strictText: false), sequence, output);
+            OnFrame(side, Lis01Frame.Parse(frame.ToArray(), acceptLowercaseChecksum: true, strictText: ValidateRestrictedCharacters), sequence, output);
             return true;
         }
 

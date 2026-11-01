@@ -1,5 +1,7 @@
 # Continuación del trabajo
 
+EDC #414, 2026-11-01: estado pasivo por traza implementado en `Astm.Tracing.AstmOperationObserver`. Leer `Current.NoPendingOperations`; Unknown no equivale a libre. Elegir alcance con `IInstrumentOperationPolicyProvider`, crear política por traza, alimentar ambos sentidos y notificar lifecycle. Perfil inicial de resultados explícito; políticas de queries por equipo y frontend/IA no homologados aquí. [Uso y extensión](OPERACION-OBSERVADA.md). PortGate/VCOM no interpreta protocolos; #408 sigue abierto.
+
 Cierre posterior 2026-11-01: el usuario pide marcar EDC #404 resuelto con la corrección ya commiteada (ASTM c47e630 / EDC 657c2b85). EDC #408 queda abierto para firma, instalación y pruebas Windows/Glyms; no volver a interpretar el cierre como homologación. El estado abierto/revocado de las notas inferiores es anterior a esta decisión.
 
 Corrección 2026-11-01, EDC #404: agente/SDK fuente 0.5 y driver experimental 0.2. El observador declara protocolo/preparación/no_pending_operations; guarda opcional de 5000 ms elegida por el usuario, cancelación ante RX/TX y entrega al solicitante exacto después de desconectar sólo el VCOM. Se retiraron el intérprete LIS01 y los IOCTL propietarios del legacy. Disponibilidad posterior según semáforo. [Contrato y límites](COM-VIRTUAL.md). Firma y ensayo instalado/Glyms pendientes #408; el cierre previo de creación fue revocado. Las entradas anteriores conservan evidencia histórica, no describen el diseño vigente.
