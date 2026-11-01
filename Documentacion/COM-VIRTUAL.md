@@ -4,6 +4,8 @@ Decisiones humanas vigentes 2026-11-01: legacy sin conocimiento de PortGate; só
 
 ## Estado y plataformas
 
+Cierre de la corrección, 2026-11-01: el usuario acepta cerrar #404 como resuelto con los commits ASTM c47e630 y EDC 657c2b85. #408 permanece abierto para firma y validación instalada. Esta decisión posterior sustituye el estado abierto indicado durante la entrega; no convierte las pruebas sintéticas en homologación del driver.
+
 Agente/SDK fuente 0.5, driver UMDF 2.15 experimental 0.2 para Windows 10 1803+/11 x64 (clientes Win32 x86/x64). XP no ofrece VCOM; TTY/PTY POSIX pendiente. El núcleo y los puertos físicos siguen separados por plataforma.
 
 Código/build/pruebas del transporte y arbitraje; sin driver instalado ni firma Authenticode/catálogo firmado. No acredita interoperabilidad de una aplicación legacy. El cierre anterior de #404 fue revocado por el diseño incorrecto. Firma, instalación, Win32/SerialPort/Glyms, PnP y ACL continúan en [#408](https://github.com/kalyx-ar/EDC/issues/408).

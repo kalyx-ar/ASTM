@@ -1,5 +1,7 @@
 # Estado de la implementación
 
+Cierre posterior 2026-11-01: por instrucción humana explícita se resuelve EDC #404 con la implementación corregida ASTM c47e630 / EDC 657c2b85. EDC #408 sigue abierto con firma y validación instalada pendientes. La revocación del cierre original que figura debajo pertenece al historial anterior a esta aceptación.
+
 Corrección 2026-11-01, EDC #404: agente/SDK fuente 0.5 y driver experimental 0.2. El observador declara protocolo/preparación/no_pending_operations; guarda opcional de 5000 ms elegida por el usuario, cancelación ante RX/TX y entrega al solicitante exacto después de desconectar sólo el VCOM. Se retiraron el intérprete LIS01 y los IOCTL propietarios del legacy. Disponibilidad posterior según semáforo. [Contrato y límites](COM-VIRTUAL.md). Firma y ensayo instalado/Glyms pendientes #408; el cierre previo de creación fue revocado. Las entradas anteriores conservan evidencia histórica, no describen el diseño vigente.
 
 Evidencia de esta corrección: CTest repetido 855 + 33 verificaciones sin fallos (7,53/7,51 s); solución .NET repetida 424 correctas y una omitida (13 s), builds Release agente/driver e INF/catálogo correctos. Driver/catálogo propios NotSigned; ninguna instalación. [Detalle reproducible](COM-VIRTUAL.md#sdk-y-pruebas).
