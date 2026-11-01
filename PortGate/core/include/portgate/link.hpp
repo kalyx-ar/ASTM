@@ -46,6 +46,9 @@ enum class Type : std::uint8_t {
     SecurityEvent = 0x23,
     ObservedData = 0x24,
     PortState = 0x25,
+    RetirementNotice = 0x26,
+    RetireAtBoundary = 0x27,
+    RetireResult = 0x28,
     Observe = 0x30,
     ObserveResult = 0x31,
     // Administration endpoint (spec/admin-v1.md)
@@ -62,6 +65,7 @@ enum class Type : std::uint8_t {
     SetCaptureKey = 0x4A,
     ReadCapture = 0x4B,
     AckCapture = 0x4C,
+    PrepareRetirement = 0x4D,
     AdminEvent = 0x4E,
     AdminResult = 0x4F,
     Heartbeat = 0x7E,

@@ -20,6 +20,7 @@
 #include "portgate/platform.hpp"
 #include "portgate/state.hpp"
 #include "portgate/transport.hpp"
+#include "portgate/virtual_com.hpp"
 
 namespace portgate {
 
@@ -41,6 +42,7 @@ struct PortStatus {
     std::size_t queued = 0;
     bool closed = false;
     std::uint64_t quarantine_ms = 0;  // remaining
+    bool withdrawing = false;
 };
 
 class Agent {
@@ -63,6 +65,8 @@ public:
     std::vector<PortStatus> status();
     bool revoke_port(const std::string& port_id, const std::string& actor, std::string& error);
     bool reopen_port(const std::string& port_id, const std::string& actor, std::string& error);
+    bool prepare_retirement(const std::string& port_id, const std::string& actor, const std::string& reason,
+                            bool withdraw, std::string& error);
     bool unblock(const std::string& controller_id, const std::string& actor);
     /// Must be set before start(): durable capture of the ports that enable it.
     void set_capture_sink(CaptureSink sink) { capture_sink_ = std::move(sink); }
@@ -91,6 +95,8 @@ private:
         std::string peer;
         bool hello = false;
         bool outbound = false;  // opened by the agent toward the server (agent-initiated mode)
+        std::uint16_t local_port = 0;
+        std::string local_controller;
         std::atomic<bool> alive{true};
         std::atomic<std::uint64_t> last_rx_ms{0};
     };
@@ -113,6 +119,7 @@ private:
         std::atomic<bool> open{false};
         std::uint64_t rx_seq = 0;
         std::uint64_t rx_offset = 0;
+        std::uint64_t tx_version = 0;
         std::uint64_t unowned_rx = 0;
         bool last_write_unknown = false;
         std::thread reader;
@@ -134,12 +141,15 @@ private:
     };
 
     void accept_loop();
+    bool start_virtual_frontends(std::string& error);
+    void serve_virtual(std::unique_ptr<Transport> transport, std::uint16_t port, const std::string& controller);
     void serve(platform::Socket socket);
     bool authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const;
     void connection_loop(std::shared_ptr<Connection> connection, link::Decoder decoder, std::vector<link::Unit> pending);
     void port_loop(Port& port);
     void handle(const std::shared_ptr<Connection>& connection, const link::Unit& unit);
     void handle_serial_data(const std::shared_ptr<Connection>& connection, Port& port, const link::Unit& unit);
+    void retire_at_boundary(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map);
     void drop(const std::shared_ptr<Connection>& connection, const std::string& reason);
 
     // Semaphore extensions; all called with `mutex_` held.
@@ -189,6 +199,7 @@ private:
     platform::Listener listener_;
     std::atomic<bool> stopping_{false};
     std::thread accept_thread_;
+    std::vector<std::unique_ptr<VirtualComListener>> virtual_frontends_;
     std::mutex mutex_;  // connections_, port arbitration, port counters and security state
     std::map<ConnectionId, std::shared_ptr<Connection>> connections_;
     std::vector<std::unique_ptr<Port>> ports_;

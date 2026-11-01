@@ -1,5 +1,7 @@
 # Continuación del trabajo
 
+EDC #404 (2026-11-01): backend COM virtual Windows 10/11 x64 y retiro al finalizar una tarea en código experimental; detalles en [COM-VIRTUAL](COM-VIRTUAL.md). Por orden humana se cierra la creación #404 y se transfiere la validación instalada/mejora continua a [EDC #408](https://github.com/kalyx-ar/EDC/issues/408). No declarar homologación sin paquete firmado y pruebas Win32/SerialPort/PnP/ACL. XP no ofrece COM virtual; una evaluación posterior puede dejarlo fuera de soporte. El núcleo/puertos físicos multiplataforma se conservan. No instalar drivers ni cambiar confianza/Secure Boot/test signing por iniciativa del agente.
+
 Guía para retomar ASTM desde otra sesión o agente. Estado al 27 de octubre de 2026, `main` en `github.com/kalyx-ar/ASTM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
 
 Nombre vigente: **ASTM**; proyectos/paquetes `Astm.*` 0.3.0 y salidas `astm-diagnostics`/`astm-trace`. Corrección completa Alpha, sin aliases ni lectores de formatos anteriores. [Alcance y nombres](RENOMBRADO-ASTM.md). Las referencias de entrega 0.2.0 siguientes son evidencia anterior al renombrado.

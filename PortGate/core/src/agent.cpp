@@ -68,7 +68,7 @@ bool Agent::start(std::string& error) {
             Port* p = port.get();
             p->reader = std::thread([this, p] { port_loop(*p); });
         }
-        return true;
+        return start_virtual_frontends(error);
     }
     if (config_.tls == TlsMode::Tls) {
         // Never fall back to plain text when TLS was requested.
@@ -84,7 +84,32 @@ bool Agent::start(std::string& error) {
         p->reader = std::thread([this, p] { port_loop(*p); });
     }
     accept_thread_ = std::thread([this] { accept_loop(); });
+    return start_virtual_frontends(error);
+}
+
+bool Agent::start_virtual_frontends(std::string& error) {
+    for (const auto& port : ports_) {
+        if (port->config.virtual_com.empty()) continue;
+        const auto index = port->index;
+        const auto controller = "vcom:" + port->config.virtual_com;
+        auto listener = VirtualComListener::start(port->config.virtual_com,
+            [this, index, controller](std::unique_ptr<Transport> transport) { serve_virtual(std::move(transport), index, controller); }, error);
+        if (!listener) return false;
+        virtual_frontends_.push_back(std::move(listener));
+    }
     return true;
+}
+
+void Agent::serve_virtual(std::unique_ptr<Transport> transport, std::uint16_t port, const std::string& controller) {
+    if (stopping_) return;
+    ++active_connections_;
+    auto connection = std::make_shared<Connection>();
+    connection->transport = std::move(transport); connection->peer = "virtual:" + controller;
+    connection->local_port = port; connection->local_controller = controller; connection->last_rx_ms = now_ms();
+    { std::lock_guard<std::mutex> lock(mutex_); connection->id = next_connection_++; connections_[connection->id] = connection; }
+    start_writer(connection); send_hello(connection);
+    connection_loop(connection, link::Decoder(config_.max_unit_bytes), {});
+    --active_connections_;
 }
 
 void Agent::run(const std::atomic<bool>& stop) {
@@ -141,6 +166,8 @@ void Agent::shutdown() {
     }
     // Connection threads are detached; wait until every one has left its loop.
     while (active_connections_ > 0) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    for (auto& frontend : virtual_frontends_) frontend->stop();
+    virtual_frontends_.clear();
     for (auto& port : ports_) {
         if (port->reader.joinable()) port->reader.join();
         port->device->close();
@@ -161,10 +188,32 @@ std::vector<PortStatus> Agent::status() {
         s.generation = port->arbiter->generation();
         s.queued = port->arbiter->queued();
         s.closed = port->arbiter->closed();
+        s.withdrawing = port->arbiter->withdrawing();
         s.quarantine_ms = port->arbiter->quarantine_until() > now ? port->arbiter->quarantine_until() - now : 0;
         out.push_back(std::move(s));
     }
     return out;
+}
+
+bool Agent::prepare_retirement(const std::string& port_id, const std::string& actor, const std::string& reason,
+                               bool withdraw, std::string& error) {
+    if (reason.empty() || reason.size() > 500) { error = "retirement reason must contain 1..500 bytes"; return false; }
+    std::lock_guard<std::mutex> lock(mutex_);
+    Port* port = port_by_id(port_id);
+    if (!port) { error = "unknown port " + port_id; return false; }
+    std::vector<ArbiterEvent> events;
+    if (withdraw) port->arbiter->prepare_withdrawal(events);
+    dispatch(*port, events);
+    const auto owner = port->arbiter->owner();
+    if (owner) if (auto target = connection_by_id(*owner))
+        send(target, link::control(link::Type::RetirementNotice, port->index,
+             Value::map({{0, Value::uint(port->arbiter->generation())}, {1, Value::text(reason)}, {2, Value::boolean(withdraw)}})));
+    Event event;
+    event.kind = "retirement-requested"; event.port_id = port_id; event.actor = actor;
+    event.target = owner ? controller_of(*owner) : std::string(); event.reason = reason;
+    event.generation = port->arbiter->generation();
+    broadcast(*port, emit(event));
+    return true;
 }
 
 bool Agent::revoke_port(const std::string& port_id, const std::string& actor, std::string& error) {
@@ -202,6 +251,9 @@ bool Agent::reopen_port(const std::string& port_id, const std::string& actor, st
     }
     std::vector<ArbiterEvent> events;
     port->arbiter->reopen(now_ms(), events);
+    if(auto owner=port->arbiter->owner()) if(auto target=connection_by_id(*owner))
+        send(target,link::control(link::Type::RetirementNotice,port->index,Value::map({
+            {0,Value::uint(port->arbiter->generation())},{1,Value::text("")},{2,Value::boolean(false)},{3,Value::boolean(true)}})));
     Event event;
     event.kind = "reopen";
     event.port_id = port_id;
@@ -304,6 +356,11 @@ void Agent::adopt(std::unique_ptr<Transport> transport, std::vector<link::Unit> 
 }
 
 bool Agent::authorize(const std::shared_ptr<Connection>& connection, const std::string& controller_id, std::string& reason) const {
+    if (connection->local_port) {
+        if (controller_id == connection->local_controller) return true;
+        reason = "local virtual COM controller mismatch"; return false;
+    }
+    if(controller_id.rfind("vcom:",0)==0) { reason="virtual COM controllers are local driver endpoints"; return false; }
     // Outbound (agent-initiated) connections go to the server authenticated by its pinned certificate or the PSK when TLS
     // is used; the controller id it declares is then accepted (the port list still decides who may use each port).
     if (connection->outbound) return true;
@@ -366,6 +423,10 @@ void Agent::connection_loop(std::shared_ptr<Connection> connection, link::Decode
 }
 
 void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Unit& unit) {
+    if (connection->local_port && unit.channel != 0 && unit.channel != connection->local_port) {
+        send_error(connection, "PORTGATE-BAD-CHANNEL", 0, "virtual COM is bound to one port");
+        connection->alive = false; return;
+    }
     if (unit.type == link::Type::SerialData) {
         Port* port = port_for(unit.channel);
         if (!connection->hello || !port) {
@@ -429,6 +490,8 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
         send_error(connection, "PORTGATE-BAD-CHANNEL", request_id, "unknown port index " + std::to_string(unit.channel));
         return;
     }
+
+    if (unit.type == link::Type::RetireAtBoundary) { retire_at_boundary(connection,*port,*map); return; }
 
     std::vector<std::shared_ptr<Connection>> to_drop;
     {
@@ -723,7 +786,8 @@ void Agent::publish_state(Port& port, const std::shared_ptr<Connection>& only) {
                                           {3, Value::uint(port.arbiter->queued())},
                                           {4, Value::boolean(port.arbiter->closed())},
                                           {5, Value::boolean(port.arbiter->quarantine_until() > now)},
-                                          {6, Value::boolean(port.config.shared)}};
+                                          {6, Value::boolean(port.config.shared)},
+                                          {7, Value::boolean(port.arbiter->withdrawing())}};
     if (auto owner = port.arbiter->owner()) fields.emplace(1, Value::text(controller_of(*owner)));
     const auto unit = link::control(link::Type::PortState, port.index, Value::map(std::move(fields)));
     if (unit.payload == port.observed_state) {
@@ -760,17 +824,37 @@ void Agent::broadcast(Port& port, const Event& event) {
     }
 }
 
+void Agent::retire_at_boundary(const std::shared_ptr<Connection>& connection, Port& port, const Value& map) {
+    // Same lock order as physical writes. A soft commit cannot overtake a write in flight or already-accounted RX.
+    std::unique_lock<std::mutex> writing(port.write_mutex);
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto generation=static_cast<std::uint32_t>(uint_or(map,0,0));
+    const bool accepted=port.open && !port.pending_device && port.arbiter->may_write(connection->id,generation) && !port.last_write_unknown &&
+        uint_or(map,1,UINT64_MAX)==port.rx_offset && uint_or(map,2,UINT64_MAX)==port.rx_seq && uint_or(map,3,UINT64_MAX)==port.tx_version;
+    send(connection,link::control(link::Type::RetireResult,port.index,
+        Value::map({{0,Value::uint(uint_or(map,4,0))},{1,Value::boolean(accepted)}, {2,Value::text(accepted?"":"PORTGATE-BOUNDARY-CHANGED")}})));
+    if(accepted) {
+        std::vector<ArbiterEvent> events;
+        port.arbiter->release(connection->id,generation,now_ms(),events);
+        // Release's standard reason is refined for the old owner; queue/generation handling is unchanged.
+        for(auto& event:events) if(event.kind==ArbiterEvent::Kind::Revoked) event.code="PORTGATE-VCOM-TASK-COMPLETE";
+        writing.unlock(); // dispatch probes this mutex; the arbiter still stays under mutex_.
+        dispatch(port,events);
+    }
+}
+
 void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Port& port, const link::Unit& unit) {
     auto data = link::parse_serial_data(unit);
     if (!data) {
         send_error(connection, "PORTGATE-BAD-SERIAL-DATA", 0, "SerialData shorter than its header");
         return;
     }
+    std::uint64_t write_version=0;
     auto status = [&](std::uint64_t written, link::WriteResult result, const std::string& code) {
         std::map<std::uint64_t, Value> fields{{0, Value::uint(data->seq)},
                                               {1, Value::uint(result == link::WriteResult::Rejected ? 0 : data->data.size())},
                                               {2, Value::uint(written)},
-                                              {3, Value::uint(static_cast<std::uint64_t>(result))}};
+                                              {3, Value::uint(static_cast<std::uint64_t>(result))}, {5,Value::uint(write_version)}};
         if (!code.empty()) fields.emplace(4, Value::text(code));
         send(connection, link::control(link::Type::WriteStatus, port.index, Value::map(std::move(fields))));
     };
@@ -793,8 +877,17 @@ void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Po
     int written;
     {
         std::lock_guard<std::mutex> write_lock(port.write_mutex);
+        {
+            // Admission must be checked after waiting for an earlier physical write, as that wait may span a transfer.
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (!port.arbiter->may_write(connection->id, data->generation)) {
+                status(0, link::WriteResult::Rejected, "PORTGATE-NOT-ADMITTED");
+                return;
+            }
+            write_version=++port.tx_version;
+        }
         written = port.device->write(data->data.data(), data->data.size());
-        port.last_write_unknown = written < 0;
+        port.last_write_unknown = written < 0 || static_cast<std::size_t>(written)!=data->data.size();
     }
     if (written > 0) tap(port, 1, data->data.data(), static_cast<std::size_t>(written));
     if (written < 0) status(0, link::WriteResult::Unknown, "PORTGATE-WRITE-FAILED");
@@ -903,7 +996,8 @@ void Agent::dispatch(Port& port, const std::vector<ArbiterEvent>& events) {
                                                            {3, Value::uint(port.arbiter->lease_ms())},
                                                            {4, Value::uint(0)},
                                                            {5, Value::boolean(writing || port.last_write_unknown)},
-                                                           {6, Value::uint(port.unowned_rx)}})));
+                                                           {6, Value::uint(port.unowned_rx)}, {7,Value::uint(port.rx_offset)},
+                                                           {8,Value::uint(port.rx_seq)}, {9,Value::uint(port.tx_version)}})));
                 port.unowned_rx = 0;
                 // Renewals answer with Granted for the same generation; only a new generation is an event.
                 if (event.generation != port.logged_generation) {
@@ -1069,7 +1163,7 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
                                     {4, Value::boolean(false)},
                                     {5, Value::uint(port->config.max_write_bytes)},
                                     {6, Value::boolean(port->config.max_queued_requests > 0)},
-                                    {7, encode_device(device)}}));
+                                    {7, encode_device(device)}, {8, Value::text(port->config.virtual_com)}, {9, Value::text(port->config.virtual_com_profile)}}));
     }
     lock.unlock();
     send(connection, link::control(link::Type::Capabilities, 0, Value::map({{0, Value::array(std::move(ports))}})));

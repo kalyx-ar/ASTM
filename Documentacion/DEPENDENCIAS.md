@@ -1,5 +1,17 @@
 # Dependencias
 
+## WDK/SDK Microsoft para COM virtual (#404, 2026-11-01)
+
+Consumidor: build opcional del driver propio `PortGate/driver/windows`, UMDF 2.15 para Windows 10 1803+/11 x64. No integra com0com ni SDK/driver tercero. Las herramientas/kit no se redistribuyen con EDC; Windows proporciona el runtime UMDF/reflector. Fuente oficial: [WDK NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget), paquete `Microsoft.Windows.WDK.x64` de nuget.org, autor Microsoft, librerías de plataforma con aprobación implícita EDC y registro previo en [#404](https://github.com/kalyx-ar/EDC/issues/404).
+
+Kit final evaluado: **10.0.26100.6584**, SHA256 del nupkg `C393D03DFB640B5C92F546B32F6770EF68CD3AAF691956E7D66D8E2C28A1B55E`. Dependencia declarada `Microsoft.Windows.SDK.cpp.x64 [10.0.26100,10.0.26101)`; se usa SDK 10.0.26100.0 Microsoft ya instalado. `LICENSE.txt` del paquete rotulado Microsoft pre-release: se utiliza para diseño/build/evaluación, sin desplegar el kit en operación viva. Conservar sus términos en el entorno de herramientas y revisar los aplicables al publicar.
+
+`dotnet nuget verify --all` correcto: firma de autor Microsoft (SHA256 certificado `566A31882BE208BE4422F7CFD66ED09F5D4524A5994F50CCC8B05EC0528C1353`) y repositorio NuGet.org (`1F4B311D9ACC115C8DC8018B5A49E00FCE6DA8E2855F9F014CA6F34570BC482D`), con sello temporal. No se añaden a ninguna lista de confianza EDC. `WdfDriverStubUm.lib` es estática, no un PE Authenticode ni ensamblado Strong Name.
+
+Ensayo inicial: WDK 10.0.28000.2526/SDK 28000, SHA256 `63C939FB5A79295BF40E941DB592681272219B04EDFF095FE2F3D123E5579A90`, mismas firmas válidas y licencia rotulada pre-release. Se conserva como evidencia del primer build, no se mezcla con el kit final. Herramienta InfVerif inicial Authenticode Valid, Microsoft Corporation.
+
+**Driver propio: Authenticode NotSigned; catálogo firmado/instalación pendientes.** El SDK administrado conserva Strong Name de distribución; eso no firma el driver. No se generaron claves/certificados ni se cambiaron test signing, Secure Boot, editores, raíces o baselines. No se declara homologación por compilar o verificar el INF.
+
 Registro de cada dependencia externa: origen, versión, licencia, consumidores, verificación y aprobación.
 
 ## Mbed TLS 4.1.1 (PortGate)

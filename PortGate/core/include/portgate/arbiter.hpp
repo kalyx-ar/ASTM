@@ -50,6 +50,10 @@ public:
     /// Secure close: revokes the owner, denies every queued request and refuses new ones until reopen().
     void close(const std::string& code, std::vector<ArbiterEvent>& out);
     void reopen(std::uint64_t now, std::vector<ArbiterEvent>& out);
+    /// Cooperative withdrawal: refuse new acquisitions and queued waiters, but retain the current lease until its
+    /// owner releases/disconnects (or genuinely loses its lease). No timer infers protocol completion.
+    void prepare_withdrawal(std::vector<ArbiterEvent>& out);
+    bool withdrawing() const { return withdrawing_; }
 
     bool may_write(ConnectionId connection, std::uint32_t generation) const;
     std::optional<ConnectionId> owner() const;
@@ -94,6 +98,7 @@ private:
     std::uint64_t order_ = 0;
     std::uint64_t quarantine_until_ = 0;
     bool closed_ = false;
+    bool withdrawing_ = false;
 };
 
 }  // namespace portgate

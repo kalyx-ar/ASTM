@@ -110,7 +110,7 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
 }
 
 bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& port) {
-    const auto* m = r.map(v, path, 9);
+    const auto* m = r.map(v, path, 11);
     if (!m) return false;
     port.port_id = r.text(*m, path, 0, true);
     port.instrument_id = r.text(*m, path, 1, false);
@@ -123,6 +123,19 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
     if (port.max_hold_ms != 0 && port.max_hold_ms < port.lease_ms) return r.fail(path + "/5", "must be 0 or at least the lease");
     port.max_write_bytes = static_cast<std::size_t>(r.number(*m, path, 7, 16 * 1024, 1, 1024 * 1024));
     port.shared = r.flag(*m, path, 9, false);
+    port.virtual_com = r.text(*m, path, 10, false);
+    port.virtual_com_profile = r.text(*m, path, 11, false, "manual");
+    if (port.virtual_com_profile != "manual" && port.virtual_com_profile != "lis01-results-batch")
+        return r.fail(path + "/11", "unknown operation completion profile");
+    if(port.virtual_com.empty() && port.virtual_com_profile!="manual") return r.fail(path+"/11","profile requires a virtual COM");
+    if (!port.virtual_com.empty()) {
+        if(port.device.kind!=DeviceConfig::Kind::Serial) return r.fail(path+"/10","virtual COM requires an owned serial device");
+        const auto& name = port.virtual_com;
+        if (name.size() < 4 || name.size() > 8 || name.substr(0, 3) != "COM" || name[3] == '0' ||
+            name.find_first_not_of("0123456789", 3) != std::string::npos)
+            return r.fail(path + "/10", "expected COM1..COM65535");
+        if (std::stoul(name.substr(3)) > 65535) return r.fail(path + "/10", "COM number out of range");
+    }
     if (auto capture = m->find(8); capture != m->end() && r.ok()) {
         const auto* cm = r.map(capture->second, path + "/8", 2);
         if (!cm) return false;
@@ -155,6 +168,8 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
             if (rights != 0) port.controller_rights[id] = rights;
         }
     }
+    if (!port.virtual_com.empty() && !port.controllers.empty() && port.controllers.count("vcom:" + port.virtual_com) == 0)
+        return r.fail(path + "/10", "virtual controller must be explicitly admitted");
     return r.ok();
 }
 
@@ -200,7 +215,7 @@ Value encode_config(const AgentConfig& config) {
                                     {6, Value::array(std::move(controllers))},
                                     {7, Value::uint(port.max_write_bytes)},
                                     {8, Value::map({{0, Value::boolean(port.capture.enabled)}, {1, Value::uint(port.capture.max_bytes)}, {2, Value::uint(port.capture.retention_ms)}})},
-                                    {9, Value::boolean(port.shared)}}));
+                                    {9, Value::boolean(port.shared)}, {10, Value::text(port.virtual_com)}, {11, Value::text(port.virtual_com_profile)}}));
     }
     std::map<std::uint64_t, Value> mode{{0, Value::uint(config.mode.initiator == ModeConfig::Initiator::Server ? 0 : 1)},
                                         {3, Value::boolean(config.mode.restricted)},
@@ -289,12 +304,20 @@ std::optional<AgentConfig> decode_config(const Value& value, std::string& error)
             r.fail("config/7", "expected an array");
         } else {
             std::set<std::string> ids;
+            std::set<std::string> virtual_coms;
             for (std::size_t i = 0; i < list->size() && r.ok(); ++i) {
                 PortConfig port;
                 const auto path = "config/7[" + std::to_string(i) + "]";
                 if (!read_port(r, (*list)[i], path, port)) break;
                 if (!ids.insert(port.port_id).second) r.fail(path + "/0", "duplicate port");
+                if (!port.virtual_com.empty() && !virtual_coms.insert(port.virtual_com).second) r.fail(path + "/10", "duplicate virtual COM");
                 config.ports.push_back(std::move(port));
+            }
+            for (const auto& port : config.ports) if (port.device.kind == DeviceConfig::Kind::Serial) {
+                auto name = port.device.path;
+                if (name.rfind("\\\\.\\", 0) == 0) name.erase(0, 4);
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+                if (virtual_coms.count(name)) r.fail("config/7", "virtual COM cannot alias a physical port");
             }
         }
     }

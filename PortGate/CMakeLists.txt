@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(portgate VERSION 0.3.0 LANGUAGES C CXX)
+project(portgate VERSION 0.4.0 LANGUAGES C CXX)
 
 # C++17 keeps the core buildable with the v141_xp toolset (Windows XP) and with ESP-IDF.
 set(CMAKE_CXX_STANDARD 17)
@@ -40,6 +40,7 @@ add_library(portgate_core STATIC
     core/src/cbor.cpp
     core/src/link.cpp
     core/src/arbiter.cpp
+    core/src/virtual_com_protocol.cpp
     core/src/capture.cpp
     core/src/config_cbor.cpp
     core/src/events.cpp
@@ -62,18 +63,21 @@ else()
 endif()
 
 if(WIN32)
-    target_sources(portgate_core PRIVATE platform/win32/serial_win32.cpp platform/win32/protect_win32.cpp platform/win32/devices_win32.cpp)
-    target_link_libraries(portgate_core PUBLIC ws2_32 crypt32 setupapi cfgmgr32)
+    target_sources(portgate_core PRIVATE platform/win32/serial_win32.cpp platform/win32/protect_win32.cpp platform/win32/devices_win32.cpp platform/win32/virtual_com_win32.cpp)
+    target_link_libraries(portgate_core PUBLIC ws2_32 crypt32 setupapi cfgmgr32 advapi32)
     # 0x0501 = Windows XP: fail the build if an API newer than the oldest supported target slips into PortGate code.
     target_compile_definitions(portgate_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0501)
 else()
-    target_sources(portgate_core PRIVATE platform/posix/serial_posix.cpp platform/posix/protect_posix.cpp platform/posix/devices_posix.cpp)
+    target_sources(portgate_core PRIVATE platform/posix/serial_posix.cpp platform/posix/protect_posix.cpp platform/posix/devices_posix.cpp platform/posix/virtual_com_posix.cpp)
     find_package(Threads REQUIRED)
     target_link_libraries(portgate_core PUBLIC Threads::Threads)
 endif()
 
 target_include_directories(portgate_core PUBLIC core/include)
 target_compile_definitions(portgate_core PUBLIC PORTGATE_VERSION="${PROJECT_VERSION}")
+if(PORTGATE_WINDOWS_XP)
+    target_compile_definitions(portgate_core PUBLIC PORTGATE_WINDOWS_XP=1)
+endif()
 
 # Warnings as errors apply to PortGate sources only (C++); Mbed TLS keeps its own settings.
 if(MSVC)
@@ -84,9 +88,14 @@ endif()
 
 if(WIN32)
     add_executable(portgate app/main.cpp app/service_win32.cpp)
+    if(PORTGATE_WINDOWS_XP)
+        target_sources(portgate PRIVATE app/vcom_setup_unsupported.cpp)
+    else()
+        target_sources(portgate PRIVATE app/vcom_setup_win32.cpp)
+    endif()
     target_link_libraries(portgate PRIVATE advapi32)
 else()
-    add_executable(portgate app/main.cpp app/service_posix.cpp)
+    add_executable(portgate app/main.cpp app/service_posix.cpp app/vcom_setup_unsupported.cpp)
 endif()
 target_link_libraries(portgate PRIVATE portgate_core)
 
@@ -96,6 +105,10 @@ if(PORTGATE_BUILD_TESTS)
     target_link_libraries(portgate-tests PRIVATE portgate_core)
     target_compile_definitions(portgate-tests PRIVATE PORTGATE_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/../conformance/link-v1/vectors.txt")
     add_test(NAME portgate-tests COMMAND portgate-tests)
+    add_executable(portgate-vcom-tests tests/virtual_com_tests.cpp protocols/lis01_results_boundary.cpp)
+    target_include_directories(portgate-vcom-tests PRIVATE protocols/include)
+    target_link_libraries(portgate-vcom-tests PRIVATE portgate_core)
+    add_test(NAME portgate-vcom-tests COMMAND portgate-vcom-tests)
 endif()
 
 install(TARGETS portgate RUNTIME DESTINATION bin)

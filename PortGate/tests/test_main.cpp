@@ -1306,6 +1306,54 @@ void test_handover_and_plain_security() {
 }
 }  // namespace
 
+namespace {
+void test_retirement_fence_and_generation() {
+    std::string error; CHECK(platform::network_startup(error));
+    FakeInstrument instrument; CHECK(instrument.start(error));
+    Agent agent(sample_config(instrument.listener.port()),[](LogLevel,const std::string&){});
+    CHECK(agent.start(error)); std::atomic<bool> stop{false}; std::thread housekeeping([&]{agent.run(stop);});
+    CHECK(instrument.accept(3000));
+    auto a=hello_client(agent.listen_port(),"controller","server-a");
+    a.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(1)}})));
+    const auto granted=a.next(link::Type::Granted); CHECK(granted.has_value());
+    if(granted) {
+        const auto grant=*link::parse_map(*granted); const auto generation=*grant.get(1)->as_uint();
+        a.send(link::control(link::Type::ConfirmTransfer,1,Value::map({{1,Value::uint(generation)},{2,*grant.get(2)}})));
+        auto b=hello_client(agent.listen_port(),"controller","server-b");
+        b.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(2)}}))); CHECK(b.next(link::Type::Queued).has_value());
+        CHECK(agent.prepare_retirement("p1","test-admin","Retiro al finalizar",false,error));
+        CHECK(a.next(link::Type::RetirementNotice).has_value()); CHECK(agent.status()[0].owner=="server-a");
+        link::SerialData tx;tx.seq=1;tx.generation=static_cast<std::uint32_t>(generation);tx.data={5,0,255};
+        a.send(link::serial_data(1,tx)); const auto status=a.next(link::Type::WriteStatus); CHECK(status.has_value());
+        std::uint8_t sent[3]{}; CHECK(instrument.socket.receive(sent,sizeof(sent),1000)==3); CHECK(sent[0]==5 && sent[1]==0 && sent[2]==255);
+        const std::uint8_t terminal[]{4,0,255}; CHECK(instrument.socket.send_all(terminal,sizeof(terminal)));
+        const auto received=a.next(link::Type::SerialData); CHECK(received.has_value());
+        if(status && received) {
+            const auto write_status=*link::parse_map(*status); const auto rx=*link::parse_serial_data(*received);
+            const auto request=[&](std::uint64_t offset,std::uint64_t seq) {
+                a.send(link::control(link::Type::RetireAtBoundary,1,Value::map({{0,Value::uint(generation)},
+                    {1,Value::uint(offset)},{2,Value::uint(seq)},{3,*write_status.get(5)},{4,Value::uint(71)}})));
+                return a.next(link::Type::RetireResult);
+            };
+            const auto stale=request(*grant.get(7)->as_uint(),*grant.get(8)->as_uint());
+            CHECK(stale && !*link::parse_map(*stale)->get(1)->as_bool()); CHECK(agent.status()[0].owner=="server-a");
+            const auto accepted=request(rx.offset+rx.data.size(),rx.seq+1);
+            CHECK(accepted && *link::parse_map(*accepted)->get(1)->as_bool()); CHECK(a.next(link::Type::Revoked).has_value());
+            const auto next=b.next(link::Type::Granted); CHECK(next && *link::parse_map(*next)->get(1)->as_uint()>generation);
+            a.send(link::serial_data(1,tx)); const auto stale_write=a.next(link::Type::WriteStatus);
+            CHECK(stale_write && *link::parse_map(*stale_write)->get(3)->as_uint()==3); CHECK(!instrument.socket.wait_readable(50));
+            CHECK(agent.prepare_retirement("p1","test-admin","Próximo apagado",true,error)); CHECK(agent.status()[0].withdrawing);
+            auto c=hello_client(agent.listen_port(),"controller","server-c");
+            c.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(3)}}))); CHECK(c.next(link::Type::Denied).has_value());
+            CHECK(agent.reopen_port("p1","test-admin",error)); CHECK(!agent.status()[0].withdrawing);
+            CHECK(b.next(link::Type::RetirementNotice).has_value());
+            const auto cancelled=b.next(link::Type::RetirementNotice); CHECK(cancelled && *link::parse_map(*cancelled)->get(3)->as_bool());
+        }
+    }
+    stop=true; housekeeping.join(); agent.shutdown(); platform::network_cleanup();
+}
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::string(argv[1]) == "--emit-vectors") {
         std::cout << "# PortGate Link v1 conformance vectors: <name> <hex of the complete unit>\n";
@@ -1332,6 +1380,7 @@ int main(int argc, char** argv) {
     test_sealed_capture_store();
     test_observers_and_capture_tap(false);
     test_observers_and_capture_tap(true);
+    test_retirement_fence_and_generation();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

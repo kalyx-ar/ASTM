@@ -134,3 +134,15 @@ Per port and optional (`capture.enabled`). The agent seals each read and each su
 Event map: {0 id, 1 timeUtcMs, 2 kind, 3 portId, 4 actor, 5 target, 6 generation, 7 reason, 8 untilUtcMs, 9 uncertain, 10 detail}. Kinds: `agent-start`, `config-applied`, `tls-updated`, `tls-cleared`, `restart`, `admin-denied`, `granted`, `revoked`, `admin-revoke`, `reopen`, `unblock`, `handover-requested`, `handover-yielded`, `handover-kept`, `kill-switch`, `kill-switch-denied`, `contest`, `secure-close`, `device-arrived`, `device-removed`, `observe-start`, `observe-stop`, `capture-key`, `capture-ack`.
 
 The log is persistent (sealed records, size-bounded with one rotated file). Configuration changes are recorded as who, when and revision — never their content.
+
+## Virtual COM and preventive retirement (0.4, EDC #404/#408)
+
+Port configuration map adds 10 virtual COM name (empty disables) and 11 completion profile (manual or lis01-results-batch). A virtual endpoint requires an owned serial device, a distinct COM1..COM65535, uniqueness in the agent and its admitted controller vcom:COMn. Non-manual completion requires an enabled virtual endpoint. Backend support is optional; Windows XP does not offer it, and POSIX virtual TTY is not implemented.
+
+GetStatus adds 13 virtual COM backend supported on this OS/build, 14 cooperative-retirement extension supported. These flags are capabilities, not proof that a driver is installed/homologated. Each port status adds 9 withdrawing. Observed PortState adds 7 withdrawing.
+
+PrepareRetirement (0x4D), authenticated administration: fields 0 requestId, 1 portId, 2 reason (1..500 UTF-8 bytes), 3 withdraw bool. The normal AdminResult acknowledges preparation, not completion. The owner receives RetirementNotice without losing its tenure. With withdraw=true, queued/new acquisitions are denied until Reopen; false requests a soft yield. Reopen clears the withdrawal and sends cancellation to a surviving owner. Actual lease/connection loss and explicit hard revoke/kill switch remain distinct.
+
+Configuring/removing ports or restarting the agent are administrative operations, not automatic soft retirement. An orchestrator must prepare withdrawal and wait for the owner to finish before a disruptive configuration. EDC blocks install/remove while its virtual endpoint is owned. Driver provisioning and physical-device ACL commands are explicit local administrator operations; no service startup installs a driver or accepts a signer.
+
+Installed driver/Win32/PnP/ACL testing is deliberately deferred to EDC #408. Closing EDC #404 records creation of experimental code, not production driver certification.

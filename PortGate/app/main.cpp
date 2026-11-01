@@ -14,6 +14,7 @@
 
 #include "portgate/supervisor.hpp"
 #include "service.hpp"
+#include "vcom_setup.hpp"
 
 namespace {
 
@@ -36,6 +37,7 @@ int usage() {
                  "       portgate service install [options]     install the service (automatic start)\n"
                  "       portgate service uninstall [--state <dir>] [--purge]\n"
                  "       portgate service start | stop\n"
+                 "       portgate vcom list | create --inf <signed INF> | remove --instance <ROOT id> | protect --physical <COM>\n"
                  "options: --state <dir>  --admin <host:port> (default 0.0.0.0:28240)  --name <agent>\n"
                  "         --server-cert <sha256> | --psk <identity>:<hex>   fix the administering server at installation\n"
                  "         --server <host:port>   agent-initiated: dial this server, no inbound port needed\n"
@@ -203,6 +205,7 @@ int run(const RunOptions& options, const portgate::Logger& logger, std::atomic<b
 }  // namespace
 
 int main(int argc, char** argv) {
+    if(argc>1 && std::string(argv[1])=="vcom") return portgate::virtual_com_command(std::vector<std::string>(argv+2,argv+argc));
     const std::vector<std::string> args(argv + 1, argv + argc);
     if (args.empty()) return usage();
     RunOptions options;

@@ -56,6 +56,9 @@ struct PortConfig {
     /// Shared access: observers with the right also receive the traffic of the port. Exclusive (default): they only see
     /// the semaphore and the port state (spec/admin-v1.md § Observers).
     bool shared = false;
+    /// Local Windows virtual COM frontend, backed by the PortGate driver. Controller id is "vcom:" + virtual_com.
+    std::string virtual_com;
+    std::string virtual_com_profile = "manual";
     /// Durable capture of the port traffic, sealed with the key the server provisions (spec/admin-v1.md § Capture).
     struct Capture {
         bool enabled = false;

@@ -459,6 +459,14 @@ void Supervisor::handle(const std::shared_ptr<AdminConnection>& connection, cons
         case link::Type::ListDevices:
             reply(connection, request_id, devices_body());
             break;
+        case link::Type::PrepareRetirement: {
+            std::lock_guard<std::mutex> lock(agent_mutex_);
+            std::string error = "the agent is not running";
+            if (agent_ && agent_->prepare_retirement(text_or(*map, 1), connection->server_id, text_or(*map, 2), bool_or(*map, 3), error))
+                reply(connection, request_id, Value::map({}));
+            else refuse(connection, request_id, "PORTGATE-RETIREMENT", error);
+            break;
+        }
         case link::Type::RevokePort:
         case link::Type::ReopenPort: {
             std::lock_guard<std::mutex> lock(agent_mutex_);
@@ -714,7 +722,7 @@ Value Supervisor::status_body() {
                                             {5, Value::uint(p.generation)},
                                             {6, Value::uint(p.queued)},
                                             {7, Value::boolean(p.closed)},
-                                            {8, Value::uint(p.quarantine_ms)}}));
+                                            {8, Value::uint(p.quarantine_ms)}, {9, Value::boolean(p.withdrawing)}}));
             }
         }
     }
@@ -730,7 +738,7 @@ Value Supervisor::status_body() {
                        {9, Value::text(tls::certificate_sha256(state_.admin_tls.certificate_pem))},
                        {10, Value::array(std::move(ports))},
                        {11, Value::boolean(state_.configured && state_.config.tls == TlsMode::Tls)},
-                       {12, Value::text(link_error)}});
+                       {12, Value::text(link_error)}, {13,Value::boolean(virtual_com_supported())}, {14,Value::boolean(true)}});
 }
 
 Value Supervisor::devices_body() {

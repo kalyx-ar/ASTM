@@ -18,6 +18,10 @@ void Arbiter::acquire(ConnectionId connection, const std::string& controller_id,
         }
         priority = it->second;
     }
+    if (withdrawing_ && (!owner_ || owner_->connection != connection)) {
+        out.push_back({ArbiterEvent::Kind::Denied, connection, request_id, 0, {}, 0, "PORTGATE-WITHDRAWING"});
+        return;
+    }
     if (closed_) {
         out.push_back({ArbiterEvent::Kind::Denied, connection, request_id, 0, {}, 0, "PORTGATE-SECURE-CLOSED"});
         return;
@@ -52,7 +56,7 @@ void Arbiter::renew(ConnectionId connection, std::uint64_t request_id, std::uint
         out.push_back({ArbiterEvent::Kind::Denied, connection, request_id, generation, {}, 0, "PORTGATE-STALE-LEASE"});
         return;
     }
-    if (max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
+    if (!withdrawing_ && max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
         end_tenure("PORTGATE-MAX-HOLD", now, out);
         return;
     }
@@ -90,7 +94,7 @@ void Arbiter::tick(std::uint64_t now, std::vector<ArbiterEvent>& out) {
     }
     if (owner_ && now >= owner_->expires) {
         end_tenure("PORTGATE-LEASE-EXPIRED", now, out);
-    } else if (owner_ && max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
+    } else if (owner_ && !withdrawing_ && max_hold_ms_ != 0 && !queue_.empty() && now - owner_->since >= max_hold_ms_) {
         end_tenure("PORTGATE-MAX-HOLD", now, out);
     } else if (!owner_ && !closed_) {
         grant_next(now, out);  // a quarantine that just ended
@@ -115,9 +119,17 @@ void Arbiter::close(const std::string& code, std::vector<ArbiterEvent>& out) {
 }
 
 void Arbiter::reopen(std::uint64_t now, std::vector<ArbiterEvent>& out) {
+    withdrawing_ = false;
     closed_ = false;
     quarantine_until_ = 0;
     grant_next(now, out);
+}
+
+void Arbiter::prepare_withdrawal(std::vector<ArbiterEvent>& out) {
+    withdrawing_ = true;
+    for (const auto& r : queue_)
+        out.push_back({ArbiterEvent::Kind::Denied, r.connection, r.request_id, 0, {}, 0, "PORTGATE-WITHDRAWING"});
+    queue_.clear();
 }
 
 bool Arbiter::may_write(ConnectionId connection, std::uint32_t generation) const {
@@ -139,7 +151,7 @@ void Arbiter::end_tenure(const std::string& code, std::uint64_t now, std::vector
 }
 
 void Arbiter::grant_next(std::uint64_t now, std::vector<ArbiterEvent>& out) {
-    if (queue_.empty() || closed_ || now < quarantine_until_) return;
+    if (queue_.empty() || closed_ || withdrawing_ || now < quarantine_until_) return;
     const Request next = queue_.front();
     queue_.pop_front();
     grant(next, now, out);

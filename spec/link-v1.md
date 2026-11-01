@@ -58,3 +58,21 @@ Observers enable themselves with `Observe`/`ObserveResult` (0x30/0x31, spec/admi
 `Plain` mode carries the `controllerId` from `Hello` without authentication; it is accepted only when listed in the port configuration and must be used only on trusted networks.
 
 `Tls` mode (Mbed TLS 4.1 LTS in PortGate) requires TLS 1.2 or 1.3 (`minimumVersion` may force 1.3) and, by default, a client certificate that chains to `clientCa`. The `controllerId` of `Hello` must equal the certificate subject CN, or the certificate SHA-256 (DER) must equal the `certificateSha256` configured for that controller; otherwise the agent answers `Error` `PORTGATE-IDENTITY-MISMATCH` and closes. A `Tls` endpoint never falls back to plain text, and an agent built without TLS refuses to start such an endpoint.
+
+## Virtual COM / cooperative retirement extension (PortGate 0.4, EDC #404)
+
+Additive Link v1 units; raw SerialData never contains administrative warning strings:
+
+| Type | Name | Direction | CBOR fields |
+|---|---|---|---|
+| 0x26 | RetirementNotice | agent → owner | 0 generation, 1 reason text, 2 withdraw bool, 3 cancelled bool (optional false) |
+| 0x27 | RetireAtBoundary | owner → agent | 0 generation, 1 next RX offset, 2 next RX sequence, 3 last confirmed TX version, 4 opaque local warning id |
+| 0x28 | RetireResult | agent → owner | 0 warning id, 1 accepted bool, 2 error code text |
+
+Granted additionally carries 7 next RX offset, 8 next RX sequence, 9 TX version. WriteStatus carries 5 TX version. Each admitted physical write advances the TX version; this is a fencing counter, not a device acknowledgement. Capabilities port entries carry 8 virtual COM name (empty when disabled), 9 completion profile.
+
+RetireAtBoundary is a voluntary release barrier by the current admitted generation. The agent compares RX/TX counters under the arbiter and physical write exclusion. Any new accounted traffic or uncertain write rejects it; rejection does not revoke the owner. Acceptance uses the same arbiter release and its normal next generation. The virtual frontend pauses concurrent writes until the answer and never replays them into another tenure. Retirement does not issue a physical power-off command.
+
+The local Windows driver uses an ACL-protected local IPC endpoint bound to one port and controller `vcom:COMn`; a network Hello cannot use that namespace. The physical device remains exclusively open in PortGate. A native COM driver, not a pipe alias, exposes the Windows serial API to the legacy app; its optional out-of-band IOCTL contract is PortGate/driver/windows/PortGateVComIoctl.h. XP does not offer virtual COM.
+
+Manual completion needs the current opaque warning id or normal close. The opt-in lis01-results-batch provider proves only the documented single result batch, not arbitrary ASTM business workflows. It never sends instrument ACKs or infers completion from silence. See Documentacion/COM-VIRTUAL.md. Creation is EDC #404; installed validation and continuous improvement are EDC #408 by explicit human decision.

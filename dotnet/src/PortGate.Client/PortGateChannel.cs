@@ -29,7 +29,7 @@ public sealed class PortGateException(string code, string message) : IOException
     public string Code { get; } = code;
 }
 
-public enum PortGateEventKind { Queued, Granted, Revoked, Discontinuity, Faulted, Closed }
+public enum PortGateEventKind { Queued, Granted, Revoked, Discontinuity, Faulted, Closed, RetirementPending, RetirementCancelled }
 
 public sealed record PortGateEvent(PortGateEventKind Kind, DateTimeOffset Timestamp, string? Code = null, string? Detail = null);
 
@@ -361,6 +361,12 @@ public sealed class PortGateChannel : IAsyncDisposable
                 break;
             case LinkType.PortEvent:
                 Publish(PortGateEventKind.Faulted, map.GetValueOrDefault(1UL) as string, map.GetValueOrDefault(2UL) as string);
+                break;
+            case LinkType.RetirementNotice when unit.Channel == _port && _tenure is { } retiring
+                && (map.GetValueOrDefault(0UL) as ulong?) == retiring.Lease.Generation:
+                Publish(map.GetValueOrDefault(3UL) is true ? PortGateEventKind.RetirementCancelled : PortGateEventKind.RetirementPending,
+                    map.GetValueOrDefault(3UL) is true ? "PORTGATE-RETIREMENT-CANCELLED" : map.GetValueOrDefault(2UL) is true ? "PORTGATE-WITHDRAWING" : "PORTGATE-YIELD-PENDING",
+                    map.GetValueOrDefault(1UL) as string);
                 break;
             case LinkType.HandoverResult or LinkType.SecurityResult or LinkType.ObserveResult when _controlReplies.TryRemove(requestId, out var result):
                 result.TrySetResult(map);

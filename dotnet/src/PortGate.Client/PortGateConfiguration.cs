@@ -58,6 +58,9 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
     public PortGateCapture? Capture { get; init; }
     /// <summary>Shared access: observers also receive the traffic. Exclusive (default): they only see the semaphore and the port state.</summary>
     public bool Shared { get; init; }
+    /// <summary>Local PortGate virtual COM driver frontend, e.g. COM15. Admit controller vcom:COM15 explicitly.</summary>
+    public string VirtualCom { get; init; } = "";
+    public string VirtualComCompletionProfile { get; init; } = "manual";
 
     internal SortedDictionary<ulong, object?> ToMap() => LinkCbor.Map(
         (0, PortId), (1, InstrumentId), (2, Device.ToMap()), (3, (ulong)Lease.TotalMilliseconds), (4, (ulong)MaxQueuedRequests),
@@ -73,7 +76,7 @@ public sealed record PortGatePort(string PortId, string InstrumentId, PortGateDe
         }).ToList()),
         (7, (ulong)MaxWriteBytes),
         (8, Capture is null ? LinkCbor.Map((0, false)) : LinkCbor.Map((0, true), (1, (ulong)Capture.MaxBytes), (2, (ulong)Capture.Retention.TotalMilliseconds))),
-        (9, Shared));
+        (9, Shared), (10, VirtualCom), (11, VirtualComCompletionProfile));
 }
 
 public sealed record PortGateSecurity

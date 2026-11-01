@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "service.hpp"
+#include "portgate/virtual_com.hpp"
 
 namespace portgate::service {
 
@@ -113,6 +114,12 @@ int command(const std::string& verb, const std::vector<std::string>& run_argumen
             SC_ACTION actions[3] = {{SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 5000}, {SC_ACTION_RESTART, 5000}};
             SERVICE_FAILURE_ACTIONSW failure{86400, nullptr, nullptr, 3, actions};
             ChangeServiceConfig2W(service, SERVICE_CONFIG_FAILURE_ACTIONS, &failure);
+#ifndef PORTGATE_WINDOWS_XP
+            if(virtual_com_supported()) {
+                SERVICE_SID_INFO sid{SERVICE_SID_TYPE_UNRESTRICTED};
+                if(!ChangeServiceConfig2W(service,SERVICE_CONFIG_SERVICE_SID_INFO,&sid)) result=report("enabling PortGate service SID");
+            }
+#endif
             std::cout << "service installed; state in " << state_directory << "\n";
             CloseServiceHandle(service);
         }

@@ -235,6 +235,14 @@ public sealed class PortGateAdminClient : IAsyncDisposable
 
     public Task RevokePortAsync(string portId, CancellationToken cancellationToken = default) => RequestAsync(LinkType.RevokePort, LinkCbor.Map((1, portId)), cancellationToken);
 
+    /// <summary>Warns the current owner without revoking it. Withdrawal also denies queued/new owners until Reopen.
+    /// No deadline or idle timer is considered proof that an instrument operation completed.</summary>
+    public Task PrepareRetirementAsync(string portId, string reason, bool withdraw = true, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        return RequestAsync(LinkType.PrepareRetirement, LinkCbor.Map((1, portId), (2, reason), (3, withdraw)), cancellationToken);
+    }
+
     public Task ReopenPortAsync(string portId, CancellationToken cancellationToken = default) => RequestAsync(LinkType.ReopenPort, LinkCbor.Map((1, portId)), cancellationToken);
 
     public Task UnblockControllerAsync(string controllerId, CancellationToken cancellationToken = default) =>

@@ -29,6 +29,28 @@ public class PortGateTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     [PortGateFact]
+    public async Task Retirement_notice_is_out_of_band_and_reopen_cancels_it_without_revocation()
+    {
+        using var listener=new TcpListener(IPAddress.Loopback,0); listener.Start();
+        await using var agent=await PortGateProcess.StartAsync(((IPEndPoint)listener.LocalEndpoint).Port);
+        using var stop=new CancellationTokenSource(Timeout);
+        using var peer=await listener.AcceptTcpClientAsync(stop.Token);
+        await using var channel=await PortGateChannel.ConnectAsync(new("127.0.0.1",agent.Port),new("edc-test","architect-port"),stop.Token);
+        await channel.AcquireAsync(cancellationToken:stop.Token);
+        static async Task<PortGateEvent> Next(PortGateChannel channel,PortGateEventKind kind,CancellationToken token)
+        { await foreach(var e in channel.EventsAsync(token)) if(e.Kind==kind) return e; throw new EndOfStreamException(); }
+        var notice=Next(channel,PortGateEventKind.RetirementPending,stop.Token);
+        await using var admin=await agent.AdminAsync();
+        await admin.PrepareRetirementAsync("architect-port","Dispositivo próximo a apagarse",true,stop.Token);
+        Assert.Equal("Dispositivo próximo a apagarse",(await notice).Detail); Assert.NotNull(channel.Stream);
+        await channel.Stream!.WriteAsync(new byte[]{5,0,255},stop.Token);
+        var bytes=new byte[3]; await peer.GetStream().ReadExactlyAsync(bytes,stop.Token); Assert.Equal(new byte[]{5,0,255},bytes);
+        var cancelled=Next(channel,PortGateEventKind.RetirementCancelled,stop.Token);
+        await admin.ReopenPortAsync("architect-port",stop.Token); Assert.Equal("PORTGATE-RETIREMENT-CANCELLED",(await cancelled).Code);
+        Assert.NotNull(channel.Stream); await channel.ReleaseAsync(stop.Token);
+    }
+
+    [PortGateFact]
     public async Task Instrument_results_and_host_query_cross_PortGate_as_the_session_transport()
     {
         // The device of the agent is a TCP connection to this listener, where the simulator plays the instrument.
