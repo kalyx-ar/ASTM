@@ -144,6 +144,19 @@ bool Arbiter::is_queued(ConnectionId connection) const {
     return std::any_of(queue_.begin(), queue_.end(), [&](const Request& r) { return r.connection == connection; });
 }
 
+bool Arbiter::transfer(ConnectionId owner, std::uint32_t generation, ConnectionId requester, std::uint64_t now,
+                       std::vector<ArbiterEvent>& out) {
+    if (!may_write(owner, generation) || closed_ || withdrawing_ || now < quarantine_until_) return false;
+    auto next = std::find_if(queue_.begin(), queue_.end(), [&](const Request& r) { return r.connection == requester && now < r.deadline; });
+    if (next == queue_.end()) return false;
+    const auto request = *next;
+    queue_.erase(next);
+    out.push_back({ArbiterEvent::Kind::Revoked, owner, 0, generation, {}, 0, "PORTGATE-SOFT-TRANSFER"});
+    owner_.reset();
+    grant(request, now, out);
+    return true;
+}
+
 void Arbiter::end_tenure(const std::string& code, std::uint64_t now, std::vector<ArbiterEvent>& out) {
     out.push_back({ArbiterEvent::Kind::Revoked, owner_->connection, 0, owner_->generation, {}, 0, code});
     owner_.reset();

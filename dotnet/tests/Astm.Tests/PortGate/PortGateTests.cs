@@ -29,6 +29,39 @@ public class PortGateTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     [PortGateFact]
+    public async Task Soft_takeover_uses_existing_observation_right_and_requires_the_observer_declaration()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
+        await using var agent = await PortGateProcess.LaunchAsync();
+        var configuration = new PortGateConfiguration("test-agent", [new("p", "i", PortGateDevice.Tcp("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port),
+            [new("edc-test", 10), new("observer", 20, Rights: PortGateRights.Observe)]) { Shared = true }])
+            { ListenHost = "127.0.0.1" };
+        await agent.ConfigureAsync(configuration);
+        using var stop = new CancellationTokenSource(Timeout);
+        using var peer = await listener.AcceptTcpClientAsync(stop.Token);
+        await using var owner = await PortGateChannel.ConnectAsync(new("127.0.0.1", agent.Port), new("edc-test", "p"), stop.Token);
+        var lease = await owner.AcquireAsync(cancellationToken: stop.Token);
+        await using var observer = await PortGateChannel.ConnectAsync(new("127.0.0.1", agent.Port), new("observer", "p"), stop.Token);
+        var cursor = new PortGateObservationCursor(observer.AgentEpoch, lease.Generation, 0);
+        Assert.Equal("PORTGATE-SOFT-NOT-QUEUED", (await observer.SoftKillSwitchAsync(cursor, true, true, true, cancellationToken: stop.Token)).Code);
+        var acquiring = observer.AcquireAsync(cancellationToken: stop.Token);
+        await foreach (var e in observer.EventsAsync(stop.Token)) if (e.Kind == PortGateEventKind.Queued) break;
+        Assert.Equal("PORTGATE-SOFT-NOT-OBSERVING-FLOW", (await observer.SoftKillSwitchAsync(cursor, true, true, true, cancellationToken: stop.Token)).Code);
+        Assert.Equal(new PortGateObserving(true, true), await observer.ObserveAsync(true, stop.Token));
+        Assert.Equal("PORTGATE-SOFT-DECLARATION-REQUIRED", (await observer.SoftKillSwitchAsync(cursor, false, true, true, cancellationToken: stop.Token)).Code);
+        Assert.Equal("PORTGATE-SOFT-DECLARATION-REQUIRED", (await observer.SoftKillSwitchAsync(cursor, true, false, true, cancellationToken: stop.Token)).Code);
+        Assert.Equal("PORTGATE-SOFT-DECLARATION-REQUIRED", (await observer.SoftKillSwitchAsync(cursor, true, true, false, cancellationToken: stop.Token)).Code);
+        Assert.Equal("PORTGATE-SOFT-STALE-OBSERVATION", (await observer.SoftKillSwitchAsync(cursor with { NextSequence = 1 }, true, true, true, cancellationToken: stop.Token)).Code);
+        // This bench has a network owner, not a system COM driver; correct declarations cannot disconnect it.
+        Assert.Equal("PORTGATE-SOFT-NOT-VIRTUAL-OWNER", (await observer.SoftKillSwitchAsync(cursor, true, true, true, cancellationToken: stop.Token)).Code);
+        Assert.NotNull(owner.Stream);
+        await owner.Stream!.WriteAsync(new byte[] { 0, 255 }, stop.Token);
+        var bytes = new byte[2]; await peer.GetStream().ReadExactlyAsync(bytes, stop.Token); Assert.Equal(new byte[] { 0, 255 }, bytes);
+        await owner.ReleaseAsync(stop.Token);
+        await acquiring;
+    }
+
+    [PortGateFact]
     public async Task Retirement_notice_is_out_of_band_and_reopen_cancels_it_without_revocation()
     {
         using var listener=new TcpListener(IPAddress.Loopback,0); listener.Start();

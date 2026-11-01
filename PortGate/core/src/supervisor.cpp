@@ -738,7 +738,7 @@ Value Supervisor::status_body() {
                        {9, Value::text(tls::certificate_sha256(state_.admin_tls.certificate_pem))},
                        {10, Value::array(std::move(ports))},
                        {11, Value::boolean(state_.configured && state_.config.tls == TlsMode::Tls)},
-                       {12, Value::text(link_error)}, {13,Value::boolean(virtual_com_supported())}, {14,Value::boolean(true)}});
+                       {12, Value::text(link_error)}, {13,Value::boolean(virtual_com_supported())}, {14,Value::boolean(true)}, {15,Value::boolean(true)}});
 }
 
 Value Supervisor::devices_body() {

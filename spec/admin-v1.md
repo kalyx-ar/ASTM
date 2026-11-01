@@ -135,14 +135,16 @@ Event map: {0 id, 1 timeUtcMs, 2 kind, 3 portId, 4 actor, 5 target, 6 generation
 
 The log is persistent (sealed records, size-bounded with one rotated file). Configuration changes are recorded as who, when and revision — never their content.
 
-## Virtual COM and preventive retirement (0.4, EDC #404/#408)
+## COM virtual y retiro (0.5, EDC #404/#408)
 
-Port configuration map adds 10 virtual COM name (empty disables) and 11 completion profile (manual or lis01-results-batch). A virtual endpoint requires an owned serial device, a distinct COM1..COM65535, uniqueness in the agent and its admitted controller vcom:COMn. Non-manual completion requires an enabled virtual endpoint. Backend support is optional; Windows XP does not offer it, and POSIX virtual TTY is not implemented.
+Configuración de puerto: 10 nombre COM virtual, 12 guarda opcional del soft en ms (predeterminado 5000, rango 0..600000; 0 omite sólo la espera). La antigua clave 11 del perfil del driver se rechaza con diagnóstico de reprovisión explícita. El agente no borra/recrea el estado. Requiere COM físico serie distinto, nombre virtual único COM1..COM65535 y controlador vcom:COMn admitido. XP y el stub POSIX no ofrecen frontend virtual.
 
-GetStatus adds 13 virtual COM backend supported on this OS/build, 14 cooperative-retirement extension supported. These flags are capabilities, not proof that a driver is installed/homologated. Each port status adds 9 withdrawing. Observed PortState adds 7 withdrawing.
+GetStatus: 13 soporte backend virtual de este OS/build, 14 aviso administrativo cooperativo, 15 soft iniciado por observador. No acreditan driver instalado/homologado. Estado del puerto 9 withdrawing. PortState del observador 7 withdrawing y 8 siguiente secuencia como snapshot de observación.
 
-PrepareRetirement (0x4D), authenticated administration: fields 0 requestId, 1 portId, 2 reason (1..500 UTF-8 bytes), 3 withdraw bool. The normal AdminResult acknowledges preparation, not completion. The owner receives RetirementNotice without losing its tenure. With withdraw=true, queued/new acquisitions are denied until Reopen; false requests a soft yield. Reopen clears the withdrawal and sends cancellation to a surviving owner. Actual lease/connection loss and explicit hard revoke/kill switch remain distinct.
+PrepareRetirement (0x4D), administración autenticada: 0 requestId, 1 portId, 2 motivo (1..500 bytes), 3 withdraw bool. Su AdminResult confirma preparación, no finalización. El dueño de red compatible recibe RetirementNotice conservando su tenencia; withdraw=true rechaza cola/nuevas adquisiciones hasta Reopen. false sólo solicita cesión cooperativa. Reopen cancela un aviso al dueño superviviente. El VCOM no interpreta ese aviso y no tiene un IOCTL para confirmar tareas. No confundirlo con SoftKillSwitch iniciado por el observador en Link (spec/link-v1.md).
 
-Configuring/removing ports or restarting the agent are administrative operations, not automatic soft retirement. An orchestrator must prepare withdrawal and wait for the owner to finish before a disruptive configuration. EDC blocks install/remove while its virtual endpoint is owned. Driver provisioning and physical-device ACL commands are explicit local administrator operations; no service startup installs a driver or accepts a signer.
+El soft reutiliza solicitud de control y lectura del flujo autorizadas; exige declaraciones explícitas y cursor vigente. Guarda cancelable ante RX/TX, pausa/desconexión exclusivamente virtual y entrega al solicitante exacto. No usa el hard ni envía comandos/señales al dispositivo real. Eventos técnicos: soft-kill-requested, soft-kill-cancelled, soft-kill-transferred; motivo/generación/actor y guarda aplicada, sin payload clínico.
 
-Installed driver/Win32/PnP/ACL testing is deliberately deferred to EDC #408. Closing EDC #404 records creation of experimental code, not production driver certification.
+Configurar/quitar/reiniciar son operaciones administrativas independientes. EDC sigue bloqueando install/remove si está ocupado el VCOM. La provisión del ROOT y la ACL física requieren administrador y pruebas en destino; arrancar el servicio no instala drivers ni acepta firmantes. Al liberar el dueño, el VCOM configurado vuelve a estar disponible según el semáforo.
+
+Firma, instalación y compatibilidad Win32/SerialPort/Glyms/PnP/ACL siguen pendientes #408. El código y las pruebas del agente/frontend simulado no acreditan homologación del COM instalado.

@@ -110,7 +110,7 @@ bool read_device(Reader& r, const Value& v, const std::string& path, DeviceConfi
 }
 
 bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& port) {
-    const auto* m = r.map(v, path, 11);
+    const auto* m = r.map(v, path, 12);
     if (!m) return false;
     port.port_id = r.text(*m, path, 0, true);
     port.instrument_id = r.text(*m, path, 1, false);
@@ -124,10 +124,8 @@ bool read_port(Reader& r, const Value& v, const std::string& path, PortConfig& p
     port.max_write_bytes = static_cast<std::size_t>(r.number(*m, path, 7, 16 * 1024, 1, 1024 * 1024));
     port.shared = r.flag(*m, path, 9, false);
     port.virtual_com = r.text(*m, path, 10, false);
-    port.virtual_com_profile = r.text(*m, path, 11, false, "manual");
-    if (port.virtual_com_profile != "manual" && port.virtual_com_profile != "lis01-results-batch")
-        return r.fail(path + "/11", "unknown operation completion profile");
-    if(port.virtual_com.empty() && port.virtual_com_profile!="manual") return r.fail(path+"/11","profile requires a virtual COM");
+    if(m->count(11)) return r.fail(path+"/11","completion profiles were removed; reprovision this configuration explicitly");
+    port.virtual_com_guard_ms = static_cast<std::uint32_t>(r.number(*m, path, 12, 5000, 0, 600000));
     if (!port.virtual_com.empty()) {
         if(port.device.kind!=DeviceConfig::Kind::Serial) return r.fail(path+"/10","virtual COM requires an owned serial device");
         const auto& name = port.virtual_com;
@@ -215,7 +213,7 @@ Value encode_config(const AgentConfig& config) {
                                     {6, Value::array(std::move(controllers))},
                                     {7, Value::uint(port.max_write_bytes)},
                                     {8, Value::map({{0, Value::boolean(port.capture.enabled)}, {1, Value::uint(port.capture.max_bytes)}, {2, Value::uint(port.capture.retention_ms)}})},
-                                    {9, Value::boolean(port.shared)}, {10, Value::text(port.virtual_com)}, {11, Value::text(port.virtual_com_profile)}}));
+                                    {9, Value::boolean(port.shared)}, {10, Value::text(port.virtual_com)}, {12, Value::uint(port.virtual_com_guard_ms)}}));
     }
     std::map<std::uint64_t, Value> mode{{0, Value::uint(config.mode.initiator == ModeConfig::Initiator::Server ? 0 : 1)},
                                         {3, Value::boolean(config.mode.restricted)},

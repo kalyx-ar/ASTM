@@ -1,34 +1,46 @@
 # COM virtual de PortGate (EDC #404)
 
-Decisión humana 2026-11-01: el legacy usa un COM convencional y sólo PortGate posee el COM físico. Aviso de próximo apagado/retiro fuera del protocolo del equipo; cesión diferida sólo al finalizar una operación confirmada. [Seguimiento](https://github.com/kalyx-ar/EDC/issues/404).
+Decisiones humanas vigentes 2026-11-01: legacy sin conocimiento de PortGate; sólo el observador interpreta el protocolo y declara que no hay operaciones. [Issue](https://github.com/kalyx-ar/EDC/issues/404).
 
 ## Estado y plataformas
 
-Agente/SDK PortGate 0.4; driver propio UMDF 2.15 experimental 0.1 para Windows 10 1803+/11 x64. Admite clientes Win32 de 32/64 bits. No se instala un driver al arrancar PortGate. **XP no ofrece COM virtual**; una futura evaluación puede excluirlo definitivamente. El núcleo C++17 sigue separado del backend y conserva sus puertos físicos Win32/POSIX. El frontend virtual POSIX aún no está implementado y devuelve indisponibilidad explícita.
+Agente/SDK fuente 0.5, driver UMDF 2.15 experimental 0.2 para Windows 10 1803+/11 x64 (clientes Win32 x86/x64). XP no ofrece VCOM; TTY/PTY POSIX pendiente. El núcleo y los puertos físicos siguen separados por plataforma.
 
-Build del driver e INF verificados, más pruebas del protocolo/arbitraje; todavía **sin firma Authenticode/catálogo firmado, instalación ni ensayo CreateFile/SerialPort sobre el dispositivo virtual**. No se presenta como una integración homologada. Por decisión humana se cierra la creación experimental EDC #404 y se traslada la validación instalada/mejora continua a [EDC #408](https://github.com/kalyx-ar/EDC/issues/408). No se modificaron dispositivos, servicio, ACL ni seguridad de arranque de la estación de desarrollo.
+Código/build/pruebas del transporte y arbitraje; sin driver instalado ni firma Authenticode/catálogo firmado. No acredita interoperabilidad de una aplicación legacy. El cierre anterior de #404 fue revocado por el diseño incorrecto. Firma, instalación, Win32/SerialPort/Glyms, PnP y ACL continúan en [#408](https://github.com/kalyx-ar/EDC/issues/408).
 
-## Arquitectura
+## Arquitectura y propiedad
 
-`driver/windows`: FDO UMDF, interfaz COM, nombre asignado por PortsClassInstaller y registro DEVICEMAP propio. Colas WDF cancelables y timeouts, buffers de sesión, lectura/escritura y controles básicos. Los IOCTL de hardware no implementados fallan. Las líneas/baudios virtuales no reconfiguran el dispositivo físico; éste sigue bajo la configuración del agente.
+El driver nunca abre el COM físico. Expone la interfaz serial Windows, colas cancelables, timeouts y controles básicos; envía bytes por IPC local al mismo Agent/Arbiter como controlador reservado vcom:COMn. El IPC sólo acepta clientes locales con DACL SYSTEM/LocalService y el worker verifica al propietario del pipe. La identidad reservada no se admite por Link de red.
 
-`VirtualComProtocol`: negociación Link, generación/confirmación, renovación, fragmentación de escritura y sus resultados; discontinuidad y revocación. El driver nunca abre el COM físico ni crea otro árbitro. `platform/win32/virtual_com_win32.cpp` conecta el frontend local al mismo `Agent` y `Arbiter`; la identidad `vcom:COMn` y el índice del puerto quedan vinculados y no se admiten por conexiones de red.
+Se retiraron OperationBoundary, Lis01ResultsBoundary, el perfil de finalización y PortGateVComIoctl.h. No hay API propietaria requerida en el legacy. Los controles serie virtuales no cambian DTR/RTS, baudios o configuración del dispositivo físico.
 
-IPC local, DACL SYSTEM/LocalService y comprobación del propietario del pipe. El servicio existente sigue bajo LocalService. La provisión habilita su SID específico y permite proteger el COM físico con ese SID, en vez de concederlo a toda aplicación que comparta la cuenta. Administradores/SYSTEM siguen administrando Windows.
+El servicio sigue LocalService con SID específico. Los comandos vcom list/create/remove/protect mantienen la provisión del ROOT propio y la política física para SYSTEM/SID PortGate. Create requiere paquete firmado y Windows lo valida; remove/protect consultan veto PnP. Sólo se ejecutó list: no se instalaron dispositivos ni se cambiaron servicio, ACL, certificados, confianza o Secure Boot.
 
-`app/vcom_setup_win32.cpp`: `portgate vcom list`, `create --inf <paquete firmado>`, `remove --instance <ROOT id>` y `protect --physical <COM>`. Create usa exclusivamente el hardware ID ROOT de PortGate y Windows valida el paquete; no acepta certificados ni desactiva comprobaciones. Remove se limita a dispositivos propios; remove/protect consultan veto PnP. Protect requiere poner el dispositivo en servicio sin handles activos, guarda la política para SYSTEM/SID PortGate y reenumera. **Create/remove/protect y el cambio de SID no se ejecutaron: requieren pruebas en destino.**
+## Soft kill switch por observador
 
-Primero instalar/provisionar el driver firmado y servicio, proteger el COM físico y anotar el COM virtual asignado; luego configurar sus claves 10/11 y el controlador. La política persistente protege también con el agente detenido. El handle físico exclusivo mantiene la propiedad durante el funcionamiento.
+El solicitante tiene Acquire pendiente y Observe activo sobre flujo compartido, con los permisos existentes. Declara conocimiento del protocolo, preparación y no_pending_operations junto a época/generación/siguiente secuencia interpretada. Una copia atrasada o con pérdidas desde el inicio de observación se rechaza. Tras resincronizar su protocolo, renueva explícitamente Observe. PortGate no evalúa la interpretación del observador ni crea permisos nuevos.
 
-## Retiro ordenado
+La configuración de puerto lleva 10 nombre VCOM y 12 guarda en ms: 5000 predeterminados por elección humana, rango 0..600000. Cero desactiva sólo la espera. La antigua clave 11 se rechaza con diagnóstico de reprovisión explícita: no se elimina ni recrea ningún estado automáticamente.
 
-Administración `PrepareRetirement` 0x4D: puerto, motivo, retirar/ceder. El agente avisa al dueño por `RetirementNotice` 0x26. Retirar niega cola/adquisiciones hasta Reopen; ceder permite la cola normal tras finalizar. No revoca por silencio ni por duración de la operación; las reglas explícitas de lease/perdida de conexión y killswitch duro siguen separadas.
+Durante la guarda cualquier RX/TX cancela el intento, sin rearme/reintento automático. No cuentan heartbeats/controles del túnel. El solicitante decide reintentar o pedir hard explícito, con sus reglas existentes; no hay escalamiento automático.
 
-La aplicación compatible puede usar `PortGateVComIoctl.h`: STATE/WAIT_STATE y COMPLETE_TASK con identificador opaco del aviso. El perfil manual también termina por CloseHandle. Un legacy sin esa API obtiene desconexión/error de I/O cuando se confirma el fin; los últimos datos recibidos quedan disponibles para lectura antes del error. No se insertan avisos en el stream del equipo.
+Al concluir la guarda se coordina la admisión de I/O con el árbitro y se pide la pausa al frontend local. Éste marca el endpoint desconectado y completa accesos pendientes mediante la interfaz COM estándar. El acuse interno se envía después de aplicar ese estado en WDF, sin esperar mensaje/CloseHandle del legacy. Después el árbitro transfiere al solicitante exacto, incluso si otro candidato tiene mayor prioridad en la cola. Nunca se inyecta un mensaje ni una señal de desconexión al dispositivo físico.
 
-`protocols/Lis01ResultsBoundary` es opt-in `lis01-results-batch`: un lote del instrumento, ENQ/ACK, frames con número/checksum correctos, registros H/P/O/R/C/L, R presente, L normal `L|1|N`, ACK explícitos y EOT. No consulta ni responde al equipo. Registros desconocidos, consultas/listas sin R, errores o ACK ausentes no dan prueba de finalización. Un lote no equivale al proceso completo de una consulta multi-turno: para eso hace falta un perfil con la evidencia del equipo/ciclo concreto. Manual y otros perfiles no se autodetectan por marca.
+Una lectura esperando datos no es una operación de protocolo. PortGate tampoco inspecciona ACKs, resultados o incertidumbre semántica; esa decisión pertenece al observador y su riesgo fue aceptado. Los locks/generaciones impiden que el acceso anterior continúe usando el flujo tomado por otro dueño.
 
-La barrera `RetireAtBoundary` compara generación, offset/secuencia RX y versión TX. Espera escrituras confirmadas y se coordina con el mutex de escritura y el árbitro. Tráfico nuevo rechaza la cesión; las escrituras concurrentes esperan la respuesta, y no se repiten al cambiar de tenencia. El agente libera con el árbitro existente y el frontend marca desconectado. Libera la tenencia, sin apagar físicamente el equipo.
+Los intentos se correlacionan con un token interno único, no con IDs reutilizables de clientes. Cancelación, pérdida de conexión/observación, cambio de dueño/generación o retiro invalidan el intento. Un fallo o timeout técnico del frontend cancela y rehabilita la tenencia anterior aún vigente. El timeout utiliza la configuración técnica de handover existente, independiente de la guarda del dispositivo.
+
+Al liberar el nuevo dueño y quedar verde el semáforo, el VCOM está disponible. Un handle legacy todavía abierto solicita tenencia nueva y restaura I/O; sin aplicación abierta no se reserva. No hay restauración de la sesión del protocolo ni replay de bytes entre generaciones. Los últimos bytes del receptor anterior permanecen en su buffer mientras está desconectado y se limpian al abrir la generación siguiente.
+
+PrepareRetirement/RetirementNotice son avisos cooperativos administrativos para dueños compatibles de red o cierre normal. El frontend virtual los ignora: no son la solicitud soft del observador ni prueban fin de una operación.
+
+## SDK y pruebas
+
+PortGateChannel ofrece ObserveAsync, CursorAfter y SoftKillSwitchAsync mientras AcquireAsync está pendiente. Las tres declaraciones son explícitas y el cursor debe representar lo ya interpretado. Cancelar la llamada pide cancelar el intento; no revierte una transferencia que ya se haya aplicado. Capabilities anuncia soporte para diagnosticar agentes anteriores.
+
+Las pruebas nativas usan dispositivo TCP simulado y un sustituto del frontend local, sin modificar la admisión de identidades del producto. Comprueban declaraciones, frescura/pérdidas, guarda opcional, RX/TX, tokens atrasados y entrega exacta. La máquina del VCOM comprueba bytes binarios, pausa/errores y disponibilidad posterior sin interpretación. No equivale a prueba del driver instalado.
+
+Verificación 2026-11-01: build Release del agente y driver correctos. CTest repetido: 855 verificaciones del agente y 33 del transporte VCOM, cero fallos, 7,53 y 7,51 s. `dotnet test dotnet/Astm.slnx --no-restore -m:1 -v quiet` repetido: 424 correctas, una omitida, cero fallos, 13 s por ejecución. La omitida requiere una traza privada seleccionada expresamente; no se usa información clínica real para esta validación. InfVerif `/w` correcto e Inf2Cat sin errores/advertencias; generan un catálogo **sin firma**. Hash de la DLL y procedencia del kit en DEPENDENCIAS.
 
 ## Build y prueba pendiente
 
@@ -41,6 +53,6 @@ cmake --build PortGate/build/vcom-26100 --config Release
 
 La DLL y el INF quedan juntos en Release. La generación/firma del catálogo y la firma del driver siguen el procedimiento de publicación aprobado; este build no genera certificados ni modifica confianza. Herramientas/licencias/hashes en DEPENDENCIAS. Strong Name del SDK .NET no sustituye a la firma del driver.
 
-Aceptación pendiente en Windows de prueba: instalar el paquete firmado, crear/quitar el dispositivo propio, comprobar veto con handles abiertos y política del COM real, abrir con cliente Win32 y SerialPort, fragmentación/lectura/escritura/cancelación/timeouts/reapertura, contienda con Link, aviso y cesión sin cruces entre sesiones, pérdida de agente y Driver Verifier/WDF. No instalar en una estación de trabajo ni cambiar Secure Boot/test signing para hacer pasar esa verificación.
+Aceptación pendiente en Windows de prueba: instalar el paquete firmado, crear/quitar el dispositivo propio, comprobar veto con handles abiertos y política del COM real, abrir con cliente Win32 y SerialPort, fragmentación/lectura/escritura/cancelación/timeouts/reapertura, contienda con Link, soft por observador, desconexión y disponibilidad posterior sin cruces entre generaciones, pérdida de agente y Driver Verifier/WDF. No instalar en una estación de trabajo ni cambiar Secure Boot/test signing para hacer pasar esa verificación.
 
 Evaluación completa del ecosistema EDC y ámbito de la consola: `EDC/Documentacion/Modulos/Ports/com-virtual-404.md`. No hay datos clínicos persistidos por este backend ni nuevas dependencias de terceros.

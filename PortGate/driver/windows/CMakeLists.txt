@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PortGateVCom VERSION 0.1.0 LANGUAGES CXX)
+project(PortGateVCom VERSION 0.2.0 LANGUAGES CXX)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "This backend targets Windows 10/11 x64. It does not change PortGate's portable core or XP target.")
 endif()
@@ -14,9 +14,9 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(vcom_root "${CMAKE_CURRENT_LIST_DIR}/../..")
 add_library(PortGateVCom SHARED driver.cpp worker.cpp
     "${vcom_root}/core/src/cbor.cpp" "${vcom_root}/core/src/link.cpp"
-    "${vcom_root}/core/src/virtual_com_protocol.cpp" "${vcom_root}/protocols/lis01_results_boundary.cpp"
+    "${vcom_root}/core/src/virtual_com_protocol.cpp"
     "${vcom_root}/platform/win32/virtual_com_win32.cpp")
-target_include_directories(PortGateVCom PRIVATE "${vcom_root}/core/include" "${vcom_root}/protocols/include")
+target_include_directories(PortGateVCom PRIVATE "${vcom_root}/core/include")
 target_include_directories(PortGateVCom SYSTEM PRIVATE "${vcom_wdf}")
 target_compile_definitions(PortGateVCom PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00 UMDF_VERSION_MAJOR=2 UMDF_VERSION_MINOR=15 UNICODE _UNICODE)
 target_compile_options(PortGateVCom PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)

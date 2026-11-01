@@ -23,6 +23,8 @@ public sealed record PortGateOptions(string ControllerId, string PortId)
 public sealed record PortGateHandoverRequest(ulong HandoverId, string Requester, string? Reason, TimeSpan Timeout);
 
 public sealed record PortGateHandoverResult(bool Yielded, string? Code);
+public sealed record PortGateObservationCursor(Guid AgentEpoch, uint Generation, ulong NextSequence);
+public sealed record PortGateSoftKillResult(bool Transferred, string? Code);
 
 public sealed class PortGateException(string code, string message) : IOException($"{code}: {message}")
 {
@@ -37,7 +39,10 @@ public sealed record PortGateEvent(PortGateEventKind Kind, DateTimeOffset Timest
 public sealed record PortGateLease(uint Generation, Guid TransferId, TimeSpan Duration, bool UncertainTx, ulong UnownedRxBytes);
 
 /// <summary>Port as the agent announces it, including the serial settings in force (null for TCP devices).</summary>
-public sealed record PortGatePortInfo(string PortId, string? InstrumentId, int MaxWriteBytes, string? DeviceKind, SerialSettings? Serial);
+public sealed record PortGatePortInfo(string PortId, string? InstrumentId, int MaxWriteBytes, string? DeviceKind, SerialSettings? Serial)
+{
+    public bool ObserverSoftKill { get; init; }
+}
 
 /// <summary>
 /// Connection to one port of a PortGate agent (spec/link-v1.md, spec/admin-v1.md). Acquiring the port yields a
@@ -117,7 +122,7 @@ public sealed class PortGateChannel : IAsyncDisposable
                 var device = p.GetValueOrDefault(7UL) as SortedDictionary<ulong, object?>;
                 var info = new PortGatePortInfo(options.PortId, p.GetValueOrDefault(1UL) as string, (int)(p.GetValueOrDefault(5UL) as ulong? ?? 16 * 1024),
                     device is null ? null : (device.GetValueOrDefault(0UL) as ulong?) switch { 0 => "serial", 1 => "tcp", 2 => "tcp-listen", _ => null },
-                    PortGateDevices.Serial(device));
+                    PortGateDevices.Serial(device)) { ObserverSoftKill = capabilities.Map()?.GetValueOrDefault(1UL) is true };
                 var channel = new PortGateChannel(stream, options, (ushort)(i + 1), epoch, info);
                 channel.Start(decoder, units);
                 return channel;
@@ -173,6 +178,37 @@ public sealed class PortGateChannel : IAsyncDisposable
     {
         var map = await ControlRequestAsync(LinkType.RequestHandover, reason is null ? [] : LinkCbor.Map((1, reason)), cancellationToken).ConfigureAwait(false);
         return new PortGateHandoverResult(map.GetValueOrDefault(1UL) is true, map.GetValueOrDefault(2UL) as string);
+    }
+
+    /// <summary>Cursor after the last observation actually interpreted by the caller. The caller must detect gaps and resynchronize
+    /// its protocol before renewing observation/declarations; receiving a copy does not prove it was processed.</summary>
+    public PortGateObservationCursor CursorAfter(PortGateObservation observation) => new(AgentEpoch, observation.Generation, checked(observation.Sequence + 1));
+
+    /// <summary>The caller must have an AcquireAsync pending and active traffic observation. The observer, not PortGate or VCOM,
+    /// declares protocol knowledge, readiness and no pending operations. New traffic cancels the optional guard; never retries or escalates to hard.</summary>
+    public async Task<PortGateSoftKillResult> SoftKillSwitchAsync(PortGateObservationCursor cursor, bool knowsProtocol, bool ready,
+        bool noPendingOperations, string? reason = null, CancellationToken cancellationToken = default)
+    {
+        if (!Port.ObserverSoftKill) throw new PortGateException("PORTGATE-CH-SOFT-UNSUPPORTED", "The agent does not support observer soft takeover.");
+        var requestId = (ulong)Interlocked.Increment(ref _requestId);
+        var reply = Register(_controlReplies, requestId);
+        try
+        {
+            await SendAsync(LinkUnit.Control(LinkType.SoftKillSwitch, _port, LinkCbor.Map((0, requestId), (1, cursor.AgentEpoch.ToByteArray()),
+                (2, (ulong)cursor.Generation), (3, cursor.NextSequence), (4, knowsProtocol), (5, ready),
+                (6, noPendingOperations ? "no_pending_operations" : ""), (7, reason ?? ""))), cancellationToken).ConfigureAwait(false);
+            var result = await reply.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return new(result.GetValueOrDefault(1UL) is true, result.GetValueOrDefault(2UL) as string);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancellation cannot roll back a transfer already committed by the agent.
+            try { await SendAsync(LinkUnit.Control(LinkType.CancelSoftKill, _port, LinkCbor.Map((1, requestId))), _stop.Token)
+                    .WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+            catch (Exception e) when (e is IOException or OperationCanceledException or ObjectDisposedException or TimeoutException) { }
+            throw;
+        }
+        finally { _controlReplies.TryRemove(requestId, out _); }
     }
 
     /// <summary>Forced interruption of the current owner (needs TLS with an authenticated peer and the right). Returns the event id to contest.</summary>
@@ -368,7 +404,9 @@ public sealed class PortGateChannel : IAsyncDisposable
                     map.GetValueOrDefault(3UL) is true ? "PORTGATE-RETIREMENT-CANCELLED" : map.GetValueOrDefault(2UL) is true ? "PORTGATE-WITHDRAWING" : "PORTGATE-YIELD-PENDING",
                     map.GetValueOrDefault(1UL) as string);
                 break;
-            case LinkType.HandoverResult or LinkType.SecurityResult or LinkType.ObserveResult when _controlReplies.TryRemove(requestId, out var result):
+            case LinkType.SoftKillResult when map.GetValueOrDefault(3UL) as string == "pending":
+                break;
+            case LinkType.HandoverResult or LinkType.SecurityResult or LinkType.ObserveResult or LinkType.SoftKillResult when _controlReplies.TryRemove(requestId, out var result):
                 result.TrySetResult(map);
                 break;
             case LinkType.HandoverAsked when unit.Channel == _port:
@@ -381,7 +419,8 @@ public sealed class PortGateChannel : IAsyncDisposable
             case LinkType.PortState when unit.Channel == _port:
                 _portStates.Writer.TryWrite(new PortGatePortState(map.GetValueOrDefault(0UL) is true, map.GetValueOrDefault(1UL) as string,
                     (uint)(map.GetValueOrDefault(2UL) as ulong? ?? 0), (int)(map.GetValueOrDefault(3UL) as ulong? ?? 0), map.GetValueOrDefault(4UL) is true,
-                    map.GetValueOrDefault(5UL) is true, map.GetValueOrDefault(6UL) is true));
+                    map.GetValueOrDefault(5UL) is true, map.GetValueOrDefault(6UL) is true)
+                    { NextObservationSequence = map.GetValueOrDefault(8UL) as ulong? ?? 0 });
                 break;
             case LinkType.SecurityEvent when unit.Channel == _port:
                 _securityEvents.Writer.TryWrite(new PortGateAuditEvent(requestId,
@@ -563,4 +602,7 @@ public sealed record PortGateObservation(ulong Sequence, ulong Offset, uint Gene
 public sealed record PortGateObserving(bool Observing, bool Traffic);
 
 /// <summary>Port state for observers: device open, owner, generation, queued requests, secure close, quarantine and access mode.</summary>
-public sealed record PortGatePortState(bool Open, string? Owner, uint Generation, int Queued, bool SecureClosed, bool Quarantined, bool Shared);
+public sealed record PortGatePortState(bool Open, string? Owner, uint Generation, int Queued, bool SecureClosed, bool Quarantined, bool Shared)
+{
+    public ulong NextObservationSequence { get; init; }
+}

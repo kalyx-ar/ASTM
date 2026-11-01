@@ -58,6 +58,9 @@ public:
     bool may_write(ConnectionId connection, std::uint32_t generation) const;
     std::optional<ConnectionId> owner() const;
     bool is_queued(ConnectionId connection) const;
+    /// Moves this tenure to the exact queued requester; no generic queue release and no hard kill/quarantine.
+    bool transfer(ConnectionId owner, std::uint32_t generation, ConnectionId requester, std::uint64_t now,
+                  std::vector<ArbiterEvent>& out);
     std::uint32_t generation() const { return generation_; }
     std::uint32_t lease_ms() const { return lease_ms_; }
     std::size_t queued() const { return queue_.size(); }

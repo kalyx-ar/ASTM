@@ -58,7 +58,8 @@ struct PortConfig {
     bool shared = false;
     /// Local Windows virtual COM frontend, backed by the PortGate driver. Controller id is "vcom:" + virtual_com.
     std::string virtual_com;
-    std::string virtual_com_profile = "manual";
+    /// Optional traffic guard for observer-declared soft takeover; 0 disables only the wait.
+    std::uint32_t virtual_com_guard_ms = 5000;
     /// Durable capture of the port traffic, sealed with the key the server provisions (spec/admin-v1.md § Capture).
     struct Capture {
         bool enabled = false;

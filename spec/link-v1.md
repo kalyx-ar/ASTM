@@ -59,20 +59,24 @@ Observers enable themselves with `Observe`/`ObserveResult` (0x30/0x31, spec/admi
 
 `Tls` mode (Mbed TLS 4.1 LTS in PortGate) requires TLS 1.2 or 1.3 (`minimumVersion` may force 1.3) and, by default, a client certificate that chains to `clientCa`. The `controllerId` of `Hello` must equal the certificate subject CN, or the certificate SHA-256 (DER) must equal the `certificateSha256` configured for that controller; otherwise the agent answers `Error` `PORTGATE-IDENTITY-MISMATCH` and closes. A `Tls` endpoint never falls back to plain text, and an agent built without TLS refuses to start such an endpoint.
 
-## Virtual COM / cooperative retirement extension (PortGate 0.4, EDC #404)
+## COM virtual y soft kill switch por observador (PortGate 0.5, EDC #404)
 
-Additive Link v1 units; raw SerialData never contains administrative warning strings:
+SerialData conserva exclusivamente los bytes del dispositivo. Capabilities agrega 1 observerSoftKill=true; cada puerto lleva 8 nombre VCOM y 9 guarda ms. Los identificadores 0x27/0x28 del intérprete retirado quedan reservados y no se reutilizan.
 
-| Type | Name | Direction | CBOR fields |
+| Tipo | Nombre | Dirección | Campos CBOR |
 |---|---|---|---|
-| 0x26 | RetirementNotice | agent → owner | 0 generation, 1 reason text, 2 withdraw bool, 3 cancelled bool (optional false) |
-| 0x27 | RetireAtBoundary | owner → agent | 0 generation, 1 next RX offset, 2 next RX sequence, 3 last confirmed TX version, 4 opaque local warning id |
-| 0x28 | RetireResult | agent → owner | 0 warning id, 1 accepted bool, 2 error code text |
+| 0x26 | RetirementNotice | agente → dueño de red | Aviso cooperativo administrativo existente; ignorado por el VCOM. |
+| 0x29 | SoftKillSwitch | observador → agente | 0 requestId, 1 época bytes[16], 2 generación, 3 siguiente secuencia observada, 4 conoce protocolo bool, 5 listo bool, 6 texto exacto no_pending_operations, 7 motivo opcional (hasta 500 bytes) |
+| 0x2A | SoftKillResult | agente → observador | 0 requestId, 1 transferred bool, 2 código, 3 pending/completed; 4 guarda ms en respuesta inicial |
+| 0x2B | CancelSoftKill | observador → agente | 1 requestId del intento a cancelar; sólo puede cancelar su propio intento |
+| 0x2C | PauseVirtualCom | agente → frontend local | 0 token interno único, 1 generación |
+| 0x2D | VirtualComPaused | frontend local → agente | 0 token, 1 generación, 2 estado aplicado bool |
+| 0x2E | ResumeVirtualCom | agente → frontend local | 0 token, 1 generación; cancela una pausa no transferida si la tenencia sigue vigente |
 
-Granted additionally carries 7 next RX offset, 8 next RX sequence, 9 TX version. WriteStatus carries 5 TX version. Each admitted physical write advances the TX version; this is a fencing counter, not a device acknowledgement. Capabilities port entries carry 8 virtual COM name (empty when disabled), 9 completion profile.
+El observador debe estar en cola y leyendo el flujo autorizado de un puerto compartido. No se crea derecho de soft ni se exige el de hard. Época/generación/siguiente secuencia se comparan con el flujo actual; una pérdida de copias desde Observe rechaza la declaración hasta que el observador resincronice su protocolo y renueve Observe. PortState agrega 8 siguiente secuencia como snapshot al suscribirse/renovar o cambiar el semáforo; no anuncia eventos nuevos sólo por cambiar ese contador.
 
-RetireAtBoundary is a voluntary release barrier by the current admitted generation. The agent compares RX/TX counters under the arbiter and physical write exclusion. Any new accounted traffic or uncertain write rejects it; rejection does not revoke the owner. Acceptance uses the same arbiter release and its normal next generation. The virtual frontend pauses concurrent writes until the answer and never replays them into another tenure. Retirement does not issue a physical power-off command.
+Guarda opcional: configuración de puerto clave 12, 5000 ms predeterminados, cero desactiva la espera. Cualquier RX/TX cancela, sin rearme ni reintento. La admisión se coordina al pausar; la respuesta interna confirma que el frontend aplicó la desconexión antes de transferir a ese solicitante exacto con generación nueva. El legacy nunca recibe controles Link ni debe enviar un acuse de PortGate. El dispositivo físico no se cierra ni recibe avisos/señales sintéticos.
 
-The local Windows driver uses an ACL-protected local IPC endpoint bound to one port and controller `vcom:COMn`; a network Hello cannot use that namespace. The physical device remains exclusively open in PortGate. A native COM driver, not a pipe alias, exposes the Windows serial API to the legacy app; its optional out-of-band IOCTL contract is PortGate/driver/windows/PortGateVComIoctl.h. XP does not offer virtual COM.
+Las respuestas terminales de intentos aceptados se conservan en una caché de hasta 64 entradas por puerto, identificadas por conexión/ID y limitada a la época del agente. Repetir el ID de un intento pendiente no rearma la guarda; repetir uno terminado devuelve su resultado mientras siga en caché. La desconexión del solicitante cancela antes del corte. Un token atrasado del frontend no puede completar otro intento. Timeout técnico del frontend cancela; jamás se convierte en hard.
 
-Manual completion needs the current opaque warning id or normal close. The opt-in lis01-results-batch provider proves only the documented single result batch, not arbitrary ASTM business workflows. It never sends instrument ACKs or infers completion from silence. See Documentacion/COM-VIRTUAL.md. Creation is EDC #404; installed validation and continuous improvement are EDC #408 by explicit human decision.
+El frontend sigue el semáforo tras la cesión: al quedar libre solicita otra tenencia si el handle legacy permanece abierto. Una lectura en espera no impide el corte y no se interpreta el protocolo. No hay IOCTL propietario del legacy ni perfiles de finalización en el driver. Firma/instalación y compatibilidad real pendientes en EDC #408; XP no ofrece COM virtual.

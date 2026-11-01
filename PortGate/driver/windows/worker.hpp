@@ -13,7 +13,7 @@ public:
     ~Worker();
     bool start();
     bool write(std::uint64_t id, const link::Bytes& bytes);
-    bool complete_task(std::uint64_t warning);
+
     void fault(const std::string& reason);
     void close();
 private:

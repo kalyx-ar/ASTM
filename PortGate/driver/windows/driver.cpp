@@ -13,12 +13,13 @@
 #include <mutex>
 #include <string>
 #include "worker.hpp"
-#include "PortGateVComIoctl.h"
+
 
 using portgate::VirtualComEvent;
 using portgate::vcom::Worker;
 namespace {
 constexpr std::size_t kRxLimit=1024*1024;
+struct EndpointStatus { ULONG State=0; WCHAR Reason[256]{}; };
 struct RequestContext {
     ULONGLONG id=0, since=0, last_byte=0, total_timeout=0;
     std::size_t progress=0;
@@ -30,13 +31,14 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(RequestContext, RequestData);
 struct State {
     WDFDEVICE device=nullptr;
     WDFTIMER timer=nullptr;
-    WDFQUEUE reads=nullptr, active_read=nullptr, writes=nullptr, waits=nullptr, state_waits=nullptr, flushes=nullptr;
+    WDFQUEUE reads=nullptr, active_read=nullptr, writes=nullptr, waits=nullptr, flushes=nullptr;
     std::mutex mutex;
     std::shared_ptr<Worker> worker;
     std::deque<std::uint8_t> received;
     std::string name;
     std::wstring pdo;
-    PORTGATE_VCOM_STATUS status{PORTGATE_VCOM_VERSION,0,0,{}};
+    EndpointStatus status{};
+    std::uint64_t generation=0;
     SERIAL_TIMEOUTS timeouts{};
     SERIAL_BAUD_RATE baud{9600};
     SERIAL_LINE_CONTROL line{STOP_BIT_1,NO_PARITY,8};
@@ -82,10 +84,7 @@ void notify_waiters(State& s) {
         }
     }
 }
-void notify_state(State& s) {
-    WDFREQUEST request=nullptr;
-    while(NT_SUCCESS(WdfIoQueueRetrieveNextRequest(s.state_waits,&request))) output(request,s.status);
-}
+
 // Must hold State::mutex. A separate one-request queue preserves read order while Windows owns cancellation.
 void drain_reads(State& s) {
     for(;;) {
@@ -120,6 +119,7 @@ void finish_write(State& s,const VirtualComEvent& event) {
             WDFREQUEST request=nullptr;
             if(NT_SUCCESS(WdfIoQueueRetrieveFoundRequest(s.writes,found,&request)))
                 WdfRequestCompleteWithInformation(request,event.detail.empty()?STATUS_SUCCESS:
+                    event.detail=="PORTGATE-SOFT-TRANSFER"?STATUS_DEVICE_NOT_CONNECTED:
                     event.detail=="PORTGATE-VCOM-WRITE-TIMEOUT"?STATUS_IO_TIMEOUT:STATUS_IO_DEVICE_ERROR,event.written);
             break;
         }
@@ -131,7 +131,8 @@ bool on_event(State& s,const VirtualComEvent& event) {
     bool healthy=true;
     switch(event.kind) {
         case VirtualComEvent::Kind::Opened:
-            s.status.State=1; s.pending_events|=SERIAL_EV_RLSD|SERIAL_EV_DSR|SERIAL_EV_CTS; break;
+            if(s.generation!=event.request) { s.received.clear(); s.generation=event.request; }
+            s.status.State=1; s.status.Reason[0]=0; s.pending_events|=SERIAL_EV_RLSD|SERIAL_EV_DSR|SERIAL_EV_CTS; break;
         case VirtualComEvent::Kind::Received:
             if(s.received.size()+event.data.size()>kRxLimit) {
                 s.status.State=0; s.pending_events|=SERIAL_EV_ERR|SERIAL_EV_RLSD;
@@ -151,16 +152,10 @@ bool on_event(State& s,const VirtualComEvent& event) {
                 complete_queue(s.flushes,event.detail.empty()?STATUS_SUCCESS:STATUS_IO_DEVICE_ERROR);
             } }
             break;
-        case VirtualComEvent::Kind::Warning:
-            s.status.State=2; s.status.WarningId=event.request;
-            MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,event.detail.c_str(),-1,s.status.Reason,256);
-            s.status.Reason[255]=0; notify_state(s); break;
         case VirtualComEvent::Kind::Disconnected:
             s.status.State=0; s.pending_events|=SERIAL_EV_RLSD|SERIAL_EV_DSR|SERIAL_EV_CTS;
             MultiByteToWideChar(CP_UTF8,0,event.detail.c_str(),-1,s.status.Reason,256); s.status.Reason[255]=0;
-            complete_queue(s.writes,STATUS_DEVICE_NOT_CONNECTED); notify_state(s); break;
-        case VirtualComEvent::Kind::RetirementCancelled:
-            s.status.State=1; s.status.Reason[0]=0; notify_state(s); break;
+            complete_queue(s.writes,STATUS_DEVICE_NOT_CONNECTED); break;
         case VirtualComEvent::Kind::Discontinuity:
             s.serial_errors|=SERIAL_ERROR_OVERRUN; s.pending_events|=SERIAL_EV_ERR; break;
     }
@@ -180,7 +175,7 @@ void file_cleanup(WDFFILEOBJECT file) {
     std::lock_guard<std::mutex> lock(s.mutex);
     s.status.State=0; s.received.clear(); s.opening=false;
     complete_queue(s.reads,STATUS_CANCELLED); complete_queue(s.active_read,STATUS_CANCELLED);
-    complete_queue(s.writes,STATUS_CANCELLED); complete_queue(s.waits,STATUS_CANCELLED); complete_queue(s.state_waits,STATUS_CANCELLED);
+    complete_queue(s.writes,STATUS_CANCELLED); complete_queue(s.waits,STATUS_CANCELLED);
     complete_queue(s.flushes,STATUS_CANCELLED);
 }
 EVT_WDF_DEVICE_FILE_CREATE file_create;
@@ -189,7 +184,7 @@ void file_create(WDFDEVICE device,WDFREQUEST request,WDFFILEOBJECT) {
     std::shared_ptr<Worker> worker;
     { std::lock_guard<std::mutex> lock(s.mutex);
       if(s.opening || s.worker) { WdfRequestComplete(request,STATUS_ACCESS_DENIED); return; }
-      s.opening=true; s.received.clear(); s.status={PORTGATE_VCOM_VERSION,0,0,{}}; s.wait_mask=0; s.pending_events=0; s.serial_errors=0;
+      s.opening=true; s.received.clear(); s.status={}; s.generation=0; s.wait_mask=0; s.pending_events=0; s.serial_errors=0;
       s.timeouts={}; s.baud={9600}; s.line={STOP_BIT_1,NO_PARITY,8}; s.flow={}; s.chars={0x1a,0,0,0,0x11,0x13};
       worker=std::make_shared<Worker>(s.name,[&s](const VirtualComEvent& event){return on_event(s,event);}); s.worker=worker;
     }
@@ -249,22 +244,10 @@ void timer(WDFTIMER timer_object) {
 EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL control;
 void control(WDFQUEUE queue,WDFREQUEST request,size_t,size_t,ULONG code) {
     auto& s=*DeviceData(WdfIoQueueGetDevice(queue))->state;
-    if(code==IOCTL_PORTGATE_VCOM_COMPLETE_TASK) {
-        ULONGLONG warning=0; if(!input(request,warning)) { WdfRequestComplete(request,STATUS_BUFFER_TOO_SMALL); return; }
-        std::shared_ptr<Worker> worker;
-        { std::lock_guard<std::mutex> lock(s.mutex); worker=s.worker; }
-        WdfRequestComplete(request,worker && worker->complete_task(warning)?STATUS_SUCCESS:STATUS_INVALID_DEVICE_STATE); return;
-    }
+
     std::lock_guard<std::mutex> lock(s.mutex);
     NTSTATUS result=STATUS_SUCCESS;
     switch(code) {
-        case IOCTL_PORTGATE_VCOM_STATE: output(request,s.status); return;
-        case IOCTL_PORTGATE_VCOM_WAIT_STATE: {
-            ULONGLONG known=0;
-            if(!input(request,known)) { result=STATUS_BUFFER_TOO_SMALL; break; }
-            if(s.status.State==0 || known!=s.status.WarningId) { output(request,s.status); return; }
-            forward(request,s.state_waits); return;
-        }
         case IOCTL_SERIAL_GET_BAUD_RATE: output(request,s.baud); return;
         case IOCTL_SERIAL_SET_BAUD_RATE: {
             SERIAL_BAUD_RATE v{}; if(!input(request,v) || !v.BaudRate) result=STATUS_INVALID_PARAMETER;
@@ -398,7 +381,7 @@ NTSTATUS add(WDFDRIVER,PWDFDEVICE_INIT init) {
     status=WdfDeviceOpenDevicemapKey(device,&subkey,KEY_SET_VALUE,WDF_NO_OBJECT_ATTRIBUTES,&key); if(!NT_SUCCESS(status)) return status;
     UNICODE_STRING pdo_name{}; pdo_name.Buffer=s->pdo.data(); pdo_name.Length=static_cast<USHORT>(s->pdo.size()*sizeof(wchar_t)); pdo_name.MaximumLength=pdo_name.Length;
     status=WdfRegistryAssignUnicodeString(key,&pdo_name,&name); WdfRegistryClose(key); if(!NT_SUCCESS(status)) return status;
-    for(auto target:{&s->reads,&s->active_read,&s->writes,&s->waits,&s->state_waits,&s->flushes}) {
+    for(auto target:{&s->reads,&s->active_read,&s->writes,&s->waits,&s->flushes}) {
         WDF_IO_QUEUE_CONFIG config; WDF_IO_QUEUE_CONFIG_INIT(&config,WdfIoQueueDispatchManual); config.PowerManaged=WdfFalse; config.EvtIoCanceledOnQueue=cancelled;
         status=WdfIoQueueCreate(device,&config,WDF_NO_OBJECT_ATTRIBUTES,target); if(!NT_SUCCESS(status)) return status;
     }

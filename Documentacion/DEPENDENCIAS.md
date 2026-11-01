@@ -12,6 +12,8 @@ Ensayo inicial: WDK 10.0.28000.2526/SDK 28000, SHA256 `63C939FB5A79295BF40E941DB
 
 **Driver propio: Authenticode NotSigned; catálogo firmado/instalación pendientes.** El SDK administrado conserva Strong Name de distribución; eso no firma el driver. No se generaron claves/certificados ni se cambiaron test signing, Secure Boot, editores, raíces o baselines. No se declara homologación por compilar o verificar el INF.
 
+Corrección del soft kill switch, 2026-11-01: driver propio 0.2.0.0, mismo WDK/SDK verificado y sin dependencias nuevas. DLL Release SHA256 `8E8D0B0FC087F6C6B2026A16DE19212018A372D5E2883B140FE5484E42A600CC`; InfVerif `/w` correcto e Inf2Cat correcto para 10_RS4/10_CO/10_NI/10_GE x64, sin errores ni advertencias. DLL y catálogo siguen **NotSigned**. La verificación instalada continúa en EDC #408.
+
 Registro de cada dependencia externa: origen, versión, licencia, consumidores, verificación y aprobación.
 
 ## Mbed TLS 4.1.1 (PortGate)

@@ -117,6 +117,7 @@ void Agent::run(const std::atomic<bool>& stop) {
     while (!stop && !stopping_) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kPollMs));
         const auto now = now_ms();
+        for (auto& port : ports_) advance_soft(*port);
         std::vector<std::shared_ptr<Connection>> stale;
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -442,7 +443,8 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
         const bool known = unit.type == link::Type::Hello || unit.type == link::Type::Acquire || unit.type == link::Type::Renew ||
                            unit.type == link::Type::Release || unit.type == link::Type::ConfirmTransfer || unit.type == link::Type::RequestHandover ||
                            unit.type == link::Type::HandoverAnswer || unit.type == link::Type::KillSwitch || unit.type == link::Type::Contest || unit.type == link::Type::Observe ||
-                           unit.type == link::Type::Heartbeat || unit.type == link::Type::Error;
+                           unit.type == link::Type::Heartbeat || unit.type == link::Type::Error || unit.type == link::Type::SoftKillSwitch ||
+                           unit.type == link::Type::CancelSoftKill || unit.type == link::Type::VirtualComPaused;
         if (known || (unit.flags & link::kFlagCritical) != 0) {
             send_error(connection, "PORTGATE-BAD-PAYLOAD", 0, "unit " + std::to_string(static_cast<int>(unit.type)) + " without a valid CBOR map");
             if ((unit.flags & link::kFlagCritical) != 0) connection->alive = false;
@@ -474,6 +476,7 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
         }
         connection->controller_id = *text;
         connection->hello = true;
+        if (connection->local_port) if (auto local=port_for(connection->local_port)) local->observers.push_back(connection->id);
         log(LogLevel::Info, "connection " + std::to_string(connection->id) + " identifies as " + *text + (tls_ ? " (verified)" : " (unauthenticated in plain mode)"));
         return;
     }
@@ -491,7 +494,7 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
         return;
     }
 
-    if (unit.type == link::Type::RetireAtBoundary) { retire_at_boundary(connection,*port,*map); return; }
+    if (unit.type == link::Type::VirtualComPaused) { virtual_paused(connection,*port,*map); return; }
 
     std::vector<std::shared_ptr<Connection>> to_drop;
     {
@@ -527,6 +530,12 @@ void Agent::handle(const std::shared_ptr<Connection>& connection, const link::Un
                 break;
             case link::Type::KillSwitch:
                 kill_switch(connection, *port, *map, now);
+                break;
+            case link::Type::SoftKillSwitch:
+                soft_kill(connection,*port,*map,now); break;
+            case link::Type::CancelSoftKill:
+                if(port->soft && port->soft->requester==connection->id && port->soft->request==uint_or(*map,1,0))
+                    finish_soft(*port,false,"PORTGATE-SOFT-CANCELLED");
                 break;
             case link::Type::Observe:
                 observe(connection, *port, *map);
@@ -723,7 +732,9 @@ void Agent::observe(const std::shared_ptr<Connection>& connection, Port& port, c
     };
     auto it = std::find(port.observers.begin(), port.observers.end(), connection->id);
     if (enable && !has_right(port, connection->controller_id, RightObserve)) return reply(false, "PORTGATE-OBSERVE-NOT-ALLOWED");
-    if (enable == (it != port.observers.end())) return reply(enable, {});
+    if(enable) port.observation_drops[connection->id]=connection->dropped_observed.load();
+    else { port.observation_drops.erase(connection->id); if(port.soft && port.soft->requester==connection->id) finish_soft(port,false,"PORTGATE-SOFT-OBSERVATION-STOPPED"); }
+    if (enable == (it != port.observers.end())) { reply(enable, {}); if(enable) publish_state(port,connection); return; }
     if (enable) port.observers.push_back(connection->id);
     else port.observers.erase(it);
     // Observation is visible to everyone on the port: a silent read-only copy would be a hidden tap.
@@ -752,9 +763,11 @@ void Agent::tap(Port& port, std::uint8_t direction, const std::uint8_t* data, st
         // Exclusive ports show their observers only the semaphore and the state (PortState), never the traffic.
         if (port.config.shared)
             for (auto id : port.observers)
-                if (auto observer = connection_by_id(id)) observers.push_back(observer);
+                if (auto observer = connection_by_id(id); observer && !observer->local_port) observers.push_back(observer);
+        if(port.soft && !port.soft->pausing) finish_soft(port,false,"PORTGATE-SOFT-TRAFFIC");
+        const auto observed_sequence=port.observe_seq++;
         if (!observers.empty()) {
-            copy.seq = port.observe_seq++;
+            copy.seq = observed_sequence;
             copy.offset = offset;
             copy.generation = generation;
             copy.direction = direction;
@@ -787,14 +800,16 @@ void Agent::publish_state(Port& port, const std::shared_ptr<Connection>& only) {
                                           {4, Value::boolean(port.arbiter->closed())},
                                           {5, Value::boolean(port.arbiter->quarantine_until() > now)},
                                           {6, Value::boolean(port.config.shared)},
-                                          {7, Value::boolean(port.arbiter->withdrawing())}};
+                                          {7, Value::boolean(port.arbiter->withdrawing())}, {8,Value::uint(port.observe_seq)}};
     if (auto owner = port.arbiter->owner()) fields.emplace(1, Value::text(controller_of(*owner)));
     const auto unit = link::control(link::Type::PortState, port.index, Value::map(std::move(fields)));
-    if (unit.payload == port.observed_state) {
+    auto stable=*link::parse_map(unit)->as_map(); stable.erase(8);
+    const auto state=link::control(link::Type::PortState,port.index,Value::map(std::move(stable))).payload;
+    if (state == port.observed_state) {
         if (only) send(only, unit);  // a new observer gets the current state even when it did not change
         return;
     }
-    port.observed_state = unit.payload;
+    port.observed_state = state;
     for (auto id : port.observers)
         if (auto observer = connection_by_id(id)) send(observer, unit);
 }
@@ -824,25 +839,6 @@ void Agent::broadcast(Port& port, const Event& event) {
     }
 }
 
-void Agent::retire_at_boundary(const std::shared_ptr<Connection>& connection, Port& port, const Value& map) {
-    // Same lock order as physical writes. A soft commit cannot overtake a write in flight or already-accounted RX.
-    std::unique_lock<std::mutex> writing(port.write_mutex);
-    std::lock_guard<std::mutex> lock(mutex_);
-    const auto generation=static_cast<std::uint32_t>(uint_or(map,0,0));
-    const bool accepted=port.open && !port.pending_device && port.arbiter->may_write(connection->id,generation) && !port.last_write_unknown &&
-        uint_or(map,1,UINT64_MAX)==port.rx_offset && uint_or(map,2,UINT64_MAX)==port.rx_seq && uint_or(map,3,UINT64_MAX)==port.tx_version;
-    send(connection,link::control(link::Type::RetireResult,port.index,
-        Value::map({{0,Value::uint(uint_or(map,4,0))},{1,Value::boolean(accepted)}, {2,Value::text(accepted?"":"PORTGATE-BOUNDARY-CHANGED")}})));
-    if(accepted) {
-        std::vector<ArbiterEvent> events;
-        port.arbiter->release(connection->id,generation,now_ms(),events);
-        // Release's standard reason is refined for the old owner; queue/generation handling is unchanged.
-        for(auto& event:events) if(event.kind==ArbiterEvent::Kind::Revoked) event.code="PORTGATE-VCOM-TASK-COMPLETE";
-        writing.unlock(); // dispatch probes this mutex; the arbiter still stays under mutex_.
-        dispatch(port,events);
-    }
-}
-
 void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Port& port, const link::Unit& unit) {
     auto data = link::parse_serial_data(unit);
     if (!data) {
@@ -861,7 +857,7 @@ void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Po
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!port.arbiter->may_write(connection->id, data->generation)) {
+        if (!port.arbiter->may_write(connection->id, data->generation) || (port.soft && port.soft->pausing && port.soft->owner==connection->id)) {
             status(0, link::WriteResult::Rejected, "PORTGATE-NOT-ADMITTED");
             return;
         }
@@ -880,7 +876,7 @@ void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Po
         {
             // Admission must be checked after waiting for an earlier physical write, as that wait may span a transfer.
             std::lock_guard<std::mutex> lock(mutex_);
-            if (!port.arbiter->may_write(connection->id, data->generation)) {
+            if (!port.arbiter->may_write(connection->id, data->generation) || (port.soft && port.soft->pausing && port.soft->owner==connection->id)) {
                 status(0, link::WriteResult::Rejected, "PORTGATE-NOT-ADMITTED");
                 return;
             }
@@ -888,8 +884,9 @@ void Agent::handle_serial_data(const std::shared_ptr<Connection>& connection, Po
         }
         written = port.device->write(data->data.data(), data->data.size());
         port.last_write_unknown = written < 0 || static_cast<std::size_t>(written)!=data->data.size();
+        // Keep traffic accounting inside the same physical-write boundary used by soft takeover.
+        if (written > 0) tap(port, 1, data->data.data(), static_cast<std::size_t>(written));
     }
-    if (written > 0) tap(port, 1, data->data.data(), static_cast<std::size_t>(written));
     if (written < 0) status(0, link::WriteResult::Unknown, "PORTGATE-WRITE-FAILED");
     else if (static_cast<std::size_t>(written) < data->data.size()) status(static_cast<std::uint64_t>(written), link::WriteResult::Partial, "PORTGATE-WRITE-PARTIAL");
     else status(static_cast<std::uint64_t>(written), link::WriteResult::Completed, {});
@@ -944,8 +941,17 @@ void Agent::port_loop(Port& port) {
                 continue;
             }
         }
+        std::unique_lock<std::mutex> reading(port.read_mutex);
+        bool paused=false;
+        { std::lock_guard<std::mutex> lock(mutex_); paused=port.soft && port.soft->pausing; }
+        if(paused) { reading.unlock(); std::this_thread::sleep_for(std::chrono::milliseconds(1)); continue; }
         const int n = port.device->read(buffer.data(), buffer.size(), kPollMs);
-        if (n == 0) continue;
+        if (n == 0) {
+            reading.unlock();
+            // Permit a pending control transition to acquire the read boundary between polls.
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
         if (n < 0) {
             log(LogLevel::Warning, "port " + port.config.port_id + " read failed; reopening");
             port.device->close();
@@ -1043,6 +1049,8 @@ void Agent::drop(const std::shared_ptr<Connection>& connection, const std::strin
         const auto now = now_ms();
         for (auto& port : ports_) {
             std::vector<ArbiterEvent> events;
+            if(port->soft && (port->soft->requester==connection->id || port->soft->owner==connection->id)) finish_soft(*port,false,"PORTGATE-SOFT-CONNECTION-LOST");
+            port->observation_drops.erase(connection->id);
             port->arbiter->disconnect(connection->id, now, events);
             port->observers.erase(std::remove(port->observers.begin(), port->observers.end(), connection->id), port->observers.end());
             dispatch(*port, events);
@@ -1163,10 +1171,10 @@ void Agent::send_hello(const std::shared_ptr<Connection>& connection) {
                                     {4, Value::boolean(false)},
                                     {5, Value::uint(port->config.max_write_bytes)},
                                     {6, Value::boolean(port->config.max_queued_requests > 0)},
-                                    {7, encode_device(device)}, {8, Value::text(port->config.virtual_com)}, {9, Value::text(port->config.virtual_com_profile)}}));
+                                    {7, encode_device(device)}, {8, Value::text(port->config.virtual_com)}, {9, Value::uint(port->config.virtual_com_guard_ms)}}));
     }
     lock.unlock();
-    send(connection, link::control(link::Type::Capabilities, 0, Value::map({{0, Value::array(std::move(ports))}})));
+    send(connection, link::control(link::Type::Capabilities, 0, Value::map({{0, Value::array(std::move(ports))},{1,Value::boolean(true)}})));
 }
 
 Agent::Port* Agent::port_for(std::uint16_t channel) {

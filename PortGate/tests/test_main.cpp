@@ -23,6 +23,27 @@
 #include "portgate/supervisor.hpp"
 #include "portgate/transport.hpp"
 
+namespace portgate {
+struct AgentTestPeer {
+    // Stand-in for the local driver IPC only in this executable; production identity admission remains unchanged.
+    static void virtual_owner(Agent& agent,const std::string& id) {
+        std::lock_guard<std::mutex> lock(agent.mutex_);
+        for(auto& pair:agent.connections_) if(pair.second->controller_id==id) {
+            pair.second->local_port=1; agent.ports_[0]->observers.push_back(pair.first);
+        }
+    }
+    static void guard(Agent& agent,std::uint32_t ms) {
+        std::lock_guard<std::mutex> lock(agent.mutex_); agent.ports_[0]->config.virtual_com_guard_ms=ms;
+    }
+    static void observation_gap(Agent& agent,const std::string& id) {
+        std::lock_guard<std::mutex> lock(agent.mutex_);
+        for(auto& pair:agent.connections_) if(pair.second->controller_id==id) ++pair.second->dropped_observed;
+    }
+    static bool soft_pending(Agent& agent) {
+        std::lock_guard<std::mutex> lock(agent.mutex_); return agent.ports_[0]->soft.has_value();
+    }
+};
+}
 extern "C" {
 #include "mbedtls/ssl.h"
 }
@@ -1307,47 +1328,101 @@ void test_handover_and_plain_security() {
 }  // namespace
 
 namespace {
-void test_retirement_fence_and_generation() {
+void test_soft_takeover() {
     std::string error; CHECK(platform::network_startup(error));
     FakeInstrument instrument; CHECK(instrument.start(error));
-    Agent agent(sample_config(instrument.listener.port()),[](LogLevel,const std::string&){});
+    auto config=sample_config(instrument.listener.port());
+    config.ports[0].shared=true; config.ports[0].virtual_com_guard_ms=200;
+    config.ports[0].controllers["server-c"]=0; // A different, higher-priority waiter must not receive this transfer.
+    config.ports[0].controller_rights["server-b"]=RightObserve; // No hard-kill or new soft permission.
+    Agent agent(config,[](LogLevel,const std::string&){});
     CHECK(agent.start(error)); std::atomic<bool> stop{false}; std::thread housekeeping([&]{agent.run(stop);});
     CHECK(instrument.accept(3000));
     auto a=hello_client(agent.listen_port(),"controller","server-a");
     a.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(1)}})));
-    const auto granted=a.next(link::Type::Granted); CHECK(granted.has_value());
-    if(granted) {
-        const auto grant=*link::parse_map(*granted); const auto generation=*grant.get(1)->as_uint();
-        a.send(link::control(link::Type::ConfirmTransfer,1,Value::map({{1,Value::uint(generation)},{2,*grant.get(2)}})));
+    const auto grant=a.next(link::Type::Granted); CHECK(grant.has_value());
+    if(grant) {
+        const auto granted=*link::parse_map(*grant); const auto generation=*granted.get(1)->as_uint();
+        a.send(link::control(link::Type::ConfirmTransfer,1,Value::map({{1,Value::uint(generation)},{2,*granted.get(2)}})));
+        AgentTestPeer::virtual_owner(agent,"server-a");
         auto b=hello_client(agent.listen_port(),"controller","server-b");
-        b.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(2)}}))); CHECK(b.next(link::Type::Queued).has_value());
-        CHECK(agent.prepare_retirement("p1","test-admin","Retiro al finalizar",false,error));
-        CHECK(a.next(link::Type::RetirementNotice).has_value()); CHECK(agent.status()[0].owner=="server-a");
-        link::SerialData tx;tx.seq=1;tx.generation=static_cast<std::uint32_t>(generation);tx.data={5,0,255};
-        a.send(link::serial_data(1,tx)); const auto status=a.next(link::Type::WriteStatus); CHECK(status.has_value());
-        std::uint8_t sent[3]{}; CHECK(instrument.socket.receive(sent,sizeof(sent),1000)==3); CHECK(sent[0]==5 && sent[1]==0 && sent[2]==255);
-        const std::uint8_t terminal[]{4,0,255}; CHECK(instrument.socket.send_all(terminal,sizeof(terminal)));
-        const auto received=a.next(link::Type::SerialData); CHECK(received.has_value());
-        if(status && received) {
-            const auto write_status=*link::parse_map(*status); const auto rx=*link::parse_serial_data(*received);
-            const auto request=[&](std::uint64_t offset,std::uint64_t seq) {
-                a.send(link::control(link::Type::RetireAtBoundary,1,Value::map({{0,Value::uint(generation)},
-                    {1,Value::uint(offset)},{2,Value::uint(seq)},{3,*write_status.get(5)},{4,Value::uint(71)}})));
-                return a.next(link::Type::RetireResult);
-            };
-            const auto stale=request(*grant.get(7)->as_uint(),*grant.get(8)->as_uint());
-            CHECK(stale && !*link::parse_map(*stale)->get(1)->as_bool()); CHECK(agent.status()[0].owner=="server-a");
-            const auto accepted=request(rx.offset+rx.data.size(),rx.seq+1);
-            CHECK(accepted && *link::parse_map(*accepted)->get(1)->as_bool()); CHECK(a.next(link::Type::Revoked).has_value());
-            const auto next=b.next(link::Type::Granted); CHECK(next && *link::parse_map(*next)->get(1)->as_uint()>generation);
-            a.send(link::serial_data(1,tx)); const auto stale_write=a.next(link::Type::WriteStatus);
-            CHECK(stale_write && *link::parse_map(*stale_write)->get(3)->as_uint()==3); CHECK(!instrument.socket.wait_readable(50));
-            CHECK(agent.prepare_retirement("p1","test-admin","Próximo apagado",true,error)); CHECK(agent.status()[0].withdrawing);
-            auto c=hello_client(agent.listen_port(),"controller","server-c");
-            c.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(3)}}))); CHECK(c.next(link::Type::Denied).has_value());
-            CHECK(agent.reopen_port("p1","test-admin",error)); CHECK(!agent.status()[0].withdrawing);
-            CHECK(b.next(link::Type::RetirementNotice).has_value());
-            const auto cancelled=b.next(link::Type::RetirementNotice); CHECK(cancelled && *link::parse_map(*cancelled)->get(3)->as_bool());
+        auto c=hello_client(agent.listen_port(),"controller","server-c");
+        auto request=[&](std::uint64_t id,std::uint64_t seq,bool known=true,bool ready=true,const std::string& condition="no_pending_operations") {
+            b.send(link::control(link::Type::SoftKillSwitch,1,Value::map({{0,Value::uint(id)},
+                {1,Value::bytes(cbor::Bytes(agent.epoch().begin(),agent.epoch().end()))},{2,Value::uint(generation)},
+                {3,Value::uint(seq)},{4,Value::boolean(known)},{5,Value::boolean(ready)},{6,Value::text(condition)}})));
+            return b.next(link::Type::SoftKillResult);
+        };
+        auto result=request(10,0); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-NOT-QUEUED");
+        c.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(2)}}))); CHECK(c.next(link::Type::Queued).has_value());
+        b.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(3)}}))); CHECK(b.next(link::Type::Queued).has_value());
+        result=request(11,0); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-NOT-OBSERVING-FLOW");
+        b.send(link::control(link::Type::Observe,1,Value::map({{0,Value::uint(4)},{1,Value::boolean(true)}})));
+        CHECK(b.next(link::Type::ObserveResult).has_value()); CHECK(b.next(link::Type::PortState).has_value());
+        result=request(12,0,false); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-DECLARATION-REQUIRED");
+        result=request(13,0,true,false); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-DECLARATION-REQUIRED");
+        result=request(14,0,true,true,"maybe"); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-DECLARATION-REQUIRED");
+        result=request(15,1); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-STALE-OBSERVATION");
+        result=request(16,0); CHECK(result && *link::parse_map(*result)->get(3)->as_text()=="pending");
+        const std::uint8_t traffic[]{5,0,255}; CHECK(instrument.socket.send_all(traffic,sizeof(traffic)));
+        CHECK(a.next(link::Type::SerialData).has_value()); auto observed=b.next(link::Type::ObservedData); CHECK(observed.has_value());
+        result=b.next(link::Type::SoftKillResult); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-TRAFFIC");
+        result=request(17,0); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-STALE-OBSERVATION");
+        auto cursor=observed?link::parse_observed_data(*observed)->seq+1:1;
+        AgentTestPeer::observation_gap(agent,"server-b");
+        result=request(20,cursor); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-OBSERVATION-GAP");
+        b.send(link::control(link::Type::Observe,1,Value::map({{0,Value::uint(21)},{1,Value::boolean(true)}})));
+        CHECK(b.next(link::Type::ObserveResult).has_value()); // Observer explicitly renews observation after its resynchronization.
+        result=request(22,cursor); CHECK(result && *link::parse_map(*result)->get(3)->as_text()=="pending");
+        link::SerialData during_guard; during_guard.generation=static_cast<std::uint32_t>(generation); during_guard.seq=40; during_guard.data={6};
+        a.send(link::serial_data(1,during_guard)); CHECK(a.next(link::Type::WriteStatus).has_value());
+        std::uint8_t transmitted=0; CHECK(instrument.socket.receive(&transmitted,1,1000)==1 && transmitted==6);
+        observed=b.next(link::Type::ObservedData); CHECK(observed.has_value());
+        if(observed) cursor=link::parse_observed_data(*observed)->seq+1;
+        result=b.next(link::Type::SoftKillResult); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-TRAFFIC");
+        AgentTestPeer::guard(agent,2000);
+        auto departing=hello_client(agent.listen_port(),"controller","server-b");
+        departing.send(link::control(link::Type::Acquire,1,Value::map({{0,Value::uint(50)}}))); CHECK(departing.next(link::Type::Queued).has_value());
+        departing.send(link::control(link::Type::Observe,1,Value::map({{0,Value::uint(51)},{1,Value::boolean(true)}}))); CHECK(departing.next(link::Type::ObserveResult).has_value());
+        departing.send(link::control(link::Type::SoftKillSwitch,1,Value::map({{0,Value::uint(52)},
+            {1,Value::bytes(cbor::Bytes(agent.epoch().begin(),agent.epoch().end()))},{2,Value::uint(generation)},
+            {3,Value::uint(cursor)},{4,Value::boolean(true)},{5,Value::boolean(true)},{6,Value::text("no_pending_operations")}})));
+        CHECK(departing.next(link::Type::SoftKillResult).has_value()); departing.socket.shutdown();
+        const auto disconnect_deadline=platform::monotonic_ms()+1500;
+        while(AgentTestPeer::soft_pending(agent) && platform::monotonic_ms()<disconnect_deadline) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        CHECK(!AgentTestPeer::soft_pending(agent) && agent.status()[0].owner=="server-a");
+        AgentTestPeer::guard(agent,200);
+        auto since=platform::monotonic_ms();
+        result=request(18,cursor); CHECK(result && *link::parse_map(*result)->get(3)->as_text()=="pending");
+        result=request(18,cursor); CHECK(result && *link::parse_map(*result)->get(3)->as_text()=="pending"); // Duplicate never rearms guard.
+        auto pause=a.next(link::Type::PauseVirtualCom); CHECK(pause && platform::monotonic_ms()-since>=200);
+        const auto cancelled_token=pause?*link::parse_map(*pause)->get(0):Value::uint(0);
+        CHECK(agent.status()[0].owner=="server-a" && !b.next(link::Type::Granted,20));
+        link::SerialData tx; tx.generation=static_cast<std::uint32_t>(generation);tx.seq=1;tx.data={9,8};
+        a.send(link::serial_data(1,tx)); auto status=a.next(link::Type::WriteStatus);
+        CHECK(status && *link::parse_map(*status)->get(3)->as_uint()==3 && !instrument.socket.wait_readable(20));
+        b.send(link::control(link::Type::CancelSoftKill,1,Value::map({{1,Value::uint(18)}})));
+        result=b.next(link::Type::SoftKillResult); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-CANCELLED");
+        CHECK(a.next(link::Type::ResumeVirtualCom).has_value() && agent.status()[0].owner=="server-a");
+        result=request(18,cursor); CHECK(result && *link::parse_map(*result)->get(2)->as_text()=="PORTGATE-SOFT-CANCELLED");
+        AgentTestPeer::guard(agent,0); // Optional wait disabled; all other conditions still apply.
+        result=request(19,cursor); CHECK(result && *link::parse_map(*result)->get(3)->as_text()=="pending");
+        pause=a.next(link::Type::PauseVirtualCom); CHECK(pause.has_value());
+        a.send(link::control(link::Type::VirtualComPaused,1,Value::map({{0,cancelled_token},{1,Value::uint(generation)},{2,Value::boolean(true)}})));
+        CHECK(!b.next(link::Type::Granted,20) && agent.status()[0].owner=="server-a"); // A delayed ACK from a cancelled attempt cannot commit another one.
+        a.send(link::control(link::Type::VirtualComPaused,1,Value::map({{0,pause?*link::parse_map(*pause)->get(0):Value::uint(0)},{1,Value::uint(generation)},{2,Value::boolean(true)}})));
+        result=b.next(link::Type::SoftKillResult); CHECK(result && *link::parse_map(*result)->get(1)->as_bool());
+        auto transferred=b.next(link::Type::Granted); CHECK(transferred.has_value());
+        CHECK(a.next(link::Type::Revoked).has_value() && agent.status()[0].owner=="server-b");
+        CHECK(!c.next(link::Type::Granted,20) && !instrument.socket.wait_readable(20)); // No disconnect payload reached physical device.
+        if(transferred) {
+            auto next=*link::parse_map(*transferred);
+            b.send(link::control(link::Type::ConfirmTransfer,1,Value::map({{1,*next.get(1)},{2,*next.get(2)}})));
+            tx.generation=static_cast<std::uint32_t>(*next.get(1)->as_uint());tx.data={42};
+            b.send(link::serial_data(1,tx));CHECK(b.next(link::Type::WriteStatus).has_value());
+            std::uint8_t value=0;CHECK(instrument.socket.receive(&value,1,1000)==1 && value==42);
+            b.send(link::control(link::Type::Release,1,Value::map({{1,*next.get(1)}})));
+            CHECK(c.next(link::Type::Granted).has_value()); // Normal queue resumes afterwards.
         }
     }
     stop=true; housekeeping.join(); agent.shutdown(); platform::network_cleanup();
@@ -1380,7 +1455,7 @@ int main(int argc, char** argv) {
     test_sealed_capture_store();
     test_observers_and_capture_tap(false);
     test_observers_and_capture_tap(true);
-    test_retirement_fence_and_generation();
+    test_soft_takeover();
     std::cout << g_checks << " checks, " << g_failures << " failures\n";
     return g_failures == 0 ? 0 : 1;
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(portgate VERSION 0.4.0 LANGUAGES C CXX)
+project(portgate VERSION 0.5.0 LANGUAGES C CXX)
 
 # C++17 keeps the core buildable with the v141_xp toolset (Windows XP) and with ESP-IDF.
 set(CMAKE_CXX_STANDARD 17)
@@ -48,6 +48,7 @@ add_library(portgate_core STATIC
     core/src/supervisor.cpp
     platform/common/files.cpp
     core/src/agent.cpp
+    core/src/soft_takeover.cpp
     platform/common/net.cpp
     platform/common/tcp_device.cpp
     platform/common/test_serial.cpp)
@@ -105,8 +106,7 @@ if(PORTGATE_BUILD_TESTS)
     target_link_libraries(portgate-tests PRIVATE portgate_core)
     target_compile_definitions(portgate-tests PRIVATE PORTGATE_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/../conformance/link-v1/vectors.txt")
     add_test(NAME portgate-tests COMMAND portgate-tests)
-    add_executable(portgate-vcom-tests tests/virtual_com_tests.cpp protocols/lis01_results_boundary.cpp)
-    target_include_directories(portgate-vcom-tests PRIVATE protocols/include)
+    add_executable(portgate-vcom-tests tests/virtual_com_tests.cpp)
     target_link_libraries(portgate-vcom-tests PRIVATE portgate_core)
     add_test(NAME portgate-vcom-tests COMMAND portgate-vcom-tests)
 endif()

@@ -78,6 +78,7 @@ public:
     void adopt(std::unique_ptr<Transport> transport, std::vector<link::Unit> pending, link::Decoder decoder);
 
 private:
+    friend struct AgentTestPeer;
     struct Connection {
         ConnectionId id = 0;
         std::unique_ptr<Transport> transport;
@@ -90,7 +91,7 @@ private:
         bool writing = false;      // the writer is sending a unit taken from the outbox
         bool closing = false;      // no more units are queued; the writer drains and leaves
         bool writer_done = false;
-        std::uint64_t dropped_observed = 0;
+        std::atomic<std::uint64_t> dropped_observed{0};
         std::string controller_id;
         std::string peer;
         bool hello = false;
@@ -116,6 +117,7 @@ private:
         std::unique_ptr<platform::Device> device;
         std::unique_ptr<Arbiter> arbiter;
         std::mutex write_mutex;
+        std::mutex read_mutex;
         std::atomic<bool> open{false};
         std::uint64_t rx_seq = 0;
         std::uint64_t rx_offset = 0;
@@ -130,6 +132,17 @@ private:
         std::uint64_t capture_offset[2] = {0, 0};  // all bytes per direction (0 instrument→agent, 1 agent→instrument)
         std::uint64_t observe_seq = 0;
         std::vector<ConnectionId> observers;
+        std::map<ConnectionId, std::uint64_t> observation_drops;
+        struct SoftTakeover {
+            ConnectionId requester = 0, owner = 0;
+            std::uint64_t request = 0, token = 0, sequence = 0, tx_version = 0, deadline = 0;
+            std::uint32_t generation = 0;
+            bool pausing = false;
+            std::string reason;
+            std::string requester_name, owner_name;
+        };
+        std::optional<SoftTakeover> soft;
+        std::map<std::pair<ConnectionId, std::uint64_t>, std::pair<bool, std::string>> soft_results;
         std::vector<std::uint8_t> observed_state;  // last PortState sent to the observers (encoded map)
     };
 
@@ -149,7 +162,10 @@ private:
     void port_loop(Port& port);
     void handle(const std::shared_ptr<Connection>& connection, const link::Unit& unit);
     void handle_serial_data(const std::shared_ptr<Connection>& connection, Port& port, const link::Unit& unit);
-    void retire_at_boundary(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map);
+    void soft_kill(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map, std::uint64_t now);
+    void finish_soft(Port& port, bool transferred, const std::string& code);
+    void advance_soft(Port& port);
+    void virtual_paused(const std::shared_ptr<Connection>& connection, Port& port, const cbor::Value& map);
     void drop(const std::shared_ptr<Connection>& connection, const std::string& reason);
 
     // Semaphore extensions; all called with `mutex_` held.
@@ -208,6 +224,7 @@ private:
     std::unique_ptr<TlsServer> tls_;
     std::uint64_t next_local_event_ = 1;
     std::uint64_t next_handover_ = 1;
+    std::uint64_t next_soft_ = 1;
     std::map<std::string, std::uint64_t> blocked_;    // controller -> monotonic ms until which Hello is refused
     std::map<std::string, std::uint64_t> last_kill_;  // controller -> monotonic ms of its last kill switch
     std::map<std::uint64_t, KillRecord> kills_;       // kill-switch event id -> record

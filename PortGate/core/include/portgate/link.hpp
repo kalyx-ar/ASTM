@@ -47,8 +47,13 @@ enum class Type : std::uint8_t {
     ObservedData = 0x24,
     PortState = 0x25,
     RetirementNotice = 0x26,
-    RetireAtBoundary = 0x27,
-    RetireResult = 0x28,
+    // 0x27/0x28 belonged to the withdrawn driver-side protocol interpreter.
+    SoftKillSwitch = 0x29,
+    SoftKillResult = 0x2A,
+    CancelSoftKill = 0x2B,
+    PauseVirtualCom = 0x2C,
+    VirtualComPaused = 0x2D,
+    ResumeVirtualCom = 0x2E,
     Observe = 0x30,
     ObserveResult = 0x31,
     // Administration endpoint (spec/admin-v1.md)

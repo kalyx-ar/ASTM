@@ -1,6 +1,6 @@
 #include <chrono>
 #include "worker.hpp"
-#include "portgate/lis01_results_boundary.hpp"
+
 namespace portgate::vcom {
 Worker::Worker(std::string name, std::function<bool(const VirtualComEvent&)> sink)
     :name_(std::move(name)),protocol_(name_),sink_(std::move(sink)) {}
@@ -45,17 +45,6 @@ void Worker::run() {
             std::vector<link::Unit> units;
             if(decoder.feed(bytes,static_cast<std::size_t>(n),units)!=link::DecodeError::None) { protocol_.fault("PORTGATE-VCOM-BAD-LINK"); flush(); break; }
             for(const auto& unit:units) {
-                if(unit.type==link::Type::Capabilities) {
-                    const auto m=link::parse_map(unit); const auto* p=m?m->get(0):nullptr; const auto* list=p?p->as_array():nullptr;
-                    if(list) for(const auto& port:*list) {
-                        const auto* name=port.get(8); const auto* profile=port.get(9);
-                        if(name && name->as_text() && *name->as_text()==name_) {
-                            const auto mode=profile && profile->as_text()?*profile->as_text():"manual";
-                            if(mode=="lis01-results-batch") protocol_.set_boundary(std::make_unique<Lis01ResultsBoundary>());
-                            else if(mode!="manual") protocol_.fault("PORTGATE-VCOM-PROFILE-UNAVAILABLE");
-                        }
-                    }
-                }
                 protocol_.accept(unit);
             }
         }
@@ -68,10 +57,6 @@ void Worker::run() {
 bool Worker::write(std::uint64_t id,const link::Bytes& bytes) {
     std::lock_guard<std::mutex> lock(mutex_);
     return !stopping_ && protocol_.write(id,bytes) && flush();
-}
-bool Worker::complete_task(std::uint64_t warning) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return !stopping_ && protocol_.complete_task(warning) && flush();
 }
 void Worker::fault(const std::string& reason) {
     std::lock_guard<std::mutex> lock(mutex_);
