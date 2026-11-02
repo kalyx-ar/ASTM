@@ -1,0 +1,53 @@
+Issue: EDC #205, incremento de conocimiento instrumental, sin cerrar el análisis global.
+Autorización previa: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6586179676
+Usuario: «Agrega todo este conocimiento y verifica si hay algo más que podamos utilizar».
+Commit de implementación/release: d34753f4be16729a77d918b572114840f78b248c
+Mensaje: feat: publicar conocimiento instrumental y máscaras CS-2500 (#205)
+Tipo: feature, conocimiento opcional, interpretación contextual, diagnóstico y documentación.
+
+Rutas: Astm.Plugins/InstrumentProfileKnowledge; ProfileKnowledge de ARCHITECT ASI/HL7,
+CS-2500, XN-L, U-WAM/UC directo/UF binario, CFX, QWALYS y Ruby; Cs2500Masks,
+Cs2500Dialect/Vocabulary/Knowledge; DiagnosticCatalog/Text y detalle MAUI; comando CLI
+ProfileKnowledgeCommand, metadata/self-test NativeAOT; pruebas ProfileKnowledge y Lang;
+Documentacion/CONOCIMIENTO-POR-PERFIL, calidad/calibración, índice, estado y continuación.
+Versiones propias coordinadas 0.6.5; CS-2500 perfil 1.2.0; PluginApi 3.
+
+47 hechos en 13 perfiles reales: 24 implementados, 11 documentados, 11 sin confirmar y
+una exclusión expresa. Cada hecho tiene perfil/tema/canal/fuente y texto traducible por
+ensamblado. Los estados no se confunden con operaciones ejecutables. Un propósito sólo
+se vincula si existe en el catálogo y el hecho es implementado. Colecciones de sólo lectura,
+JSON generado AOT, CLI knowledge, detalle Diagnostics y descubrimiento EDC sin transporte.
+SNCS es servicio propietario separado del LIS; SUIT otra interfaz sin plugin/perfil ficticio.
+
+Mejora concreta CS-2500: reconoce máscaras R.4 de p.33 (X, *, /, + y -) con contexto de
+medición y parte entera. Conserva números con signo/textos/rutas/mezclas desconocidas y
+no reemplaza resultados por cero. Flag derivado :measurement-mask y diagnóstico propios,
+sin fabricar códigos del fabricante. No duplica una causa ya explicada por error ampliado;
+un error ajeno no oculta una máscara específica. Flags/valor originales permanecen.
+R.3.11 se conserva como analysis.replications, sin inventar n, media/DE ni réplicas.
+
+Fuentes: manuales locales Abbott, Sysmex CS-2500 rev.2.04/XN-L 1273-MKT rev.3/U-WAM
+R315168 rev.22/SUIT v8 y QWALYS; fuentes oficiales Sysmex SNCS y CFX Maestro 2.3.
+Oportunidades documentadas para #205: CSV QC U-WAM, series RFU/fusión CFX, estado/
+notificaciones/servicio/configuración ARCHITECT, adquisición de archivos CS-2500 y SUIT.
+No se presentan como funciones implementadas por incluirlas en el conocimiento.
+Evaluación #236/#374: EDC conocimiento-instrumental-205.md contrasta todas las filas de
+las matrices #416/calibración #205, con diferencias y propietario de las brechas.
+
+Verificación: suite .NET final repetida, 564 correctas y una omitida por traza privada,
+~10 s por pasada. Lang real: 1 correcta, 161 ms, sin modificar biblioteca Lang.
+CTest: 2/2 repetido, 9,80 y 8,49 s. CLI NativeAOT win-x64/self-test y knowledge all:
+47 hechos / 13 perfiles, JSON generado correcto. MAUI autónomo/self-test de salida real
+PASS y auditoría de referencias correcta, ProductVersion 0.6.5+d34753f4be16729a77d918b572114840f78b248c.
+EDC Instruments: 28 correctas, 42 s, con los paquetes finales; Astm.Plugins cargado
+por tests tiene ProductVersion 0.6.5+d34753f4be16729a77d918b572114840f78b248c.
+
+Release local: 22 paquetes propios 0.6.5, nuspec repository commit d34753f y dependencias
+propias 0.6.5. DLL versión 0.6.5.0/token 066190a23251f202 comprobados; Strong Name de la
+compilación de distribución. Authenticode NotSigned y NuGet sin firma de release. GUI:
+cinco CS8002 de DLL oficiales MAUI sin Strong Name conservadas. EDC: CS8602 PortsListeners
+y CS8321 MedicineClinical ajenas, sin cambios para silenciarlas. Sin cambios de confianza.
+Estado: incremento completo. Sin homologación física ni herramienta IA/remota registrada;
+no se abre SNCS, rutas del instrumento o carpeta, no se instala software ni se hace push.
+Sin dependencias, DB/spool, polling, permisos o cambios de derivación/Identidades/Lang.
+README previo del usuario preservado. #205 global y #408/VCOM conservan sus alcances abiertos.
