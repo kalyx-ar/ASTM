@@ -1,6 +1,6 @@
 # Operaciones, contratos de datos y especializaciones (#416)
 
-Análisis de diseño, 2026-11-01. [Issue propietario EDC #416](https://github.com/kalyx-ar/EDC/issues/416). Propietario técnico ASTM; EDC es un consumidor. **Propuesta de estructuración, sin implementación nueva ni cambio de paquetes.** La implementación/mejora sigue abierta en el issue.
+Análisis de diseño, 2026-11-01. [Issue propietario EDC #416](https://github.com/kalyx-ar/EDC/issues/416). Propietario técnico ASTM; EDC es un consumidor. El [primer bloque implementado](OPERACIONES-NUCLEO.md) agrega Astm.Operations 0.1.0 independiente, contratos y validación estructural con prueba sintética no médica. El resto de esta arquitectura es propuesta pendiente de implementación; no se migraron plugins, modelos médicos o paquetes del host.
 
 ## Lineamiento humano y problema actual
 

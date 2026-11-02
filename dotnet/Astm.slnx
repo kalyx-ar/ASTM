@@ -11,6 +11,7 @@
     <Project Path="plugins/Astm.Plugin.Testing.Synthetic/Astm.Plugin.Testing.Synthetic.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Astm.Operations/Astm.Operations.csproj" />
     <Project Path="src/Astm.Abstractions/Astm.Abstractions.csproj" />
     <Project Path="src/Astm.Plugins/Astm.Plugins.csproj" />
     <Project Path="src/Astm.Protocol.Lis01/Astm.Protocol.Lis01.csproj" />
