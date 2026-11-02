@@ -145,7 +145,7 @@ public sealed partial class MainPage : ContentPage
             _selfTestStarted = true;
             Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(1), async () =>
             {
-                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: MAUI window, file-dialog-owner, private-runtime, instruments=9, profiles=15, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-binary-framing, chronological-blocks, duration-format, communication-statistics, synthetic-analyzer-rigid-and-randomized, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
+                try { if (Handler?.PlatformView is null) throw new InvalidOperationException("Window not realized."); _platform.EnsureWindowReady(); await SelfTestAsync(); File.WriteAllText(args[selfTest + 1], "PASS: patient-result-field-inspection, MAUI window, file-dialog-owner, private-runtime, instruments=9, profiles=15, family-auto-and-manual, quality-median-sd-with-originals, qualitative-values-and-communicated-count, ordinal-crosses-and-bounds, unperformed-column, selectable-title-and-table, interpreted-default, grouped-default, auto-columns-left-aligned, eight-views-raw-and-interpreted, uf-binary-framing, chronological-blocks, duration-format, communication-statistics, synthetic-analyzer-rigid-and-randomized, CFX=3, protected-case-roundtrip, QC=6"); Environment.Exit(0); }
                 catch (Exception error) { File.WriteAllText(args[selfTest + 1], "FAIL: " + error.GetType().Name + (error.Message.StartsWith("ASTM-", StringComparison.Ordinal) ? " " + error.Message : "")); Environment.Exit(1); }
             });
         }
@@ -415,7 +415,8 @@ public sealed partial class MainPage : ContentPage
                     var meaning = ProtocolExplainer.MessageContent(message, Profile, observations[message.Sequence].ToArray());
                     return Row([message.Sequence.ToString(), D(message.Direction), interpreted ? kind : message.Type, ProtocolExplainer.SingleLine(interpreted ? meaning : message.Text)],
                         Detail(kind + "\n" + meaning + "\n" + DiagnosticText.Text("Evidence") + "\n" + (message.Explanation?.Text.Evidence ?? ProtocolExplainer.RecordEvidence(message.Text, Profile))
-                            + "\n" + BinaryTracePresentation.DescribeMessage(message, Profile) + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value)), message.Text), message.Direction, message.Type, message.Text);
+                            + "\n" + BinaryTracePresentation.DescribeMessage(message, Profile) + "\n" + string.Join("\n", message.Fields.Select(f => f.Key + ": " + f.Value))
+                            + "\n" + MessageInspectionPresentation.Describe(message.Text, Profile), message.Text), message.Direction, message.Type, message.Text);
                 }).ToArray();
                 var messageGroups = DiagnosticGrouping.Build(rows, _group.IsChecked, consecutive: true).Select(group =>
                 {
@@ -675,6 +676,20 @@ public sealed partial class MainPage : ContentPage
             for (_tab = 0; _tab < _tabs.Length; _tab++) { ShowTable(); await Task.Delay(100); _table.VerifyAutomaticLayout(); }
         }
         _tab = 4; ShowTable();
+        SelectProfile(Astm.Plugins.StandardAstmPlugin.ProfileId);
+        _case = DiagnosticReader.Read("H|\\^&\rP|1|PAT-SYN|||FAMILY-SYN^GIVEN-SYN\rO|1|SYN-SAMPLE\rR|1|^^^SYN-TEST|42|SYN-UNIT\rL|1|N\r"u8.ToArray(),
+            DiagnosticInputFormat.AstmMessage, Profile, "synthetic", TimeSpan.Zero);
+        Analyze(); _tab = 1;
+        foreach (var interpreted in new[] { true, false })
+        {
+            _interpret.IsChecked = interpreted; ShowTable(); await Task.Delay(100);
+            _table.SelectFirstRowForSelfTest();
+            if (!_detail.Text.Contains(DiagnosticText.Text("Inspection.Title"), StringComparison.Ordinal)
+                || !_detail.Text.Contains("P.6.1 | Apellido | \"FAMILY-SYN\"", StringComparison.Ordinal)
+                || !_detail.Text.Contains("R.4 | Resultado | \"42\"", StringComparison.Ordinal)
+                || !_detail.Text.Contains("P@2/O@3/R@4", StringComparison.Ordinal))
+                throw new InvalidDataException("ASTM-MAUI-MESSAGE-INSPECTION-SELFTEST");
+        }
         VerifySemanticPresentation();
         VerifyQualityPresentation();
         VerifyKnowledgePresentation();

@@ -1,5 +1,7 @@
 # Interpretación y uso de Diagnostics
 
+2026-11-02, 0.6.6: seleccionar una fila de **Mensajes** muestra el desglose de paciente/solicitud/resultado del plugin: campo, significado, original y decodificado, con evidencia y desconocidos explícitos. El original completo sigue visible al final; funciona también al desactivar Interpretar. [Mapas, uso y límites](INSPECCION-DE-MENSAJES.md).
+
 Decisiones humanas del 2026-10-25, [EDC#205](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6398309342). Esta ampliación corrige la presentación MAUI y la selección/detección de entradas, sin modificar protocolos ni la custodia de EDC.
 
 ## Vista predeterminada

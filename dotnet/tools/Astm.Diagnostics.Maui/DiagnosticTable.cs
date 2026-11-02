@@ -23,6 +23,7 @@ internal sealed class DiagnosticTable : ContentView
     private string _view = "";
     private int _flexibleColumn;
     public event Action<string>? DetailSelected;
+    internal void SelectFirstRowForSelfTest() => _list.SelectedItem = _visibleRows.First();
     internal void VerifyAutomaticLayout()
     {
         if (_state is null || Width <= 0 || _list.Handler?.PlatformView is null || _surface.Width < Width - 1)

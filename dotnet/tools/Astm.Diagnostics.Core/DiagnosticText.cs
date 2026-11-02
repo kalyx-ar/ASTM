@@ -17,6 +17,14 @@ public static class DiagnosticText
         ["Knowledge.Implemented"] = "Implementado", ["Knowledge.Documented"] = "Documentado; pendiente de implementación",
         ["Knowledge.Unconfirmed"] = "Sin confirmar", ["Knowledge.Excluded"] = "Excluido en esta interfaz",
         ["Knowledge.Entry"] = "{0} ({1})\n{2}\nFuente: {3}",
+        ["Inspection.Title"] = "Estructura interpretada por el plugin",
+        ["Inspection.Columns"] = "Campo | Significado | Original → Decodificado",
+        ["Inspection.Unknown"] = "Sin interpretación documentada",
+        ["Inspection.Unassociated"] = "Resultado sin solicitud/muestra previa; asociación desconocida.",
+        ["Inspection.DecodeError"] = "Escape inválido; se conserva el original.",
+        ["Inspection.Evidence"] = "Fuente: {0}",
+        ["Inspection.Record"] = "Registro {0} · {1}",
+        ["Finding.ASTM-INSPECTION-ESCAPE"] = "No se pudo decodificar el escape del campo; consulte su original.",
         ["Group.Details"] = "{0} filas agrupadas. Despliegue el grupo para consultar cada registro y su detalle original.",
         ["Group.Values"] = "{0} valores distintos", ["Unknown.Command"] = "Comando sin interpretación documentada ({0})",
         ["Message.Results"] = "Resultados de análisis", ["Message.Query"] = "Consulta de solicitudes",
@@ -141,15 +149,16 @@ public static class DiagnosticText
         ArgumentNullException.ThrowIfNull(database);
 #if KALYX_LANG
         await InitializeSeedAsync(lang, typeof(DiagnosticText).Assembly.GetName().Name!, database, target, cancellationToken);
-        var common = StandardDiagnosticVocabulary.Shared.Values.ToDictionary(v => v.Key, v => v.Fallback, StringComparer.Ordinal);
         var commonSource = typeof(StandardDiagnosticVocabulary).Assembly.GetName().Name!;
-        await InitializeSeedAsync(common, commonSource, database, target, cancellationToken); pluginSeeds[commonSource] = common;
         var texts = catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().Concat(catalog.TracePlugins)
             .Concat(catalog.ContentPlugins.OfType<IInstrumentDiagnosticVocabulary>())
             .SelectMany(p => p.DiagnosticVocabulary.Values.Where(v => v.SourceAssembly is null)
                 .Select(v => (Source: p.GetType().Assembly.GetName().Name!, Text: v)))
             .Concat(catalog.Profiles.SelectMany(p => p.Knowledge).SelectMany(f => new[] { f.Title, f.Detail })
-                .Select(v => (Source: v.SourceAssembly!, Text: v)));
+                .Select(v => (Source: v.SourceAssembly!, Text: v)))
+            .Concat(catalog.Profiles.Where(p => p.MessageSchema is not null).SelectMany(p => p.MessageSchema!.Fields.Values)
+                .Select(v => (Source: v.SourceAssembly!, Text: v)))
+            .Concat(StandardDiagnosticVocabulary.Shared.Values.Select(v => (Source: commonSource, Text: v)));
         foreach (var assembly in texts.GroupBy(p => p.Source, StringComparer.Ordinal))
         {
             var seed = assembly.Select(p => p.Text).GroupBy(v => v.Key, StringComparer.Ordinal)

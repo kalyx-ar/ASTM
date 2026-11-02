@@ -1,5 +1,7 @@
 # ASTM: integración de instrumentos de laboratorio
 
+Diagnostics 0.6.6: [inspección estructural de pacientes y resultados](INSPECCION-DE-MENSAJES.md) desde cada plugin, con comparación de campos y originales en Mensajes.
+
 Fecha: 24 de octubre de 2026. Estado: **propuesta en implementación**: núcleo .NET, plugin Architect, herramientas de traza y agente nativo Windows x64 implementados y probados; ver [ESTADO](ESTADO.md).
 
 ASTM es un proyecto **neutral**: un agente de comunicación, un motor genérico de los protocolos de laboratorio (CLSI LIS01-A2 / LIS02-A2, conocidos como ASTM E1381 / E1394, y HL7 v2.5.1 / IHE LAW) y plugins por fabricante. No depende de ningún LIS/LIMS; cada sistema anfitrión implementa un único puerto. El primer anfitrión será EDC ([INTEGRACION-EDC](INTEGRACION-EDC.md)).

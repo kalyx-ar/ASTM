@@ -37,6 +37,8 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public InstrumentTraceProfile? TraceProfile { get; init; }
     public bool IsHl7 { get; init; }
     public IReadOnlyList<InstrumentProfileFact> Knowledge { get; init; } = [];
+    public InstrumentMessageSchema? MessageSchema { get; init; }
+    public Func<string, InstrumentMessageInspection>? InspectMessage { get; init; }
     public bool CanSimulateHost => AstmProfile is not null || IsHl7;
     public bool CanConnect => CanSimulateHost || TracePlugin is not null;
     public IHl7Dialect Hl7Dialect(TimeZoneInfo zone) => IsHl7
@@ -79,9 +81,13 @@ public sealed class DiagnosticCatalog
         {
             var descriptor = plugin.Describe();
             profiles.Add(new(profile.Id, descriptor.Manufacturer, string.Join(", ", descriptor.Models), "ASTM")
-                { AstmPlugin = plugin, AstmProfile = profile, Knowledge = (plugin as IInstrumentProfileKnowledge)?.DescribeKnowledge(profile.Id) ?? [] });
+                { AstmPlugin = plugin, AstmProfile = profile, Knowledge = (plugin as IInstrumentProfileKnowledge)?.DescribeKnowledge(profile.Id) ?? [],
+                    MessageSchema = (plugin as IInstrumentMessageInspection)?.MessageSchema(profile.Id),
+                    InspectMessage = plugin is IInstrumentMessageInspection inspector ? text => inspector.InspectMessage(profile.Id, text) : null });
         }
-        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP") { IsHl7 = true, Knowledge = ArchitectHl7Plugin.ProfileKnowledge });
+        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP")
+        { IsHl7 = true, Knowledge = ArchitectHl7Plugin.ProfileKnowledge, MessageSchema = ArchitectHl7Plugin.InspectionSchema,
+            InspectMessage = ArchitectHl7Plugin.InspectDiagnosticMessage });
         if (profiles.Select(p => p.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != profiles.Count) throw new InvalidOperationException("Duplicate profile ID.");
         Profiles = profiles;
         Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,

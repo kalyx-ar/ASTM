@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType><UseMaui>true</UseMaui><SingleProject>true</SingleProject>
     <AssemblyName>astm-diagnostics</AssemblyName><RootNamespace>Astm.Diagnostics.Maui</RootNamespace>
     <ApplicationTitle>ASTM Diagnóstico</ApplicationTitle><ApplicationId>com.kalyx.astm.diagnostics</ApplicationId>
-    <ApplicationDisplayVersion>0.6.5</ApplicationDisplayVersion><ApplicationVersion>7</ApplicationVersion>
+    <ApplicationDisplayVersion>0.6.6</ApplicationDisplayVersion><ApplicationVersion>8</ApplicationVersion>
     <WindowsPackageType>None</WindowsPackageType><WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained><RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

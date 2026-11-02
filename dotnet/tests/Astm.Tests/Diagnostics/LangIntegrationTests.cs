@@ -21,6 +21,7 @@ public sealed class LangIntegrationTests
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "value.Crosses")] = "CRUCES TRADUCIDAS";
         database.Translations[("Astm.Plugins", "state.Normal")] = "ESTADO TRADUCIDO";
         database.Translations[("Astm.Plugins", "value.Image")] = "IMAGEN TRADUCIDA";
+        database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "inspection.P.4")] = "IDENTIFICADOR TRADUCIDO";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "finding.ASTM-UWAM-CHEMISTRY-UC3500-9902")] = "ERROR TRADUCIDO";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "flag.UC3500.00CC")] = "ESTADO DE ERROR TRADUCIDO";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "unit.NotTransmitted")] = "UNIDAD NO INFORMADA TRADUCIDA";
@@ -33,6 +34,8 @@ public sealed class LangIntegrationTests
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "uf.need.DBS_LANG_02215")] = "LIMPIEZA TRADUCIDA";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "uf.field.counter")] = "CONTADOR TRADUCIDO {0}: {1}";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
+        Assert.Contains("P.4 | IDENTIFICADOR TRADUCIDO | \"PAT-SYN\" → \"PAT-SYN\"",
+            MessageInspectionPresentation.Describe("H|\\^&\rP|1||PAT-SYN\rL|1|N\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
         Assert.Contains("SNCS TRADUCIDO", DiagnosticText.Knowledge(catalog.Resolve("sysmex.xnl.astm02.results").Knowledge.Single(f => f.Id == "xnl.sncs-calibration")));
         Assert.Contains("CURVA CFX TRADUCIDA", DiagnosticText.Knowledge(catalog.Resolve("biorad.cfx.maestro.standard-curve-csv").Knowledge.Single(f => f.Id == "cfx.standard-curve")));
         Assert.Contains(database.Missing, label => label.Source == "Astm.Plugin.Abbott.CellDynRuby" && label.Label.StartsWith("knowledge.", StringComparison.Ordinal));

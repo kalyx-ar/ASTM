@@ -1,5 +1,7 @@
 # Continuación del trabajo
 
+Incremento #205, 2026-11-02, 0.6.6: [inspección de mensajes](INSPECCION-DE-MENSAJES.md) implementada para nueve perfiles LIS02/HL7. En Mensajes, seleccionar una fila para comparar campos originales/decodificados y contexto paciente/solicitud/resultado. Los mapas viven en los plugins; conservar desconocidos y la hipótesis Ruby. No convertir esta inspección en importación/validación clínica ni aplicar P/O/R a UC/UF/CFX.
+
 Incremento #205, 2026-11-02, 0.6.5: [conocimiento por perfil](CONOCIMIENTO-POR-PERFIL.md) enumerable, fuentes/estado/canal, CLI `knowledge`, detalle Diagnostics y descubrimiento EDC. CS-2500 1.2.0 incorpora máscaras de resultado sin error ampliado y R.3.11. Las oportunidades documentadas no se anuncian como operaciones ejecutables.
 
 Incremento #205, 2026-11-02: calibración ARCHITECT HL7 implementada en 0.6.4, perfil 1.2.0: OUL/R24, consulta INR/U06 y recepción INU/U05, contratos/lecturas/lote/observación comunes. [Uso y límites](CALIBRACION-ARCHITECT.md). No retomar R24 como pendiente de implementación; siguen fuera de alcance la interpretación matemática por modelo, homologación física y UI/proyección QC propia del anfitrión. ASI conserva su exclusión documentada de calibradores.
