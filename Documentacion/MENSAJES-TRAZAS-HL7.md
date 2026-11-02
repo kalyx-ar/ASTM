@@ -36,7 +36,7 @@ Para **EDC**, la decisión adoptada exige SQLCipher estándar por propietario/te
 
 No se presenta como conformidad IHE LAW completa. Faltan actor/AWOS y lifecycle LAB-28/LAB-29, opciones y validación exhaustiva de cardinalidades/segmentos de LAW, reconocimiento por ensayo y un kit de conformidad de equipo. ARCHITECT 206797-101 es un perfil particular de 2012: usa ZOS y declara no soportar el identificador WOS de IHE. No se fuerza a compartir el perfil Q11/K11.
 
-También quedan pendientes OUL^R24/calibración de curvas y estados/inventario/notificaciones del fabricante; no se aceptan como resultados de paciente. La pila, métricas y anonimización de trazas históricas actuales son ASTM; no se afirma que la CLI anonimice HL7. Las nuevas pruebas HL7 son sintéticas y no se exportó corpus real.
+Incremento 0.6.4 (2026-11-02): [OUL^R24 e inventario/calibración INR^U06/INU^U05](CALIBRACION-ARCHITECT.md) implementados con contratos, lote común y ACK por custodia; no se convierten en resultados de paciente. Siguen pendientes estados generales/notificaciones del fabricante y extracción matemática de las curvas por modelo. La pila, métricas y anonimización de trazas históricas actuales son ASTM; no se afirma que la CLI anonimice HL7. Las pruebas HL7 son sintéticas y no se exportó corpus real.
 
 Fuentes primarias:
 

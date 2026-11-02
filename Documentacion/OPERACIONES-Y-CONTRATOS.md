@@ -1,5 +1,7 @@
 # Operaciones y contratos médicos interoperables (#416)
 
+Extensión #205, 2026-11-02, 0.6.4: ARCHITECT HL7 incorpora medical.lab.calibration.report, medical.lab.inventory.query y medical.lab.inventory.report mediante extensiones del dialecto; `medical.lab.decoded` revisión 1.1 conserva CalibrationReports/InventoryStatuses en el lote común. [Uso, evidencia y límites](CALIBRACION-ARCHITECT.md). ASI no anuncia estas capacidades.
+
 Implementación 0.6.3, 2026-11-01. [Issue propietario](https://github.com/kalyx-ar/EDC/issues/416). ASTM es neutral por industria; medicina se incorpora mediante contratos/formatos médicos opcionales o plugins especializados. Operación incluye datos, validación, preparación/interpretación y lifecycle.
 
 ## Arquitectura implementada

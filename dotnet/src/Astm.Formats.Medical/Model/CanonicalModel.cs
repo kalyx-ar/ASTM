@@ -85,6 +85,8 @@ public sealed record InstrumentObservation(
 public sealed record InstrumentObservationBatch(Guid BatchId, InstrumentRef Instrument, IReadOnlyList<InstrumentObservation> Observations, TraceRef Trace)
 {
     public IReadOnlyList<QualityResourceReference> QualityResources { get; init; } = [];
+    public IReadOnlyList<CalibrationReport> CalibrationReports { get; init; } = [];
+    public IReadOnlyList<InstrumentInventoryStatus> InventoryStatuses { get; init; } = [];
 }
 
 public sealed record OrderQuery(Guid QueryId, InstrumentRef Instrument, IReadOnlyList<SpecimenRef> Specimens, string Scope, TraceRef Trace);

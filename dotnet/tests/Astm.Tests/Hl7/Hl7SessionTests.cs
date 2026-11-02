@@ -13,6 +13,24 @@ namespace Astm.Tests.Hl7;
 public class Hl7SessionTests
 {
     [Fact]
+    public async Task Inventory_query_correlates_U06_ACK_and_receives_independent_U05_data()
+    {
+        await using var rig = new Rig();
+        var request = Astm.Formats.Medical.MedicalRequests.Inventory(rig.Session.Operations, new("MOD-SYN", "1"), Guid.NewGuid());
+        var sending = rig.Session.SendOperationAsync(request);
+        var query = await rig.ReceiveAsync();
+        Assert.Equal("U06", query.Trigger);
+        await rig.SendAsync(Hl7Data.Header("ACK^R24^ACK", "WRONG-ACK") + "MSA|AA|" + query.ControlId + "\r");
+        await rig.Unmatched.Task.WaitAsync(TimeSpan.FromSeconds(2)); Assert.False(sending.IsCompleted);
+        await rig.SendAsync(Hl7Acknowledgements.Build(query, "AA", "INR-ACK", DateTimeOffset.UnixEpoch).Serialize());
+        Assert.Equal(OrderDeliveryState.Sent, (await sending.WaitAsync(TimeSpan.FromSeconds(2))).State);
+        await rig.SendAsync(ArchitectCalibrationTests.Inventory());
+        var response = await rig.ReceiveAsync();
+        Assert.Equal("U05", response.Trigger); Assert.Equal("AA", Hl7Acknowledgements.Read(response)!.Code);
+        Assert.Equal(2, Assert.Single(rig.Host.Batches).InventoryStatuses.Count);
+    }
+
+    [Fact]
     public async Task Fragmented_MLLP_and_coalesced_blocks_are_acknowledged_individually()
     {
         await using var rig = new Rig();

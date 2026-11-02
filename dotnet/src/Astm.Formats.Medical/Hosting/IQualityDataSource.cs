@@ -12,6 +12,10 @@ public sealed record QualityDataQuery(string? InstrumentId = null, CodedValue? T
 
 public sealed record QualityDatum(Guid BatchId, InstrumentObservation Observation, AnalyticalQualityContext Context, TraceRef BatchTrace);
 public sealed record QualityResourceQuery(string? InstrumentId = null, Guid? TraceId = null);
+public sealed record CalibrationReportQuery(string? InstrumentId = null, CodedValue? Assay = null,
+    string? ReagentLot = null, string? ModuleId = null, Guid? TraceId = null);
+public sealed record InventoryStatusQuery(string? InstrumentId = null, CodedValue? Assay = null,
+    string? ReagentLot = null, string? ModuleId = null, Guid? TraceId = null);
 
 /// <summary>Host-owned read port over durably accepted observations and reported statistics.
 /// Implementations enforce authorization/retention; this port does not query an analyzer or initiate calibration.</summary>
@@ -19,6 +23,8 @@ public interface IQualityDataSource
 {
     IAsyncEnumerable<QualityDatum> ReadAsync(QualityDataQuery query, CancellationToken cancellationToken = default);
     IAsyncEnumerable<QualityResourceReference> ReadResourcesAsync(QualityResourceQuery query, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<CalibrationReport> ReadCalibrationReportsAsync(CalibrationReportQuery query, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<InstrumentInventoryStatus> ReadInventoryStatusesAsync(InventoryStatusQuery query, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Optional host/ETL port. Implementations authorize and resolve untrusted references, limit

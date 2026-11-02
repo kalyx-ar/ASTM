@@ -136,8 +136,9 @@ public static class MedicalOperationObservers
         private readonly Dictionary<string, Guid> _queries = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Guid[]> _answers = new(StringComparer.Ordinal);
         private readonly Dictionary<string, byte[]> _payloads = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _expectedAcks = new(StringComparer.Ordinal);
         public Hl7Observer(IMedicalOperations adapter, Guid traceId) : base(traceId) => _adapter = adapter;
-        protected override void Reset() { _received = new(); _transmitted = new(); _messages.Clear(); _queries.Clear(); _answers.Clear(); _payloads.Clear(); }
+        protected override void Reset() { _received = new(); _transmitted = new(); _messages.Clear(); _queries.Clear(); _answers.Clear(); _payloads.Clear(); _expectedAcks.Clear(); }
         protected override void OnEntry(TraceEntry entry)
         {
             var events = new List<MllpEvent>();
@@ -147,7 +148,11 @@ public static class MedicalOperationObservers
                 if (item.Kind != MllpEventKind.Message) { Invalidate(); break; }
                 var parsed = Hl7Codec.Parse(Encoding.GetEncoding(_adapter.Profile.EncodingName).GetString(item.Payload!));
                 if (parsed.Message is not { } message || parsed.Diagnostics.Count > 0 || message.ControlId.Length == 0) { Invalidate(); break; }
-                if (message.Type is not ("ACK" or "ORL" or "OML" or "RSP") &&
+                var additional = _adapter.Describe(_adapter.Profile.Id).SingleOrDefault(d =>
+                    d.WireBindings.TryGetValue("message.type", out var wire) && wire == string.Join('^', message.Type, message.Trigger, message.Header.Text(9, 3)));
+                var outgoingRequest = additional is not null && entry.Direction == TraceDirection.Transmitted
+                    && additional.Capabilities.HasFlag(OperationCapabilities.Prepare);
+                if (!outgoingRequest && message.Type is not ("ACK" or "ORL" or "OML" or "RSP") &&
                     _adapter.Decode(item.Payload!, new(TraceId, entry.Sequence, entry.Sequence), TimeZoneInfo.Utc).Diagnostics.Any(d => d.Severity == Astm.Abstractions.Diagnostics.AstmSeverity.Error))
                 { Invalidate(); break; }
                 var identity = entry.Direction + ":" + message.ControlId;
@@ -159,9 +164,12 @@ public static class MedicalOperationObservers
                 var opposite = entry.Direction == TraceDirection.Received ? TraceDirection.Transmitted : TraceDirection.Received;
                 if (ack is not null && (ack.Text(1) is not ("AA" or "AE" or "AR") || !_messages.ContainsKey(opposite + ":" + ack.Text(2))))
                 { Invalidate(); break; }
+                if (ack is not null && _expectedAcks.TryGetValue(opposite + ":" + ack.Text(2), out var expected)
+                    && string.Join('^', message.Type, message.Trigger, message.Header.Text(9, 3)) != expected) { Invalidate(); break; }
                 if (ack is not null && _messages.Remove(opposite + ":" + ack.Text(2), out var pending))
                 {
                     _payloads.Remove(opposite + ":" + ack.Text(2));
+                    _expectedAcks.Remove(opposite + ":" + ack.Text(2));
                     var rejected = ack.Text(1) is "AE" or "AR" || message.OfType("ORC").Any(c => c.Text(1) == "UA");
                     var evidence = message.Type == "ORL" && message.OfType("ORC").Any(c => c.Text(1) == "OK")
                         ? OperationEvidence.ApplicationAccepted : OperationEvidence.MessageAcknowledged;
@@ -175,7 +183,9 @@ public static class MedicalOperationObservers
                 if (message.Type != "ACK" && message.Type != "ORL")
                 {
                     _messages[entry.Direction + ":" + message.ControlId] = id;
-                    Record(id, message.Type == "QBP" ? MedicalPurposes.ReceiveQuery : message.Type == "OML" ? MedicalPurposes.SubmitOrders : MedicalPurposes.ReceiveObservations,
+                    if (additional is not null)
+                        _expectedAcks[entry.Direction + ":" + message.ControlId] = additional.WireBindings.GetValueOrDefault("ack.message", "ACK^" + message.Trigger + "^ACK");
+                    Record(id, additional?.Id ?? (message.Type == "QBP" ? MedicalPurposes.ReceiveQuery : message.Type == "OML" ? MedicalPurposes.SubmitOrders : MedicalPurposes.ReceiveObservations),
                         OperationState.Pending, entry.Sequence, "medical.message.awaiting-ack", OperationEvidence.Transport);
                 }
                 if (message.Type == "QBP" && entry.Direction == TraceDirection.Received)

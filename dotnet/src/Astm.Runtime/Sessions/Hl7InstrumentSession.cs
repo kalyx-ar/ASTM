@@ -97,7 +97,8 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
     {
         var prepared = Operations.Prepare(request);
         var message = Hl7Codec.Parse(profile.Encoding.GetString(prepared.Bytes.Span)).Message!;
-        var waiting = request.Purpose == MedicalPurposes.AnswerWorklist
+        var waiting = prepared.Definition.WireBindings.TryGetValue("ack.message", out var expected)
+            ? Response(expected) : request.Purpose == MedicalPurposes.AnswerWorklist
             ? new Pending("ACK", message.Trigger, "ACK", new(TaskCreationOptions.RunContinuationsAsynchronously))
             : new Pending("ORL", "O34", "ORL_O34", new(TaskCreationOptions.RunContinuationsAsynchronously));
         if (!_running) throw new InvalidOperationException("ASTM-HL7-SESSION-NOT-RUNNING");
@@ -134,6 +135,12 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
     {
         trace.Write(TraceDirection.Event, [], code);
         Diagnostics?.Invoke(new(code, AstmSeverity.Warning, "HL7 transport diagnostic; inspect the protected trace."));
+    }
+    private static Pending Response(string pattern)
+    {
+        var parts = pattern.Split('^');
+        if (parts.Length != 3 || parts.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException("ASTM-HL7-INVALID-ACK-PATTERN");
+        return new(parts[0], parts[1], parts[2], new(TaskCreationOptions.RunContinuationsAsynchronously));
     }
     private sealed record Pending(string Type, string Trigger, string Structure, TaskCompletionSource<Hl7SendOutcome> Completion);
     private sealed class ChannelWriteException(Exception? cause = null) : IOException(SessionCodes.WriteNotCompleted, cause);

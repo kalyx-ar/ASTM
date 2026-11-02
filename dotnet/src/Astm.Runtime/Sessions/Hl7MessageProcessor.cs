@@ -80,10 +80,18 @@ public sealed class Hl7MessageProcessor(IHl7Dialect dialect, Hl7Profile profile,
             }
             catch (Exception error) when (error is not OperationCanceledException) { return Reject(SessionCodes.DialectFailed); }
         }
-        if (interpretation.Observations.Count == 0) return Reject("ASTM-HL7-NO-SUPPORTED-CONTENT");
+        if (interpretation.Observations.Count == 0 && interpretation.CalibrationReports.Count == 0 && interpretation.InventoryStatuses.Count == 0)
+            return Reject("ASTM-HL7-NO-SUPPORTED-CONTENT");
         var observations = interpretation.Observations.Select((o, i) => o with { ObservationId = ReceptionIdentity.Derive(receptionId, profile.Id + "/observation", i) }).ToArray();
         IngestOutcome outcome;
-        try { outcome = await host.IngestAsync(new(ReceptionIdentity.Derive(receptionId, profile.Id + "/batch", 0), instrument, observations, reference), token).ConfigureAwait(false); }
+        var batch = new InstrumentObservationBatch(ReceptionIdentity.Derive(receptionId, profile.Id + "/batch", 0), instrument, observations, reference)
+        {
+            CalibrationReports = interpretation.CalibrationReports.Select((r, i) => r with
+                { ReportId = ReceptionIdentity.Derive(receptionId, profile.Id + "/calibration", i) }).ToArray(),
+            InventoryStatuses = interpretation.InventoryStatuses.Select((s, i) => s with
+                { StatusId = ReceptionIdentity.Derive(receptionId, profile.Id + "/inventory", i) }).ToArray(),
+        };
+        try { outcome = await host.IngestAsync(batch, token).ConfigureAwait(false); }
         catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
         { Report(SessionCodes.HostIngestFailed); outcome = new(IngestState.Deferred, SessionCodes.HostIngestFailed); }
         var code = outcome.State switch { IngestState.Accepted or IngestState.Duplicate => "AA", IngestState.Rejected => "AR", _ => "AE" };

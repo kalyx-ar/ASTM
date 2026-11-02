@@ -12,13 +12,20 @@ public static class MedicalPurposes
 {
     public const string SubmitOrders = "medical.lab.order.submit", AnswerWorklist = "medical.lab.worklist.answer",
         ReceiveObservations = "medical.lab.observation.report", ReceiveQuery = "medical.lab.worklist.query",
-        ImportContent = "medical.lab.export.import", ObserveMessages = "medical.lab.communication.observe";
+        ImportContent = "medical.lab.export.import", ObserveMessages = "medical.lab.communication.observe",
+        ReceiveCalibration = "medical.lab.calibration.report", QueryInventory = "medical.lab.inventory.query",
+        ReceiveInventory = "medical.lab.inventory.report";
 }
+public sealed record MedicalInventoryRequest(string ModuleSerial, string ModuleId);
 public sealed record MedicalOrderSubmission(IReadOnlyList<WorkOrder> Orders);
 public sealed record MedicalWorklistAnswer(OrderQuery Query, OrderQueryAnswer Answer, string? OriginalMessage = null);
 public sealed record MedicalOperationContext(InstrumentRef Instrument, TimeProvider Clock);
 public sealed record MedicalDecoded(IReadOnlyList<InstrumentObservation> Observations, IReadOnlyList<OrderQuery> Queries,
-    IReadOnlyList<AstmDiagnostic> Diagnostics, IReadOnlyList<QualityResourceReference> QualityResources);
+    IReadOnlyList<AstmDiagnostic> Diagnostics, IReadOnlyList<QualityResourceReference> QualityResources)
+{
+    public IReadOnlyList<CalibrationReport> CalibrationReports { get; init; } = [];
+    public IReadOnlyList<InstrumentInventoryStatus> InventoryStatuses { get; init; } = [];
+}
 public sealed record MedicalOperationRules
 {
     public IReadOnlyList<string> PatientFields { get; init; } = ["id", "familyName", "givenName", "birthDate", "administrativeSex"];
@@ -63,6 +70,9 @@ public interface IMedicalOperations : IOperationCatalog
 }
 public static class MedicalRequests
 {
+    public static OperationEnvelope Inventory(IMedicalOperations operations, MedicalInventoryRequest request, Guid operationId) =>
+        Envelope(operations, MedicalPurposes.QueryInventory, operationId,
+            JsonSerializer.SerializeToElement(request, MedicalJsonContext.Default.MedicalInventoryRequest));
     public static OperationEnvelope Orders(IMedicalOperations operations, IReadOnlyList<WorkOrder> orders, Guid operationId) =>
         Envelope(operations, MedicalPurposes.SubmitOrders, operationId,
             JsonSerializer.SerializeToElement(new MedicalOrderSubmission(orders), MedicalJsonContext.Default.MedicalOrderSubmission));
@@ -79,6 +89,7 @@ public static class MedicalRequests
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, UseStringEnumConverter = true,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(MedicalOrderSubmission))]
+[JsonSerializable(typeof(MedicalInventoryRequest))]
 [JsonSerializable(typeof(MedicalWorklistAnswer))]
 [JsonSerializable(typeof(MedicalDecoded))]
 [JsonSerializable(typeof(InstrumentObservationBatch))]

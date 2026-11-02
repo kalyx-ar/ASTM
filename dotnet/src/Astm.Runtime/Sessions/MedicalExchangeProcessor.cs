@@ -25,13 +25,18 @@ public sealed class MedicalExchangeProcessor(IMedicalOperations operations, ILab
         var decoded = operations.Decode(content, reference, timeZone);
         if (decoded.Diagnostics.Any(d => d.Severity == AstmSeverity.Error)) return new(new(IngestState.Rejected, "medical.decode.rejected"), [], decoded.Diagnostics);
         IngestOutcome? outcome = null;
-        if (decoded.Observations.Count > 0 || decoded.QualityResources.Count > 0)
+        if (decoded.Observations.Count > 0 || decoded.QualityResources.Count > 0 || decoded.CalibrationReports.Count > 0 || decoded.InventoryStatuses.Count > 0)
         {
             var observations = decoded.Observations.Select((o, i) => o with
                 { ObservationId = ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/observation", i) }).ToArray();
-            var instrument = observations.FirstOrDefault()?.Instrument ?? decoded.QualityResources[0].Instrument;
+            var instrument = observations.FirstOrDefault()?.Instrument ?? decoded.QualityResources.FirstOrDefault()?.Instrument
+                ?? decoded.CalibrationReports.FirstOrDefault()?.Instrument ?? decoded.InventoryStatuses[0].Instrument;
             var batch = new InstrumentObservationBatch(ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/batch", 0), instrument, observations, reference)
-            { QualityResources = decoded.QualityResources.Select((r, i) => r with { ResourceId = ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/resource", i) }).ToArray() };
+            {
+                QualityResources = decoded.QualityResources.Select((r, i) => r with { ResourceId = ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/resource", i) }).ToArray(),
+                CalibrationReports = decoded.CalibrationReports.Select((r, i) => r with { ReportId = ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/calibration", i) }).ToArray(),
+                InventoryStatuses = decoded.InventoryStatuses.Select((s, i) => s with { StatusId = ReceptionIdentity.Derive(receptionId, operations.Profile.Id + "/inventory", i) }).ToArray(),
+            };
             outcome = await host.IngestAsync(batch, token).ConfigureAwait(false);
         }
         var responses = new List<PreparedOperationMessage>();

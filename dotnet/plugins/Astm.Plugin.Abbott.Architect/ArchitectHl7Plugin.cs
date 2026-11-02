@@ -14,9 +14,10 @@ public sealed class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan resp
 {
     public const string ProfileId = "abbott.architect.hl7-2.5.1";
     public IReadOnlyList<Hl7Profile> Profiles { get; } =
-    [new(ProfileId, "1.1.0", new UTF8Encoding(false, true), Positive(queryAnswerBudget), Positive(responseTimeout),
+    [new(ProfileId, "1.2.0", new UTF8Encoding(false, true), Positive(queryAnswerBudget), Positive(responseTimeout),
         ["Abbott 206797-101 (2012) §1-2 MLLP, §1-5 original ACK, §2-8/2-9 ZOS queries, §2-13 OUL^R22, §2-3 OML^O33",
-         "§3-23/26 INV gives QC/calibrator identity/lot/expiry; §3-97 ZCL identifies calibration used by an OBR. R24 ED calibration reports are not decoded.",
+         "§3-23/26 INV gives QC/calibrator identity/lot/expiry; §3-97 ZCL identifies calibration used by an OBR.",
+         "§2-17/19, §3-57/63 OUL R24 reports completed calibration (success/failure) as ED Base64 text; §2-27/30, §3-12/22 INR U06 requests all inventory/calibration states of one module, INU U05 reports them.",
          "Budgets must match deployed instrument settings; this manual does not define universal timeout defaults."])
         { OperationRules = new()
         {
@@ -27,19 +28,21 @@ public sealed class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan resp
 
     private static TimeSpan Positive(TimeSpan value) => value > TimeSpan.Zero && value.TotalMilliseconds <= uint.MaxValue - 1
         ? value : throw new ArgumentOutOfRangeException(nameof(value));
-    public PluginDescriptor Describe() => new("abbott.architect.hl7", "0.1.0", PluginApi.Version, "Abbott", ["ARCHITECT System"],
+    public PluginDescriptor Describe() => new("abbott.architect.hl7", "0.2.0", PluginApi.Version, "Abbott", ["ARCHITECT System"],
         ["ARCHITECT System HL7 Interface Manual 206797-101, January 2012; manufacturer profile, not a complete IHE LAW conformance claim"]);
     public IHl7Dialect CreateDialect(Hl7Profile profile, DialectContext context) => profile.Id == ProfileId
         ? new ArchitectHl7Dialect(context, instrumentTimeZone) : throw new ArgumentException("Unknown HL7 profile.", nameof(profile));
 }
 
-public sealed class ArchitectHl7Dialect(DialectContext context, TimeZoneInfo timeZone) : IHl7Dialect
+public sealed partial class ArchitectHl7Dialect(DialectContext context, TimeZoneInfo timeZone) : IHl7Dialect
 {
     public Hl7Interpretation Interpret(Hl7Message message, TraceRef trace)
     {
         var findings = new List<AstmDiagnostic>();
         Hl7Interpretation Invalid(string code) => new([], null, [new(code, AstmSeverity.Error, "Unsupported or incomplete ARCHITECT HL7 message.")]);
         if (message.Header.Text(12) != "2.5.1") return Invalid("ASTM-HL7-UNSUPPORTED-VERSION");
+        if (message.Type == "OUL" && message.Trigger == "R24") return InterpretCalibration(message, trace);
+        if (message.Type == "INU" && message.Trigger == "U05") return InterpretInventory(message, trace);
         if (message.Type == "QBP" && message.Trigger == "ZOS")
         {
             var parameters = message.OfType("QPD").ToArray();

@@ -6,7 +6,8 @@ namespace Astm.Formats.Medical;
 public static class MedicalDataContracts
 {
     public static readonly OperationContractReference Orders = new("medical.lab.orders", 1),
-        Answer = new("medical.lab.worklist-answer", 1), Decoded = new("medical.lab.decoded", 1),
+        Answer = new("medical.lab.worklist-answer", 1), Decoded = new("medical.lab.decoded", 1, 1),
+        InventoryRequest = new("medical.lab.inventory-request", 1),
         Content = new("medical.lab.content", 1);
     private static OperationDataSchema Text(bool nullable = false) => new(OperationDataKind.String) { Nullable = nullable };
     private static OperationDataField Field(OperationDataSchema s, bool required = false) => new(s, required ? OperationFieldRequirement.Required : OperationFieldRequirement.Optional);
@@ -44,7 +45,8 @@ public static class MedicalDataContracts
                 ("state", Field(new(OperationDataKind.String) { AllowedValues = ["Orders", "NoInformation", "Unavailable"] }, true)),
                 ("orders", Field(List(Order(rules)), true))), true)))),
             new(Decoded, Obj(("observations", Field(List(Observation()), true)), ("queries", Field(List(query), true)),
-                ("diagnostics", Field(List(Diagnostic()), true)), ("qualityResources", Field(List(QualityResource()), true)))),
+                ("diagnostics", Field(List(Diagnostic()), true)), ("qualityResources", Field(List(QualityResource()), true)),
+                ("calibrationReports", Field(List(Calibration()), true)), ("inventoryStatuses", Field(List(Inventory()), true)))),
             new(Content, new(OperationDataKind.String))];
     }
     private static OperationDataSchema Instrument() => Obj(("instrumentId", Field(Text(), true)), ("manufacturer", Field(Text())),
@@ -58,6 +60,20 @@ public static class MedicalDataContracts
     private static OperationDataSchema Value() => Obj(("rawText", Field(Text(), true)), ("numeric", Field(new(OperationDataKind.Number))),
         ("comparator", Field(Text())), ("coded", Field(Code())), ("rawUnit", Field(Text())), ("unit", Field(Code())));
     private static OperationDataSchema Map() => new(OperationDataKind.Object) { AllowAdditionalProperties = true };
+    private static OperationDataSchema Calibration() => Obj(("reportId", Field(Text(), true)), ("instrument", Field(Instrument(), true)),
+        ("assay", Field(Code(), true)), ("dilution", Field(Text())), ("moduleId", Field(Text(), true)),
+        ("systemSerial", Field(Text(), true)), ("performedAtRaw", Field(Text(), true)), ("instrumentStatus", Field(Text(), true)),
+        ("successful", Field(new(OperationDataKind.Boolean), true)), ("contentBase64", Field(Text(), true)),
+        ("contentSha256", Field(Text(), true)), ("text", Field(Text())),
+        ("materials", Field(List(Obj(("kind", Field(Text(), true)), ("identifier", Field(Text(), true)), ("lot", Field(Text())),
+            ("level", Field(Text())), ("expirationRaw", Field(Text())), ("typeRaw", Field(Text())))), true)),
+        ("reagents", Field(List(Obj(("lot", Field(Text())), ("serial", Field(Text())), ("kind", Field(Text())))), true)),
+        ("trace", Field(Trace(), true)), ("sourceFields", Field(Map(), true)));
+    private static OperationDataSchema Inventory() => Obj(("statusId", Field(Text(), true)), ("instrument", Field(Instrument(), true)),
+        ("moduleId", Field(Text(), true)), ("reportedAtRaw", Field(Text(), true)), ("substanceIdentifier", Field(Text(), true)),
+        ("substanceType", Field(Text(), true)), ("statuses", Field(List(Code()), true)), ("calibrationStates", Field(List(Text()), true)),
+        ("assays", Field(List(Code()), true)), ("reagentLot", Field(Text())), ("reagentSerial", Field(Text())),
+        ("trace", Field(Trace(), true)), ("sourceFields", Field(Map(), true)));
     private static OperationDataSchema QualityResource() => Obj(("resourceId", Field(Text(), true)), ("instrument", Field(Instrument(), true)),
         ("kind", Field(Text(), true)), ("rawLocator", Field(Text(), true)), ("sourceField", Field(Text(), true)), ("trace", Field(Trace(), true)));
     private static OperationDataSchema Quality() => Obj(

@@ -1,5 +1,7 @@
 # Continuación del trabajo
 
+Incremento #205, 2026-11-02: calibración ARCHITECT HL7 implementada en 0.6.4, perfil 1.2.0: OUL/R24, consulta INR/U06 y recepción INU/U05, contratos/lecturas/lote/observación comunes. [Uso y límites](CALIBRACION-ARCHITECT.md). No retomar R24 como pendiente de implementación; siguen fuera de alcance la interpretación matemática por modelo, homologación física y UI/proyección QC propia del anfitrión. ASI conserva su exclusión documentada de calibradores.
+
 #416 implementado integralmente por solicitud humana de terminar el trabajo sin traspaso: núcleo neutral, contratos médicos opcionales, todos los perfiles incluidos, observadores y adaptación EDC/ETL coordinados en 0.6.3 / PluginApi 3. Leer [OPERACIONES-Y-CONTRATOS](OPERACIONES-Y-CONTRATOS.md), [OPERACIONES-NUCLEO](OPERACIONES-NUCLEO.md) y [OPERACION-OBSERVADA](OPERACION-OBSERVADA.md). No retomar las instrucciones históricas de una fase parcial como pendientes vigentes.
 
 DTOs médicos/host en Astm.Formats.Medical.Model/.Hosting; no conservar aliases de Astm.Abstractions.Model/.Hosting. Interfaces comunes IMedicalOperationProvider/IMedicalOperations/IMedicalOperationObserver; capacidades/restricciones se consultan por perfil. No confundir ACK, aceptación y ejecución física; UC/UF informan Unknown donde no está probada la frontera. EDC usa paquetes 0.6.3 y un adaptador común.

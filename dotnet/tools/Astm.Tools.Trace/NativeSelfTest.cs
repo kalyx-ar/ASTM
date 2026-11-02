@@ -20,6 +20,7 @@ internal static class NativeSelfTest
     // This is an explicit CLI self-test, not a file logger or runtime storage fallback.
     internal static int Run()
     {
+        CalibrationSelfTest.Run();
         var catalog = new DiagnosticCatalog(); var profile = catalog.Resolve(CfxPlugin.CsvProfileId);
         var data = "Well,Sample,Target,Cq,Content,Cq Mean,Cq Std. Dev\nA01,SYN,T1,23.4,NTC,23.5,0.1\n"u8.ToArray();
         var input = DiagnosticReader.Read(data, DiagnosticInputFormat.Export, profile, "synthetic-native-self-test", TimeSpan.Zero);

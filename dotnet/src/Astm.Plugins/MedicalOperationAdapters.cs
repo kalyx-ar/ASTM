@@ -78,8 +78,9 @@ public static class MedicalOperationAdapters
                 var parsed = Hl7Codec.Parse(profile.Encoding.GetString(bytes.Span));
                 if (parsed.Message is null) return new([], [], parsed.Diagnostics, []);
                 var result = dialect.Interpret(parsed.Message, reference);
-                return new(result.Observations, result.Query is { } q ? [q] : [], [.. parsed.Diagnostics, .. result.Diagnostics], []);
-            });
+                return new(result.Observations, result.Query is { } q ? [q] : [], [.. parsed.Diagnostics, .. result.Diagnostics], [])
+                    { CalibrationReports = result.CalibrationReports, InventoryStatuses = result.InventoryStatuses };
+            }, dialect.AdditionalOperations(profile));
 
     private sealed class Adapter : IMedicalOperations
     {
@@ -88,15 +89,18 @@ public static class MedicalOperationAdapters
         private readonly Func<MedicalWorklistAnswer, OperationEnvelope, ReadOnlyMemory<byte>>? _answer;
         private readonly Func<ReadOnlyMemory<byte>, TraceRef, TimeZoneInfo, MedicalDecoded> _decode;
         private readonly Encoding _encoding;
+        private readonly IReadOnlyList<Hl7OperationBinding> _additional;
         public MedicalOperationProfile Profile { get; }
         public Adapter(MedicalOperationProfile profile, IReadOnlyList<string> evidence, bool orders, bool query,
             Func<MedicalOrderSubmission, OperationEnvelope, ReadOnlyMemory<byte>>? buildOrders,
             Func<MedicalWorklistAnswer, OperationEnvelope, ReadOnlyMemory<byte>>? buildAnswer,
-            Func<ReadOnlyMemory<byte>, TraceRef, TimeZoneInfo, MedicalDecoded> decode)
+            Func<ReadOnlyMemory<byte>, TraceRef, TimeZoneInfo, MedicalDecoded> decode,
+            IReadOnlyList<Hl7OperationBinding>? additional = null)
         {
             Profile = profile with { Rules = profile.Rules with { PatientFields = Array.AsReadOnly(profile.Rules.PatientFields.ToArray()),
                 OrderActions = Array.AsReadOnly(profile.Rules.OrderActions.ToArray()), WireBindings = profile.Rules.WireBindings.ToFrozenDictionary() } };
             _orders = buildOrders; _answer = buildAnswer; _decode = decode;
+            _additional = additional?.ToArray() ?? [];
             _encoding = Encoding.GetEncoding(profile.EncodingName, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
             var definitions = new List<OperationDefinition>();
             void Add(string purpose, OperationKind kind, OperationContractReference? input, OperationContractReference output,
@@ -117,7 +121,9 @@ public static class MedicalOperationAdapters
                 OperationCapabilities.Decode | (profile.Format == "content" ? OperationCapabilities.None : OperationCapabilities.Observe),
                 profile.Format == "content" ? OperationInitiator.Content : OperationInitiator.Instrument,
                 profile.Format == "content" ? OperationCompletionScope.ContentImport : OperationCompletionScope.MessageExchange);
-            _catalog = new(definitions, MedicalDataContracts.Create(Profile.Rules, Profile.Format));
+            definitions.AddRange(_additional.Select(b => b.Definition));
+            _catalog = new(definitions, MedicalDataContracts.Create(Profile.Rules, Profile.Format)
+                .Concat(_additional.Where(b => b.Input is not null).Select(b => b.Input!)));
         }
         public IReadOnlyList<OperationDefinition> Describe(string profileId) => _catalog.Describe(profileId);
         public OperationDataContract Resolve(OperationContractReference reference) => _catalog.Resolve(reference);
@@ -131,6 +137,12 @@ public static class MedicalOperationAdapters
             catch (OperationCompatibilityException e) { return [new(e.Code, "$")]; }
             var issues = OperationDataValidator.Validate(Resolve(definition.Input!), request.Data).ToList();
             if (issues.Count > 0) return issues;
+            if (_additional.SingleOrDefault(b => b.Definition.Id == request.Purpose && b.Build is not null) is { } additional)
+            {
+                CheckStrings(request.Data, "$", issues);
+                if (additional.Validate is { } validate) issues.AddRange(validate(request));
+                return issues.AsReadOnly();
+            }
             try
             {
                 IReadOnlyList<WorkOrder> orders;
@@ -196,7 +208,8 @@ public static class MedicalOperationAdapters
             if (Validate(request).Count > 0) throw new OperationCompatibilityException("medical.operation.invalid");
             // Deserialize from the owned envelope, never retain caller collections; wire output is copied by the envelope.
             var owned = request with { Data = request.Data.Clone() };
-            var bytes = owned.Purpose == MedicalPurposes.SubmitOrders
+            var binding = _additional.SingleOrDefault(b => b.Definition.Id == owned.Purpose);
+            var bytes = binding?.Build is { } build ? _encoding.GetBytes(build(owned).Serialize()) : owned.Purpose == MedicalPurposes.SubmitOrders
                 ? _orders!(owned.Data.Deserialize(MedicalJsonContext.Default.MedicalOrderSubmission)!, owned)
                 : _answer!(owned.Data.Deserialize(MedicalJsonContext.Default.MedicalWorklistAnswer)!, owned);
             return new(owned, Select(owned.Purpose), Profile.Format, bytes.Span);

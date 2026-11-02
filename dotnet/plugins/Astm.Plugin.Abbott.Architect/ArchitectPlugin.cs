@@ -55,6 +55,7 @@ public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = n
                 "Abbott 91407-108 (2012) §1 Data Link Layer: frames of 247 characters, six retransmissions, timers 15/20/30 s",
                 "Abbott 91407-108 §4: 15 s between establishment attempts; EOT reply treated as ACK by the instrument",
                 "Abbott 91407-108 §4 Table 4.1: code page subset of MS-DOS 850",
+                "Abbott 91407-108 §2-3: calibrator results and exceptions are suppressed; no calibration-report or inventory-query capability is advertised by ASI.",
             ])
         {
             OperationRules = new()

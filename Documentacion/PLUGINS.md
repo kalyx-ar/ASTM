@@ -102,7 +102,7 @@ Ordenado por evidencia disponible (manual + traza + plugin legacy):
 | `Abbott.Architect` | ARCHITECT i1000SR, c4000 | ASI: LIS1-A / LIS2-A2 (RS232) | 91407-108 | `I1000Interface.log`, `C4000Interface.log`, `Importar/*` | `Plugin_Architect` | **1** |
 | `Abbott.CellDynRuby` | CELL-DYN Ruby | LIS2-A | — (falta) | `Celldyn RUBYInterface.log` | `Plugin_Celldyn_Ruby` | 2 |
 | `Sysmex.Uwam` | UF-5000, UC-3500 vía U-WAM | E1381-02 / LIS2-A2 (TCP) | R315168 rev. 22, `SYSMEX RECORDS.xlsx` | `Sysmex/*` (con host query) | — | 3 |
-| `ArchitectHl7Plugin` (en Abbott.Architect) | ARCHITECT (interfaz HL7) | HL7 v2.5.1 original / MLLP, ZOS; perfil distinto de LAW | 206797-101 | Sólo sintéticas | — | Primer corte implementado |
+| `ArchitectHl7Plugin` (en Abbott.Architect) | ARCHITECT (interfaz HL7) | HL7 v2.5.1 original / MLLP, ZOS, R22/R24, INR/U06 e INU/U05; perfil distinto de LAW | 206797-101 | Sólo sintéticas | — | Perfil 1.2.0, [calibración](CALIBRACION-ARCHITECT.md) |
 | `BioRad.Cfx` | Exportaciones Maestro de CFX | CSV y RDML 1.0/1.1 | 10000126764B; esquema RDML | Sintéticas | — | Implementado, validar exportaciones reales |
 | `Sysmex.XnL` | XN-L 350/450/550 | E1381-02 / E1394-97 | 1273-MKT rev. 3 | Sintéticas | — | Recepción implementada, pendiente de equipo |
 | `Sysmex.Cs2500` | CS-2500 | E1381-02 / E1394-97 | rev. 2.04 | Sintéticas | — | Recepción implementada, pendiente de equipo |

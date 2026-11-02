@@ -8,6 +8,40 @@ namespace Astm.Runtime.Quality;
 /// transport or automatic statistics. Repeated receptions/corrections remain visible for host reconciliation.</summary>
 public sealed class ObservationQualityDataSource(Func<CancellationToken, IAsyncEnumerable<InstrumentObservationBatch>> readCommitted) : IQualityDataSource
 {
+    public async IAsyncEnumerable<CalibrationReport> ReadCalibrationReportsAsync(CalibrationReportQuery query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await foreach (var batch in readCommitted(cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+        foreach (var report in batch.CalibrationReports)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (query.InstrumentId is { } id && report.Instrument.InstrumentId != id
+                || query.Assay is { } assay && (report.Assay.Code != assay.Code || report.Assay.System != assay.System)
+                || query.ReagentLot is { } lot && !report.Reagents.Any(r => r.Lot == lot)
+                || query.ModuleId is { } module && report.ModuleId != module
+                || query.TraceId is { } trace && report.Trace.TraceId != trace) continue;
+            yield return report;
+        }
+    }
+
+    public async IAsyncEnumerable<InstrumentInventoryStatus> ReadInventoryStatusesAsync(InventoryStatusQuery query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await foreach (var batch in readCommitted(cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
+        foreach (var status in batch.InventoryStatuses)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (query.InstrumentId is { } id && status.Instrument.InstrumentId != id
+                || query.Assay is { } assay && !status.Assays.Any(a => a.Code == assay.Code && a.System == assay.System)
+                || query.ReagentLot is { } lot && status.ReagentLot != lot
+                || query.ModuleId is { } module && status.ModuleId != module
+                || query.TraceId is { } trace && status.Trace.TraceId != trace) continue;
+            yield return status;
+        }
+    }
+
     public async IAsyncEnumerable<QualityDatum> ReadAsync(QualityDataQuery query, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
