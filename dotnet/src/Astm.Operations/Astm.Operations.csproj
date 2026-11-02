@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
     <Description>Industry-neutral operation and data contracts; no transport, host or medical dependencies.</Description>
   </PropertyGroup>
 </Project>

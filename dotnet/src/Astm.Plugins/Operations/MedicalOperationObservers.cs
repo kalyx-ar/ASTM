@@ -81,8 +81,8 @@ public static class MedicalOperationObservers
         {
             var state = _link.Feed(entry);
             Tracker.SetLink(state.LinkInProgress == true);
-            if (state.Code is "ASTM-OP-SEQUENCE-GAP" or "ASTM-OP-UNRELIABLE-EXCHANGE" or "ASTM-OP-UNEXPECTED-FRAME" or
-                "ASTM-OP-INCOMPLETE-MESSAGE" or "ASTM-OP-INCOMPLETE-TRANSMISSION" or "ASTM-OP-BUFFER-LIMIT" or "ASTM-OP-CONTENTION") Invalidate();
+            // The link contract is authoritative. A list of diagnostic codes can miss new poison reasons.
+            if (state.LinkInProgress is null) Invalidate();
         }
         public AstmOperationDecision OnTransmission(TraceDirection direction, IReadOnlyList<Lis02Message> messages, TraceRef trace)
         {

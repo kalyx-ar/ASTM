@@ -1,6 +1,6 @@
 # Núcleo neutral de operaciones (#416)
 
-Implementación 0.6.2, 2026-11-01. [Issue EDC #416](https://github.com/kalyx-ar/EDC/issues/416). [Especialización médica y consumo](OPERACIONES-Y-CONTRATOS.md).
+Implementación 0.6.3, 2026-11-01. [Issue EDC #416](https://github.com/kalyx-ar/EDC/issues/416). [Especialización médica y consumo](OPERACIONES-Y-CONTRATOS.md).
 
 Astm.Operations utiliza sólo BCL: no referencia proyectos, pacientes, laboratorio, protocolos, EDC, transporte ni bases. Astm.Abstractions conserva transporte/trazas/diagnósticos neutrales. Los tipos clínicos y el puerto ILabWorkflowHost están en el proyecto opcional Astm.Formats.Medical, namespaces .Model y .Hosting, sin aliases antiguos.
 
@@ -36,4 +36,4 @@ Transport, MessageAcknowledged, ApplicationAccepted, DeviceReported y ContentVal
 
 OperationContractTests aporta 25 casos no médicos (receta térmica sintética) con condiciones/origen/versiones/ciclos y ausencia de dependencias clínicas. MedicalOperationTests verifica perfiles, negociación, reglas, correlación, scopes y ETL. El self-test CLI NativeAOT ejercita codecs médicos/neutrales generados.
 
-Paquetes propios 0.6.2 y PluginApi 3; consumidores migran juntos. Sin dependencias nuevas ni cambios de confianza/bases/hardware. Strong Name no equivale a Authenticode ni a firma NuGet; firmas de release conservan su proceso. #404 sigue resuelto y firma/ensayo instalado VCOM permanece en #408.
+Paquetes propios 0.6.3 y PluginApi 3; consumidores migran juntos. Sin dependencias nuevas ni cambios de confianza/bases/hardware. Strong Name no equivale a Authenticode ni a firma NuGet; firmas de release conservan su proceso. #404 sigue resuelto y firma/ensayo instalado VCOM permanece en #408.

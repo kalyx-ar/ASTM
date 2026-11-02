@@ -1,6 +1,6 @@
 # Operaciones y contratos médicos interoperables (#416)
 
-Implementación 0.6.2, 2026-11-01. [Issue propietario](https://github.com/kalyx-ar/EDC/issues/416). ASTM es neutral por industria; medicina se incorpora mediante contratos/formatos médicos opcionales o plugins especializados. Operación incluye datos, validación, preparación/interpretación y lifecycle.
+Implementación 0.6.3, 2026-11-01. [Issue propietario](https://github.com/kalyx-ar/EDC/issues/416). ASTM es neutral por industria; medicina se incorpora mediante contratos/formatos médicos opcionales o plugins especializados. Operación incluye datos, validación, preparación/interpretación y lifecycle.
 
 ## Arquitectura implementada
 

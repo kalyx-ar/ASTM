@@ -1,8 +1,8 @@
 # Continuación del trabajo
 
-#416 implementado integralmente por solicitud humana de terminar el trabajo sin traspaso: núcleo neutral, contratos médicos opcionales, todos los perfiles incluidos, observadores y adaptación EDC/ETL coordinados en 0.6.2 / PluginApi 3. Leer [OPERACIONES-Y-CONTRATOS](OPERACIONES-Y-CONTRATOS.md), [OPERACIONES-NUCLEO](OPERACIONES-NUCLEO.md) y [OPERACION-OBSERVADA](OPERACION-OBSERVADA.md). No retomar las instrucciones históricas de una fase parcial como pendientes vigentes.
+#416 implementado integralmente por solicitud humana de terminar el trabajo sin traspaso: núcleo neutral, contratos médicos opcionales, todos los perfiles incluidos, observadores y adaptación EDC/ETL coordinados en 0.6.3 / PluginApi 3. Leer [OPERACIONES-Y-CONTRATOS](OPERACIONES-Y-CONTRATOS.md), [OPERACIONES-NUCLEO](OPERACIONES-NUCLEO.md) y [OPERACION-OBSERVADA](OPERACION-OBSERVADA.md). No retomar las instrucciones históricas de una fase parcial como pendientes vigentes.
 
-DTOs médicos/host en Astm.Formats.Medical.Model/.Hosting; no conservar aliases de Astm.Abstractions.Model/.Hosting. Interfaces comunes IMedicalOperationProvider/IMedicalOperations/IMedicalOperationObserver; capacidades/restricciones se consultan por perfil. No confundir ACK, aceptación y ejecución física; UC/UF informan Unknown donde no está probada la frontera. EDC usa paquetes 0.6.2 y un adaptador común.
+DTOs médicos/host en Astm.Formats.Medical.Model/.Hosting; no conservar aliases de Astm.Abstractions.Model/.Hosting. Interfaces comunes IMedicalOperationProvider/IMedicalOperations/IMedicalOperationObserver; capacidades/restricciones se consultan por perfil. No confundir ACK, aceptación y ejecución física; UC/UF informan Unknown donde no está probada la frontera. EDC usa paquetes 0.6.3 y un adaptador común.
 
 Sin nuevas dependencias, permisos, DB/spool, timers ni instalación de drivers. Repetir suites .NET/CTest antes de commits, según AGENTS. Validación instalada/firma VCOM continúa en #408 por decisión humana; #404 permanece resuelto.
 
@@ -18,7 +18,7 @@ EDC #404 (2026-11-01): backend COM virtual Windows 10/11 x64 y retiro al finaliz
 
 Guía para retomar ASTM desde otra sesión o agente. Estado al 27 de octubre de 2026, `main` en `github.com/kalyx-ar/ASTM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
 
-Nombre vigente: **ASTM**; proyectos/paquetes `Astm.*` 0.6.2 y salidas `astm-diagnostics`/`astm-trace`. Corrección completa Alpha, sin aliases ni lectores de formatos anteriores. [Alcance y nombres](RENOMBRADO-ASTM.md). Las referencias de entrega 0.2.0 siguientes son evidencia anterior al renombrado.
+Nombre vigente: **ASTM**; proyectos/paquetes `Astm.*` 0.6.3 y salidas `astm-diagnostics`/`astm-trace`. Corrección completa Alpha, sin aliases ni lectores de formatos anteriores. [Alcance y nombres](RENOMBRADO-ASTM.md). Las referencias de entrega 0.2.0 siguientes son evidencia anterior al renombrado.
 
 Incremento de transporte/diagnóstico: COM de prueba propio de PortGate, sin driver; escenarios derivados de trazas con orden del plugin → interpretación del instrumento simulado → resultado y verificación de tiempos. GUI: Probar PortGate, COM local y opciones PortGate; catálogo de acciones opcional del plugin. [Uso y límites](PRUEBAS-SERIE.md). API/paquetes 0.2.0 para EDC. No equiparar este ensayo con validación del driver COM o del hardware.
 

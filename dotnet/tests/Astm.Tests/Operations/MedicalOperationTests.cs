@@ -167,6 +167,19 @@ public class MedicalOperationTests
     }
 
     [Fact]
+    public void Unexpected_enquiry_after_establishment_revokes_previously_idle_coverage()
+    {
+        var wire = new Wire(new StandardAstmPlugin(), StandardAstmPlugin.ProfileId);
+        wire.Transmission(Results);
+        Assert.True(wire.Observer.Current.NoPendingOperations);
+        wire.Feed(TraceDirection.Received, [Enq]);
+        wire.Feed(TraceDirection.Transmitted, [Ack]);
+        wire.Feed(TraceDirection.Received, [Enq]);
+        Assert.False(wire.Observer.Current.CoverageComplete);
+        Assert.False(wire.Observer.Current.NoPendingOperations);
+    }
+
+    [Fact]
     public void Ruby_ALL_is_not_closed_by_one_partial_positive_worklist()
     {
         var wire = new Wire(new CellDynRubyPlugin(), CellDynRubyPlugin.ProfileId);

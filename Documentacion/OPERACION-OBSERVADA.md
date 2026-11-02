@@ -1,6 +1,6 @@
 # Observación común de operaciones (#414 / #416)
 
-Contrato 0.6.2. #416 integra todos los perfiles médicos mediante IMedicalOperationObserver. #414 aportó el decodificador LIS01; PortGate/VCOM permanece agnóstico.
+Contrato 0.6.3. #416 integra todos los perfiles médicos mediante IMedicalOperationObserver. #414 aportó el decodificador LIS01; PortGate/VCOM permanece agnóstico.
 
 ## Consumo
 
