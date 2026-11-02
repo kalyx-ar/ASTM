@@ -1,5 +1,7 @@
 # Estado de operación de una traza (#414)
 
+Evolución de diseño #416: [operaciones y contratos de datos](OPERACIONES-Y-CONTRATOS.md) amplía el análisis hacia catálogo, datos requeridos/condicionales, construcción/validación y estados por equipo. Este monitor/perfil de resultados conserva su alcance específico LIS01/LIS02; no es la interfaz universal de operaciones ni acredita los plugins por fabricante.
+
 Solicitud humana 2026-11-01, [EDC #414](https://github.com/kalyx-ar/EDC/issues/414). Implementación incremental pasiva en `Astm.Tracing.AstmOperationObserver`; contratos en Abstractions/Plugins. Fuentes 0.4.0 de Abstractions, Plugins, Protocol.Lis01, Runtime y Tracing. No publica paquetes ni cambia las referencias 0.3 de EDC.
 
 ## Consulta simple

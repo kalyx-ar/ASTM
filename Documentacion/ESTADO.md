@@ -1,5 +1,7 @@
 # Estado de la implementación
 
+Análisis 2026-11-01, EDC #416: [operaciones, contratos de datos y especializaciones](OPERACIONES-Y-CONTRATOS.md). Dirección humana: núcleo neutral por industria; medicina mediante instrumentos médicos o formatos médicos genéricos. Se recomienda catálogo/schema/binding tipado y lifecycle por operación/equipo, con equivalencias HL7 y adaptador común del host. Es documentación de diseño; fuentes/paquetes/API no cambian. Implementación y conformidad por plugin pendientes #416; no sustituye la entrega acotada #414 ni cierra #408.
+
 Incremento 2026-11-01, EDC #414: `AstmOperationObserver` incremental con `Current.OperationInProgress` nullable, `NoPendingOperations`, estado del enlace separado y evidencia sin payload clínico. Políticas opcionales por plugin; StandardAstmPlugin ofrece explícitamente un mensaje de resultados como operación. Queries/flujo desconocido no se liberan con resultados ajenos; pérdidas/corrupción exigen resincronización. Contratos y bibliotecas afectadas 0.4.0 en fuente, sin actualizar paquetes del host. [Uso y límites](OPERACION-OBSERVADA.md).
 
 Evidencia #414: 25 pruebas nuevas; suite .NET repetida 449 correctas/una omitida (13 s), CTest repetido 855 + 33 sin fallos (7,71/7,69 s). Release con Strong Name obligatorio correcto, cinco DLL afectadas 0.4.0.0/token 066190a23251f202, Authenticode NotSigned pendiente de release. Sin publicación ni cambios de confianza.
