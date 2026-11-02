@@ -7,7 +7,7 @@ using Astm.Abstractions.Diagnostics;
 namespace Astm.Plugin.Sysmex.Urinalysis;
 
 /// <summary>One equipment-family plugin, with shared knowledge and separate protocol decoders.</summary>
-public sealed class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTracePlugin, ITraceLogAdapterProvider, IInstrumentKnowledge, IInstrumentValueKnowledge, IInstrumentHeaderProbe, IInstrumentMessageKnowledge, IInstrumentFlagKnowledge, IInstrumentCommandPlugin
+public sealed partial class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTracePlugin, ITraceLogAdapterProvider, IInstrumentKnowledge, IInstrumentValueKnowledge, IInstrumentHeaderProbe, IInstrumentMessageKnowledge, IInstrumentFlagKnowledge, IInstrumentCommandPlugin
 {
     public IReadOnlyList<InstrumentCommandDescriptor> Commands(string profileId) => AstmOrderCommands.Describe(this, profileId);
     public IReadOnlyList<Lis02Record> BuildAstmCommand(string profileId, InstrumentCommandRequest request, DialectContext context) => AstmOrderCommands.Build(this, profileId, request, context);

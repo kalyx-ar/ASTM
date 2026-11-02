@@ -36,6 +36,7 @@ public sealed class DiagnosticProfile(string id, string manufacturer, string nam
     public IInstrumentTracePlugin? TracePlugin { get; init; }
     public InstrumentTraceProfile? TraceProfile { get; init; }
     public bool IsHl7 { get; init; }
+    public IReadOnlyList<InstrumentProfileFact> Knowledge { get; init; } = [];
     public bool CanSimulateHost => AstmProfile is not null || IsHl7;
     public bool CanConnect => CanSimulateHost || TracePlugin is not null;
     public IHl7Dialect Hl7Dialect(TimeZoneInfo zone) => IsHl7
@@ -68,18 +69,19 @@ public sealed class DiagnosticCatalog
         foreach (var plugin in TracePlugins)
         foreach (var profile in plugin.Profiles)
             profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, string.Join(", ", plugin.Describe().Models), profile.Protocol)
-            { TracePlugin = plugin, TraceProfile = profile });
+            { TracePlugin = plugin, TraceProfile = profile, Knowledge = (plugin as IInstrumentProfileKnowledge)?.DescribeKnowledge(profile.Id) ?? [] });
         foreach (var plugin in ContentPlugins)
         foreach (var profile in plugin.Profiles)
             profiles.Add(new(profile.Id, plugin.Describe().Manufacturer, "CFX Maestro", profile.Format)
-            { ContentPlugin = plugin, ContentProfile = profile });
+            { ContentPlugin = plugin, ContentProfile = profile, Knowledge = (plugin as IInstrumentProfileKnowledge)?.DescribeKnowledge(profile.Id) ?? [] });
         foreach (var plugin in AstmPlugins)
         foreach (var profile in plugin.Profiles)
         {
             var descriptor = plugin.Describe();
-            profiles.Add(new(profile.Id, descriptor.Manufacturer, string.Join(", ", descriptor.Models), "ASTM") { AstmPlugin = plugin, AstmProfile = profile });
+            profiles.Add(new(profile.Id, descriptor.Manufacturer, string.Join(", ", descriptor.Models), "ASTM")
+                { AstmPlugin = plugin, AstmProfile = profile, Knowledge = (plugin as IInstrumentProfileKnowledge)?.DescribeKnowledge(profile.Id) ?? [] });
         }
-        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP") { IsHl7 = true });
+        profiles.Add(new(ArchitectHl7Plugin.ProfileId, "Abbott", "ARCHITECT", "HL7 / MLLP") { IsHl7 = true, Knowledge = ArchitectHl7Plugin.ProfileKnowledge });
         if (profiles.Select(p => p.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != profiles.Count) throw new InvalidOperationException("Duplicate profile ID.");
         Profiles = profiles;
         Instruments = profiles.GroupBy(p => p.InstrumentId, StringComparer.Ordinal).Select(g => new DiagnosticInstrument(g.Key,

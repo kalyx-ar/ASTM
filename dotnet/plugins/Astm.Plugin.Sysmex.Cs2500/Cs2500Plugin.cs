@@ -12,7 +12,7 @@ public sealed partial class Cs2500Plugin : IInstrumentPlugin, IInstrumentHeaderP
 {
     // Host Interface Specifications rev.2.04, §5.3.3.1: H.5.1 sender name.
     public bool RecognizesHeader(Lis02Record header) => header.Type == 'H' && header.Text(5, 1).Trim().Equals("CS-2500", StringComparison.OrdinalIgnoreCase);
-    public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.cs2500.astm02.results", "1.1.0", Lis01Options.Default,
+    public IReadOnlyList<AstmProfile> Profiles { get; } = [new("sysmex.cs2500.astm02.results", "1.2.0", Lis01Options.Default,
         Encoding.ASCII, new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults }, TimeSpan.Zero,
         ["Sysmex CS-2500 ASTM Host Interface Specifications for US rev.2.04 (2019), §5.2.2/5.2.5: 15/15/30 s, busy 10 s; §5.3.3.4 O.4, §5.3.3.5 R.3/R.7.",
          "rev.2.04 p.28/30: QC control identifier QC + name(7) + lot(6), O.12=Q; unknown level remains absent. Receive-only; no E1381-95 mode, orders, external-path dereferencing or hardware qualification."]) { Transport = Transport }];
@@ -64,6 +64,13 @@ public sealed partial class Cs2500Dialect(DialectContext context) : StandardAstm
         List<string> comments, List<Astm.Abstractions.Diagnostics.AstmDiagnostic> diagnostics)
     {
         var observation = base.ReadResult(instrument, order, result, trace, comments, diagnostics);
+        if (Cs2500Masks.Find(observation) is { } mask && !observation.Flags.Any(f =>
+            mask.DetailedCode is { } detailed ? f.System == VendorSystem + ":evaluation-error" && f.Code == detailed
+                : f.System == VendorSystem + ":evaluation-error" || f.System == VendorSystem + ":instrument-error"))
+        {
+            observation = observation with { Flags = observation.Flags.Append(new CodedValue(mask.Code, null, VendorSystem + ":measurement-mask")).ToArray() };
+            diagnostics.Add(new(mask.FindingCode, Astm.Abstractions.Diagnostics.AstmSeverity.Warning, mask.Meaning, result.Field(2)));
+        }
         foreach (var flag in observation.Flags.Where(f => f.System == VendorSystem + ":evaluation-error"))
             if (Cs2500Errors.Definitions.FirstOrDefault(e => e.Code == flag.Code) is { Attention: true } error)
                 diagnostics.Add(new(Cs2500Errors.FindingCode(error.Code), Astm.Abstractions.Diagnostics.AstmSeverity.Warning, error.Text, result.Field(2)));
@@ -82,6 +89,7 @@ public sealed partial class Cs2500Dialect(DialectContext context) : StandardAstm
         identity["dilution.percent"] = result.Text(3, 6); identity["analysis.resultType"] = result.Text(3, 7);
         identity["extended.request"] = result.Text(3, 8); identity["extended.result"] = result.Text(3, 9);
         identity["reflex.request"] = result.Text(3, 10); identity["flags.raw"] = result.Field(7);
+        identity["analysis.replications"] = result.Text(3, 11);
         return identity;
     }
     protected override Astm.Formats.Medical.Model.OrderQuery? ReadQuery(InstrumentRef instrument, Lis02Record record, Astm.Abstractions.Tracing.TraceRef trace) => null;

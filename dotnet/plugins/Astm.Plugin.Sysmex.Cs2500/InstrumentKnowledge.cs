@@ -12,6 +12,8 @@ public sealed partial class Cs2500Plugin : IInstrumentKnowledge, IInstrumentFlag
         if (context.Record == "record" && context.Field == "type")
             return DiagnosticVocabulary.TryGetValue("record." + code, out var record) ? new(record) : null;
         if (context.Record != "R") return null;
+        if (context.Field == "4" && Cs2500Masks.Definitions.SingleOrDefault(m => m.Code == code) is { } mask)
+            return new(DiagnosticVocabulary["mask." + code], mask.FindingCode, AstmSeverity.Warning, code);
         if (context.Field == "7.2" && Cs2500Errors.Definitions.FirstOrDefault(e => e.Code == code) is { } entry)
             return new(DiagnosticVocabulary["evaluation." + code], entry.Attention ? Cs2500Errors.FindingCode(code) : null,
                 entry.Attention ? AstmSeverity.Warning : AstmSeverity.Information, code);
@@ -23,6 +25,8 @@ public sealed partial class Cs2500Plugin : IInstrumentKnowledge, IInstrumentFlag
     {
         var system = CodeSystems.Vendor("sysmex.cs2500");
         if (observation.Test.Vendor.System != system) return null;
+        if (flag.System == system + ":measurement-mask" && DiagnosticVocabulary.TryGetValue("mask." + flag.Code, out var mask))
+            return new(mask, true, true);
         if (flag.System == system + ":evaluation-error" && Cs2500Errors.Definitions.FirstOrDefault(e => e.Code == flag.Code) is { } entry)
             return new(DiagnosticVocabulary["evaluation." + entry.Code], entry.Attention, entry.IsError);
         if (flag.System == system + ":instrument-error")

@@ -44,6 +44,7 @@ flowchart LR
 | [DIAGNOSTICO-MANTENIMIENTO](DIAGNOSTICO-MANTENIMIENTO.md) | GUI Windows, casos protegidos, catálogo real por modelo y prioridad Argentina |
 | [MAUI-Y-NATIVEAOT](MAUI-Y-NATIVEAOT.md) | Presentación MAUI, publicación limpia autónoma y alcance NativeAOT por ejecutable |
 | [CALIDAD-Y-CALIBRACION](CALIDAD-Y-CALIBRACION.md) | Investigación por interfaz, contexto QC/estadísticas/recursos externos y puertos de consulta del anfitrión |
+| [CONOCIMIENTO-POR-PERFIL](CONOCIMIENTO-POR-PERFIL.md) | Hechos consultables con fuentes/estado/canal, máscaras CS-2500 y oportunidades documentadas por fabricante |
 | [DEPENDENCIAS](DEPENDENCIAS.md) | Dependencias externas: origen, versión, licencia, verificación y aprobación |
 | [DATOS-DE-PRUEBA](DATOS-DE-PRUEBA.md) | Corpus, privacidad, anonimización, manuales |
 | [INTEGRACION-EDC](INTEGRACION-EDC.md) | Cómo lo consume EDC (cuatro capas, ETL, Identidades, distribución) |

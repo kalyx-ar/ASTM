@@ -15,7 +15,7 @@ public sealed record CfxCsvOptions(char Separator = ',', string Culture = "", st
     string SampleColumn = "Sample", string TargetColumn = "Target", string CqColumn = "Cq");
 
 /// <summary>Imports already analyzed exports. It never recalculates Cq or assigns clinical positivity.</summary>
-public sealed class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentContentPlugin
+public sealed partial class CfxPlugin(CfxCsvOptions? csvOptions = null) : IInstrumentContentPlugin
 {
     public const string CsvProfileId = "biorad.cfx.maestro.quantification-csv";
     public const string RdmlProfileId = "biorad.cfx.maestro.rdml";

@@ -14,6 +14,7 @@ using Astm.Tracing;
 
 const string Usage = """
     astm-trace plugins
+    astm-trace knowledge <profile-id|all>
     astm-trace self-test
     astm-trace inspect-input <file> [--profile <id>]
     astm-trace verify-publication <directory>
@@ -48,6 +49,7 @@ try
     return args[0] switch
     {
         "plugins" => ListPlugins(),
+        "knowledge" when args.Length == 2 => ProfileKnowledgeCommand.Run(args[1]),
         "self-test" => NativeSelfTest.Run(),
         "inspect-input" when args.Length >= 2 => InspectInput.Run(args[1], Option("--profile")),
         "verify-publication" when args.Length == 2 => VerifyPublication(args[1]),

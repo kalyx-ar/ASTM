@@ -14,6 +14,9 @@ public static class DiagnosticText
         ["Configuration.WithChemistry"] = "ASTM · Con analizador químico (consulta: 8 s)",
         ["Configuration.WithoutChemistry"] = "ASTM · Sin analizador químico (consulta: 18 s)",
         ["Catalog.Generic"] = "Instrumento ASTM genérico",
+        ["Knowledge.Implemented"] = "Implementado", ["Knowledge.Documented"] = "Documentado; pendiente de implementación",
+        ["Knowledge.Unconfirmed"] = "Sin confirmar", ["Knowledge.Excluded"] = "Excluido en esta interfaz",
+        ["Knowledge.Entry"] = "{0} ({1})\n{2}\nFuente: {3}",
         ["Group.Details"] = "{0} filas agrupadas. Despliegue el grupo para consultar cada registro y su detalle original.",
         ["Group.Values"] = "{0} valores distintos", ["Unknown.Command"] = "Comando sin interpretación documentada ({0})",
         ["Message.Results"] = "Resultados de análisis", ["Message.Query"] = "Consulta de solicitudes",
@@ -131,6 +134,8 @@ public static class DiagnosticText
     }
     public static string Explanation(object plugin, ProtocolExplanation value) => string.Format(CultureInfo.CurrentCulture, Plugin(plugin, value.Text), value.Arguments.Cast<object>().ToArray());
     public static string Common(string key) => Plugin(typeof(StandardDiagnosticVocabulary), StandardDiagnosticVocabulary.Shared[key]);
+    public static string Knowledge(InstrumentProfileFact fact) => Format("Knowledge.Entry",
+        Plugin(typeof(DiagnosticText), fact.Title), Text("Knowledge." + fact.Support), Plugin(typeof(DiagnosticText), fact.Detail), fact.Detail.Evidence);
     public static async Task InitializeAsync(DbConnection database, DiagnosticCatalog catalog, string target = "es-AR", CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -139,9 +144,15 @@ public static class DiagnosticText
         var common = StandardDiagnosticVocabulary.Shared.Values.ToDictionary(v => v.Key, v => v.Fallback, StringComparer.Ordinal);
         var commonSource = typeof(StandardDiagnosticVocabulary).Assembly.GetName().Name!;
         await InitializeSeedAsync(common, commonSource, database, target, cancellationToken); pluginSeeds[commonSource] = common;
-        foreach (var assembly in catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().Concat(catalog.TracePlugins).GroupBy(p => p.GetType().Assembly.GetName().Name!, StringComparer.Ordinal))
+        var texts = catalog.AstmPlugins.OfType<IInstrumentDiagnosticVocabulary>().Concat(catalog.TracePlugins)
+            .Concat(catalog.ContentPlugins.OfType<IInstrumentDiagnosticVocabulary>())
+            .SelectMany(p => p.DiagnosticVocabulary.Values.Where(v => v.SourceAssembly is null)
+                .Select(v => (Source: p.GetType().Assembly.GetName().Name!, Text: v)))
+            .Concat(catalog.Profiles.SelectMany(p => p.Knowledge).SelectMany(f => new[] { f.Title, f.Detail })
+                .Select(v => (Source: v.SourceAssembly!, Text: v)));
+        foreach (var assembly in texts.GroupBy(p => p.Source, StringComparer.Ordinal))
         {
-            var seed = assembly.SelectMany(p => p.DiagnosticVocabulary.Values).Where(v => v.SourceAssembly is null).GroupBy(v => v.Key, StringComparer.Ordinal)
+            var seed = assembly.Select(p => p.Text).GroupBy(v => v.Key, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Fallback, StringComparer.Ordinal);
             if (seed.Count == 0) continue;
             await InitializeSeedAsync(seed, assembly.Key, database, target, cancellationToken);

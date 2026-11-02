@@ -22,6 +22,11 @@ internal static class NativeSelfTest
     {
         CalibrationSelfTest.Run();
         var catalog = new DiagnosticCatalog(); var profile = catalog.Resolve(CfxPlugin.CsvProfileId);
+        var facts = catalog.Profiles.SelectMany(p => p.Knowledge).ToArray();
+        var factsJson = JsonSerializer.Serialize(facts, Astm.Plugins.InstrumentKnowledgeJsonContext.Default.InstrumentProfileFactArray);
+        if (JsonSerializer.Deserialize(factsJson, Astm.Plugins.InstrumentKnowledgeJsonContext.Default.InstrumentProfileFactArray)?.Length != facts.Length
+            || !facts.Any(f => f.Id == "xnl.sncs-calibration" && f.Support == Astm.Plugins.InstrumentKnowledgeSupport.Documented))
+            throw new InvalidDataException("Native profile knowledge metadata mismatch.");
         var data = "Well,Sample,Target,Cq,Content,Cq Mean,Cq Std. Dev\nA01,SYN,T1,23.4,NTC,23.5,0.1\n"u8.ToArray();
         var input = DiagnosticReader.Read(data, DiagnosticInputFormat.Export, profile, "synthetic-native-self-test", TimeSpan.Zero);
         var timing = new DiagnosticTiming(TimeSpan.Zero, TimeSpan.Zero, TimeZoneInfo.Utc);

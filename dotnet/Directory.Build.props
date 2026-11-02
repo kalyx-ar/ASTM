@@ -9,7 +9,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Version>0.6.4</Version>
+    <Version>0.6.5</Version>
     <Product>ASTM</Product>
     <Description>ASTM: neutral clinical laboratory instrument integration.</Description>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>

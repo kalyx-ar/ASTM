@@ -32,6 +32,11 @@ public sealed partial class Cs2500Plugin : IInstrumentDiagnosticVocabulary
             Add("finding." + Cs2500Errors.FindingCode(entry.Code), entry.Text, entry.Evidence);
         }
         Add("instrument.34422", "Reactivo insuficiente", "CS-2500 rev.2.04 p.34, ejemplo de R.7.3; superficie de reactivo no detectada");
+        foreach (var mask in Cs2500Masks.Definitions)
+        {
+            Add("mask." + mask.Code, mask.Meaning, Cs2500Masks.Evidence);
+            Add("finding." + mask.FindingCode, mask.Meaning, Cs2500Masks.Evidence);
+        }
         return values;
     }
 }

@@ -1,5 +1,7 @@
 # Datos analíticos para control interno y calibración
 
+Conocimiento compilado 0.6.5 (2026-11-02, #205): [catálogo por perfil, fuentes y oportunidades](CONOCIMIENTO-POR-PERFIL.md), separando implementado/documentado/no confirmado/excluido. Incluye máscaras sin error ampliado y repeticiones CS-2500, límites SNCS/SUIT y otros datos útiles; QC no equivale a certificación de calibración.
+
 Investigación e implementación del 2026-10-24, [EDC#205](https://github.com/kalyx-ar/EDC/issues/205), alcance previo [registrado aquí](https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6391823820). Se refiere al proyecto ASTM y a las interfaces ASTM/HL7/exportaciones específicas de sus plugins; compartir un protocolo no garantiza que todos los modelos transmitan los mismos datos.
 
 ## Hallazgo y separación de responsabilidades

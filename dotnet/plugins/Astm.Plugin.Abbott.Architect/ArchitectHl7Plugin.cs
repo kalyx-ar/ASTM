@@ -10,7 +10,7 @@ using Astm.Protocol.Hl7v2;
 
 namespace Astm.Plugin.Abbott.Architect;
 
-public sealed class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan responseTimeout, TimeZoneInfo instrumentTimeZone) : IHl7InstrumentPlugin
+public sealed partial class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan responseTimeout, TimeZoneInfo instrumentTimeZone) : IHl7InstrumentPlugin
 {
     public const string ProfileId = "abbott.architect.hl7-2.5.1";
     public IReadOnlyList<Hl7Profile> Profiles { get; } =

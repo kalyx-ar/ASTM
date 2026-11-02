@@ -467,7 +467,7 @@ public sealed partial class MainPage : ContentPage
             default:
                 headers = [T("Column.Profile"), T("Column.Configuration")];
                 rows = _catalog.Instruments.Select(instrument => Row([instrument.DisplayName, string.Join(" · ", instrument.Profiles.Select(p => p.Configuration))],
-                    string.Join("\n", instrument.Profiles.Select(p => p.DisplayName)), instrument.Id)); break;
+                    string.Join("\n\n", instrument.Profiles.Select(p => p.DisplayName + "\n" + string.Join("\n\n", p.Knowledge.Select(DiagnosticText.Knowledge)))), instrument.Id)); break;
         }
         var flexible = _tab switch { 0 => 4, 1 => 3, 2 => 6, 3 => interpreted ? 1 : 2, 4 => 2, 5 => interpreted ? 2 : 3, _ => 1 };
         _table.SetRows(_tab + ":" + interpreted, headers, rows, _group.IsChecked && _tab != 6, flexible, consecutive: _tab is 0 or 5);
@@ -613,6 +613,10 @@ public sealed partial class MainPage : ContentPage
             using (var journal = new ProtectedCaseJournal(File.Create(path), _platform.CaseProtection, _case!.Header)) foreach (var entry in _case.Entries) journal.Append("entry", TraceLine.From(entry));
             using var input = File.OpenRead(path); var loaded = ProtectedCaseJournal.Read(input, _platform.CaseProtection); var analyzed = DiagnosticReader.Analyze(loaded, Profile, Timing());
             if (!_interpret.IsChecked || !_group.IsChecked || _catalog.Instruments.Count != 9 || _catalog.Instruments.Count(i => i.Id == SysmexUrinalysisPlugin.PluginId) != 1 || _catalog.Profiles.Count != 15 || analyzed.Observations.Count != 3 || analyzed.Observations.Sum(o => o.Quality?.Statistics.Count ?? 0) != 6) throw new InvalidDataException("ASTM-MAUI-SELFTEST");
+            var profileFacts = _catalog.Profiles.SelectMany(p => p.Knowledge).ToArray();
+            if (!profileFacts.Any(f => f.Id == "xnl.sncs-calibration" && f.Support == Astm.Plugins.InstrumentKnowledgeSupport.Documented)
+                || profileFacts.Any(f => !DiagnosticText.Knowledge(f).Contains(f.Detail.Evidence, StringComparison.Ordinal)))
+                throw new InvalidDataException("ASTM-MAUI-PROFILE-KNOWLEDGE-SELFTEST");
             var quality = QualitySeriesBuilder.Build(analyzed.Observations);
             if (quality.Sum(s => s.NumericCount) != 2 || quality.Sum(s => s.MeasurementCount) != 3 || QualityGroups().Any(g => g.SummaryRow is null)) throw new InvalidDataException("ASTM-MAUI-QUALITY-SELFTEST");
             var unknownCq = QualityGroups().Single(g => g.Children.Any(r => r.Cells[5] == "Undetermined"));

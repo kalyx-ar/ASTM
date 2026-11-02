@@ -25,12 +25,17 @@ public sealed class LangIntegrationTests
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "flag.UC3500.00CC")] = "ESTADO DE ERROR TRADUCIDO";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "unit.NotTransmitted")] = "UNIDAD NO INFORMADA TRADUCIDA";
         database.Translations[("Astm.Plugin.Sysmex.Cs2500", "evaluation.0000.4000.0030")] = "CALIBRACION TRADUCIDA";
+        database.Translations[("Astm.Plugin.Sysmex.XnL", "knowledge.xnl.sncs-calibration.title")] = "SNCS TRADUCIDO";
+        database.Translations[("Astm.Plugin.BioRad.Cfx", "knowledge.cfx.standard-curve.title")] = "CURVA CFX TRADUCIDA";
         database.Translations[("Astm.Plugin.Sysmex.XnL", "ip.PLT_Clumps?")] = "SOSPECHA TRADUCIDA";
         database.Translations[("Astm.Plugin.Diagast.Qwalys", "reaction.A.CMP")] = "COMPATIBILIDAD TRADUCIDA";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "research.BACT-Info..3")] = "INDICADOR TRADUCIDO";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "uf.need.DBS_LANG_02215")] = "LIMPIEZA TRADUCIDA";
         database.Translations[("Astm.Plugin.Sysmex.Urinalysis", "uf.field.counter")] = "CONTADOR TRADUCIDO {0}: {1}";
         var catalog = new DiagnosticCatalog(); await DiagnosticText.InitializeAsync(database, catalog);
+        Assert.Contains("SNCS TRADUCIDO", DiagnosticText.Knowledge(catalog.Resolve("sysmex.xnl.astm02.results").Knowledge.Single(f => f.Id == "xnl.sncs-calibration")));
+        Assert.Contains("CURVA CFX TRADUCIDA", DiagnosticText.Knowledge(catalog.Resolve("biorad.cfx.maestro.standard-curve-csv").Knowledge.Single(f => f.Id == "cfx.standard-curve")));
+        Assert.Contains(database.Missing, label => label.Source == "Astm.Plugin.Abbott.CellDynRuby" && label.Label.StartsWith("knowledge.", StringComparison.Ordinal));
         Assert.Equal("CASO TRADUCIDO", DiagnosticText.Finding(new("ASTM-DIAG-INCOMPLETE-CASE", AstmSeverity.Warning, "Unchanged original")));
         Assert.Equal("CONTROL TRADUCIDO", ProtocolExplainer.RecordNames("S|1\r", catalog.Resolve(SysmexUrinalysisPlugin.WithChemistryProfile)));
         Assert.Contains(database.Missing, label => label.Source == "Astm.Diagnostics.Core");
