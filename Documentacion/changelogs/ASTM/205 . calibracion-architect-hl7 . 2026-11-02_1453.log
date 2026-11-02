@@ -1,0 +1,45 @@
+Issue: EDC #205; incremento acotado de plugins, sin cerrar el análisis global.
+Autorización previa: https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6583895923
+Usuario: «Incorporalo en los plugins», después de distinguir ASI/HL7 y envío/consulta/ejecución.
+Commit de implementación: 5bff0f7097517c88adbc5e08d0123b3413a706ce
+Mensaje: feat: incorporar informes y estado de calibración ARCHITECT (#205)
+Tipo: feature, contratos médicos opcionales, runtime genérico, pruebas y documentación.
+
+Rutas: plugin Abbott.Architect/ArchitectHl7Calibration.cs y perfil 1.2.0; Astm.Formats.Medical
+(CalibrationReport, InstrumentInventoryStatus, lotes, lectores, schemas revisión 1.1 y requests);
+Astm.Plugins (binding opcional de operaciones HL7, catálogo y observador); Astm.Runtime
+(lote/identidad/ACK, sesión y ETL); pruebas Hl7/ArchitectCalibrationTests y sesión;
+CLI CalibrationSelfTest; documentación CALIBRACION-ARCHITECT y estado/continuación/matriz de plugins.
+Versiones propias coordinadas 0.6.4, PluginApi 3. Sin dependencias nuevas.
+
+Decisiones: R24 como documento de calibración con F/X, módulo/sistema, materiales/reactivos,
+fecha cruda, original Base64 y hash SHA-256. Texto UTF-8 sólo si es válido; otra codificación
+conserva bytes y avisa. No se inventan coeficientes ni observaciones de paciente.
+INR/U06 pide todos los elementos de un módulo; ACK/U06 acredita recepción y no ejecución.
+INU/U05 es un informe independiente, con todos los INV/ensayos/códigos y campos originales.
+ZCL sigue siendo referencia de calibración. ASI no anuncia calibración: 91407-108 §2-3.
+Lotes/IDs comunes, AA sólo tras Accepted/Duplicate del lote completo. AR/AE para rechazo/aplazamiento.
+Sin polling, descarga histórica, arranque físico de calibración, DB/spool ni permisos nuevos.
+Evaluación del ecosistema: EDC Documentacion/Modulos/LIMS/calibracion-architect-205.md,
+reutiliza y contrasta todas las filas de la matriz #416/#236/#374.
+
+Pruebas: suite .NET completa repetida, 546 correctas / una omitida por traza privada,
+13 s por pasada. Se verificaron éxito/fallo, integridad/contexto, Base64 inválido/vacío/excesivo,
+estructura parcial, códigos conocidos/desconocidos y mezclas inválidas, schemas, lectura/filtros,
+cancelación, identidad estable sesión/ETL, demora por custodia, ACK correcto, U05 independiente,
+delimitadores personalizados y ausencia de capacidades en ASI.
+CTest: 2/2 correctas repetidas, 7,54 y 7,52 s. Primer intento en sandbox falló al abrir
+sockets de prueba y terminó con SegFault; no se modificó código nativo ni timers para corregirlo.
+dotnet publish CLI win-x64 PublishAot=true: correcto; ejecutable real self-test PASS,
+incluye consulta INR y roundtrip del informe/lote con metadata JSON generada.
+EDC LIMS/Instruments: 27 pruebas correctas, 36 s, sobre paquetes del feed (revalidación final en EDC).
+
+Release local: 22 paquetes propios 0.6.4 en EDC Feeds/astm, generados desde 5bff0f7;
+dependencias propias 0.6.4, DLL versión 0.6.4.0 y token de distribución 066190a23251f202.
+Strong Name por compilación, token/versiones comprobados. Authenticode NotSigned y NuGet
+sin firma de release: se conserva la advertencia, sin modificar confianza ni baselines.
+No se entrega ZIP, no se hace push ni instalación. Datos reales/manuales no se publican.
+Estado: incremento de plugins completo. Sin homologación física; disponibilidad HL7 depende
+del firmware/configuración. UI/almacén/proyección QC propios del host y decodificadores
+matemáticos por modelo son trabajos separados. #408 conserva la validación instalada VCOM.
+El README previamente modificado por el usuario se conserva fuera de este commit.
