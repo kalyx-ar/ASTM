@@ -1,5 +1,5 @@
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Plugins;
 
 namespace Astm.Plugin.Sysmex.Cs2500;

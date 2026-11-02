@@ -6,7 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using Astm.Abstractions.Transport;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Transport;
 using PortGate.Client;

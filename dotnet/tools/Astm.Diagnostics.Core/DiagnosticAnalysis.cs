@@ -1,6 +1,6 @@
 using System.Text;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Plugins.Tracing;

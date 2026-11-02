@@ -1,9 +1,10 @@
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Lis02;
+using Astm.Formats.Medical;
 
 namespace Astm.Runtime.Sessions;
 
@@ -20,6 +21,7 @@ public sealed record AstmProcessingResult(IReadOnlyList<IngestOutcome> Outcomes,
 public sealed class AstmMessageProcessor(IAstmDialect dialect, AstmProfile profile, ILabWorkflowHost host,
     InstrumentRef instrument, ITraceSink trace, Action<AstmDiagnostic>? diagnostics = null)
 {
+    private readonly IMedicalOperations _operations = MedicalOperationAdapters.ForAstm(profile, dialect, new(instrument, TimeProvider.System));
     public InstrumentRef Instrument { get; private set; } = instrument;
     public int MaxMessageBytes { get; init; } = 1024 * 1024;
 
@@ -109,8 +111,10 @@ public sealed class AstmMessageProcessor(IAstmDialect dialect, AstmProfile profi
                 { Report(new(SessionCodes.HostQueryTimeout, AstmSeverity.Warning, "Host query budget exceeded.")); answer = OrderQueryAnswer.Unavailable; }
                 catch (Exception error) when (error is not OperationCanceledException)
                 { Report(new(SessionCodes.HostQueryFailed, AstmSeverity.Error, error.GetType().Name)); answer = OrderQueryAnswer.Unavailable; }
-                var records = dialect.BuildQueryAnswer(query, answer);
-                if (records.Count > 0) responses.Add(records);
+                var prepared = _operations.Prepare(MedicalRequests.Answer(_operations, query, answer,
+                    ReceptionIdentity.Derive(receptionId, profile.Id + "/query-answer", responses.Count)));
+                var records = Lis02Codec.Parse(prepared.Bytes.Span, profile.Encoding).Messages.SelectMany(m => m.Records).ToArray();
+                if (records.Length > 0) responses.Add(records);
             }
         }
         return new(outcomes, responses, findings);

@@ -1,7 +1,7 @@
 using System.Globalization;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Protocol.Lis02;
 
@@ -110,6 +110,8 @@ public class StandardAstmDialect(DialectContext context, string vendorSystem) : 
             .SetComponents(6, patient.FamilyName, patient.GivenName)
             .SetText(8, patient.BirthDate?.ToString("yyyyMMdd", CultureInfo.InvariantCulture))
             .SetText(9, patient.AdministrativeSex?.ToUpperInvariant() switch { "M" => "M", "F" => "F", _ => "U" })
+            .SetText(14, patient.Physician)
+            .SetText(26, patient.Location)
             .Build();
     }
 

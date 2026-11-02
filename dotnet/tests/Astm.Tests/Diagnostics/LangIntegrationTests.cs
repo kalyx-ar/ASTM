@@ -47,26 +47,26 @@ public sealed class LangIntegrationTests
         Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultKind(observation, profile));
         Assert.Equal("IMAGEN TRADUCIDA", ProtocolExplainer.ResultValue(observation, profile));
         Assert.Equal("ERROR TRADUCIDO", DiagnosticText.Finding(new("ASTM-UWAM-CHEMISTRY-UC3500-9902", AstmSeverity.Warning, "Original"), profile));
-        var direct = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("BLD", null, "urn:astm:vendor:sysmex.uc3500")),
-            ResultKind = "CONCENTRATION", Value = new("10", Numeric: 10), Flags = [new("00CC", null, "urn:astm:vendor:sysmex.uc3500")], InstrumentStatusMeaning = Astm.Abstractions.Model.InstrumentStatusMeaning.Warning };
+        var direct = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("BLD", null, "urn:astm:vendor:sysmex.uc3500")),
+            ResultKind = "CONCENTRATION", Value = new("10", Numeric: 10), Flags = [new("00CC", null, "urn:astm:vendor:sysmex.uc3500")], InstrumentStatusMeaning = Astm.Formats.Medical.Model.InstrumentStatusMeaning.Warning };
         var directProfile = catalog.Resolve(SysmexUrinalysisPlugin.Uc3500Profile);
         Assert.Equal("ESTADO DE ERROR TRADUCIDO", ProtocolExplainer.Status(direct, directProfile));
         Assert.Equal("UNIDAD NO INFORMADA TRADUCIDA", ProtocolExplainer.Unit(direct, directProfile));
-        var cs = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("PT", null, "urn:astm:vendor:sysmex.cs2500")),
+        var cs = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("PT", null, "urn:astm:vendor:sysmex.cs2500")),
             Flags = [new("0000.4000.0030", null, "urn:astm:vendor:sysmex.cs2500:evaluation-error")] };
         Assert.Equal("CALIBRACION TRADUCIDA", ProtocolExplainer.Status(cs, catalog.Resolve("sysmex.cs2500.astm02.results")));
-        var xn = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("PLT_Clumps?", null, "urn:astm:vendor:sysmex.xnl")),
+        var xn = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("PLT_Clumps?", null, "urn:astm:vendor:sysmex.xnl")),
             Flags = [new("A", null, "urn:astm:vendor:sysmex.xnl:flag")] };
         Assert.Equal("SOSPECHA TRADUCIDA", ProtocolExplainer.Status(xn, catalog.Resolve("sysmex.xnl.astm02.results")));
-        var qw = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("SYN", null, "urn:astm:vendor:diagast.qwalys3")),
+        var qw = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("SYN", null, "urn:astm:vendor:diagast.qwalys3")),
             ResultKind = "A", Value = new("^^^^^^CMP", Coded: new("CMP", null, "urn:synthetic")) };
         Assert.Equal("COMPATIBILIDAD TRADUCIDA", ProtocolExplainer.ResultValue(qw, catalog.Resolve("diagast.qwalys3.astm.results")));
         Assert.Equal("^^^^^^CMP", qw.Value.RawText);
-        var research = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("BACT-Info.", null, "urn:astm:vendor:sysmex.uwam")),
+        var research = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("BACT-Info.", null, "urn:astm:vendor:sysmex.uwam")),
             Instrument = observation.Instrument with { Model = "U-WAM" }, VendorIdentity = new(new Dictionary<string, string> { ["instrument.id"] = "UF-5000" }),
             ResultKind = "S/RAW", Value = new("3", Coded: new("3", null, "urn:synthetic")) };
         Assert.Equal("INDICADOR TRADUCIDO", ProtocolExplainer.ResultValue(research, profile));
-        var ufNeed = observation with { Test = Astm.Abstractions.Model.CodeSet.Of(new("DBS_LANG_02215", null, "urn:astm:vendor:sysmex.uf.binary")),
+        var ufNeed = observation with { Test = Astm.Formats.Medical.Model.CodeSet.Of(new("DBS_LANG_02215", null, "urn:astm:vendor:sysmex.uf.binary")),
             Value = new("Necesidad", Coded: new("DBS_LANG_02215", null, "urn:astm:vendor:sysmex.uf.binary:need")) };
         Assert.Equal("LIMPIEZA TRADUCIDA", ProtocolExplainer.ResultValue(ufNeed, catalog.Resolve(SysmexUrinalysisPlugin.UfBinaryProfile)));
         Assert.Equal("Necesidad", ufNeed.Value.RawText);

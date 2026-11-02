@@ -1,4 +1,4 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Diagnostics;
 

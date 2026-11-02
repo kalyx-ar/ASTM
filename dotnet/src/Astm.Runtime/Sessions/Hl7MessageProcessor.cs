@@ -1,9 +1,10 @@
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Hl7v2;
+using Astm.Formats.Medical;
 
 namespace Astm.Runtime.Sessions;
 
@@ -15,6 +16,7 @@ public sealed record Hl7ProcessingResult(IngestOutcome? Outcome, IReadOnlyList<H
 public sealed class Hl7MessageProcessor(IHl7Dialect dialect, Hl7Profile profile, ILabWorkflowHost host,
     InstrumentRef instrument, ITraceSink trace, Action<AstmDiagnostic>? diagnostics = null)
 {
+    private readonly IMedicalOperations _operations = MedicalOperationAdapters.ForHl7(profile, dialect, new(instrument, TimeProvider.System));
     public int MaxMessageBytes { get; init; } = 1024 * 1024;
 
     public ValueTask<Hl7ProcessingResult> ProcessAsync(ReadOnlyMemory<byte> payload, Guid receptionId, CancellationToken token = default)
@@ -70,7 +72,12 @@ public sealed class Hl7MessageProcessor(IHl7Dialect dialect, Hl7Profile profile,
             try { answer = await host.AnswerQueryAsync(query, budget.Token).AsTask().WaitAsync(budget.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { Report(SessionCodes.HostQueryTimeout); answer = OrderQueryAnswer.Unavailable; }
             catch (Exception error) when (error is not OperationCanceledException) { Report(SessionCodes.HostQueryFailed); answer = OrderQueryAnswer.Unavailable; }
-            try { return new(null, [dialect.BuildQueryAnswer(message, new(answer, Guid.CreateVersion7().ToString()))], findings); }
+            try
+            {
+                var prepared = _operations.Prepare(MedicalRequests.Answer(_operations, query, answer,
+                    ReceptionIdentity.Derive(receptionId, profile.Id + "/query-answer", 0), message.Serialize()));
+                return new(null, [Hl7Codec.Parse(profile.Encoding.GetString(prepared.Bytes.Span)).Message!], findings);
+            }
             catch (Exception error) when (error is not OperationCanceledException) { return Reject(SessionCodes.DialectFailed); }
         }
         if (interpretation.Observations.Count == 0) return Reject("ASTM-HL7-NO-SUPPORTED-CONTENT");

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text;
-using Astm.Abstractions.Hosting;
+using Astm.Formats.Medical.Hosting;
 using Astm.Protocol.Hl7v2;
 using Astm.Protocol.Mllp;
 using Astm.Runtime.Sessions;
@@ -49,6 +49,20 @@ public class Hl7SessionTests
         await rig.SendAsync(Hl7Data.Header("ORL^O34^ORL_O34", "REPLY-SYN-2") + "MSA|AA|" + order.ControlId + "\r");
         var result = await send.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(OrderDeliveryState.Sent, result.State); Assert.Equal("AA", result.AcknowledgementCode);
+    }
+
+    [Fact]
+    public async Task Common_operation_executes_a_worklist_answer_and_waits_for_its_matching_ACK()
+    {
+        await using var rig = new Rig();
+        var operations = rig.Session.Operations;
+        var query = Assert.Single(operations.Decode(Encoding.UTF8.GetBytes(Hl7Data.Query()), Astm.Abstractions.Tracing.TraceRef.None, TimeZoneInfo.Utc).Queries);
+        var request = Astm.Formats.Medical.MedicalRequests.Answer(operations, query, OrderQueryAnswer.NoInformation, Guid.NewGuid(), Hl7Data.Query());
+        var sending = rig.Session.SendOperationAsync(request);
+        var answer = await rig.ReceiveAsync();
+        Assert.Equal("RSP", answer.Type);
+        await rig.SendAsync(Hl7Acknowledgements.Build(answer, "AA", "RESPONSE-ACK-SYN", DateTimeOffset.UnixEpoch).Serialize());
+        Assert.Equal(OrderDeliveryState.Sent, (await sending.WaitAsync(TimeSpan.FromSeconds(2))).State);
     }
 
     [Fact]

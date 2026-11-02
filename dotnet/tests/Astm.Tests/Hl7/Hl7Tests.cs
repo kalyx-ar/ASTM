@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugin.Abbott.Architect;
 using Astm.Plugins;

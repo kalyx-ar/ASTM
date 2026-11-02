@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Plugins;
 using Astm.Protocol.Lis01;
 using Astm.Protocol.Lis02;
@@ -84,6 +84,6 @@ public sealed partial class Cs2500Dialect(DialectContext context) : StandardAstm
         identity["reflex.request"] = result.Text(3, 10); identity["flags.raw"] = result.Field(7);
         return identity;
     }
-    protected override Astm.Abstractions.Model.OrderQuery? ReadQuery(InstrumentRef instrument, Lis02Record record, Astm.Abstractions.Tracing.TraceRef trace) => null;
+    protected override Astm.Formats.Medical.Model.OrderQuery? ReadQuery(InstrumentRef instrument, Lis02Record record, Astm.Abstractions.Tracing.TraceRef trace) => null;
     public override IReadOnlyList<Lis02Record> BuildOrders(IReadOnlyList<WorkOrder> orders) => throw new NotSupportedException("Receive-only CS-2500 profile.");
 }

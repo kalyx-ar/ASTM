@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.4.0</Version>
+    <Version>0.6.2</Version>
     <Description>Plugin SDK: dialect contracts that vendor plugins implement on top of the generic engine.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Astm.Protocol.Mllp\Astm.Protocol.Mllp.csproj" />
+    <ProjectReference Include="..\Astm.Formats.Medical\Astm.Formats.Medical.csproj" />
     <ProjectReference Include="..\Astm.Abstractions\Astm.Abstractions.csproj" />
     <ProjectReference Include="..\Astm.Protocol.Lis01\Astm.Protocol.Lis01.csproj" />
     <ProjectReference Include="..\Astm.Protocol.Lis02\Astm.Protocol.Lis02.csproj" />

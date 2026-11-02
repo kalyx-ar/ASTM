@@ -1,6 +1,6 @@
 using System.Text;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Lis01;
@@ -51,6 +51,6 @@ public sealed class QwalysDialect(DialectContext context) : IAstmDialect
         }
         return new(values, [], context.Instrument, findings);
     }
-    public IReadOnlyList<Lis02Record> BuildQueryAnswer(OrderQuery query, Astm.Abstractions.Hosting.OrderQueryAnswer answer) => throw new NotSupportedException("Receive-only QWALYS profile.");
+    public IReadOnlyList<Lis02Record> BuildQueryAnswer(OrderQuery query, Astm.Formats.Medical.Hosting.OrderQueryAnswer answer) => throw new NotSupportedException("Receive-only QWALYS profile.");
     public IReadOnlyList<Lis02Record> BuildOrders(IReadOnlyList<WorkOrder> orders) => throw new NotSupportedException("Receive-only QWALYS profile.");
 }

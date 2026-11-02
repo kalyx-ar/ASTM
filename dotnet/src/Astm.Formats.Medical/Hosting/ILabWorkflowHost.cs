@@ -1,6 +1,6 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 
-namespace Astm.Abstractions.Hosting;
+namespace Astm.Formats.Medical.Hosting;
 
 public enum IngestState { Accepted, Duplicate, Rejected, Deferred }
 

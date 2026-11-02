@@ -1,5 +1,5 @@
 using System.Text;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Protocol.Hl7v2;
 
@@ -9,6 +9,7 @@ namespace Astm.Plugins;
 public sealed record Hl7Profile(string Id, string Version, Encoding Encoding, TimeSpan QueryAnswerBudget,
     TimeSpan ResponseTimeout, IReadOnlyList<string> Evidence)
 {
+    public Astm.Formats.Medical.MedicalOperationRules OperationRules { get; init; } = new();
     public string Hl7Version { get; init; } = "2.5.1";
     public string CharacterSet { get; init; } = "UNICODE UTF-8";
 
@@ -26,9 +27,9 @@ public interface IHl7Dialect
     Hl7Message BuildOrders(IReadOnlyList<WorkOrder> orders, string controlId);
 }
 
-public sealed record OrderQueryAnswerContext(Astm.Abstractions.Hosting.OrderQueryAnswer Answer, string ControlId);
+public sealed record OrderQueryAnswerContext(Astm.Formats.Medical.Hosting.OrderQueryAnswer Answer, string ControlId);
 
-public interface IHl7InstrumentPlugin
+public interface IHl7InstrumentPlugin : IMedicalInstrumentPlugin
 {
     PluginDescriptor Describe();
     IReadOnlyList<Hl7Profile> Profiles { get; }

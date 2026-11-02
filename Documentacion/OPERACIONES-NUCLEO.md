@@ -1,55 +1,39 @@
-# Núcleo neutral de operaciones — primer bloque #416
+# Núcleo neutral de operaciones (#416)
 
-Implementación inicial, 2026-11-01. [Issue EDC #416](https://github.com/kalyx-ar/EDC/issues/416), abierto. El usuario pidió avanzar con una entrega acotada y dejar continuidad para otro agente. [Diseño completo](OPERACIONES-Y-CONTRATOS.md).
+Implementación 0.6.2, 2026-11-01. [Issue EDC #416](https://github.com/kalyx-ar/EDC/issues/416). [Especialización médica y consumo](OPERACIONES-Y-CONTRATOS.md).
 
-## Código entregado
+Astm.Operations utiliza sólo BCL: no referencia proyectos, pacientes, laboratorio, protocolos, EDC, transporte ni bases. Astm.Abstractions conserva transporte/trazas/diagnósticos neutrales. Los tipos clínicos y el puerto ILabWorkflowHost están en el proyecto opcional Astm.Formats.Medical, namespaces .Model y .Hosting, sin aliases antiguos.
 
-Nuevo ensamblado **Astm.Operations 0.1.0** en `dotnet/src/Astm.Operations`, sólo BCL, sin referencias a otros proyectos o paquetes. No conoce pacientes, laboratorio, HL7, EDC, transporte ni bases de datos. Los modelos clínicos existentes no se movieron todavía; la extracción/migración completa del diseño sigue pendiente.
+## Catálogo y preparación
 
-- `OperationDefinition`: ID/versión, propósito/tipo, referencias de contratos de entrada/salida, perfil/revisión, capacidades independientes y alcance de finalización. Es metadata: aún no implementa negociación, admisión de catálogos o validación de las capacidades anunciadas.
-- `IOperationCatalog`: contrato para descubrir operaciones y resolver contratos de datos. La implementación concreta sólo existe como fixture sintética en pruebas.
-- `IOperationBinding<TInput>` y `PreparedOperation<TInput>`: preparación tipada sin transmisión. El binding deberá validar y crear una instantánea propia de datos/metadata mutables antes de entregarla. Un record genérico no congela profundamente sus referencias. No hay ejecutor físico en este bloque.
-- `OperationDataContract`, `OperationDataSchema` y campos: objetos/listas/texto/número/Int64/booleano; cardinalidades, nullabilidad, códigos y origen del valor. La fase Input distingue datos del consumidor de los que completa el host; Prepared valida el objeto ya completado.
-- `OperationDataValidator.ValidateSchema` permite verificar metadata antes de recibir datos. `Validate` valida primero el esquema y después el JSON, sin I/O ni efectos de negocio.
-- `OperationJsonContext` contiene metadata generada para serializar/deserializar los descriptores sin reflexión dinámica. Es formato propio, **no** exportación ni implementación completa de JSON Schema 2020-12. La prueba de metadata no equivale a publicar un ejecutable NativeAOT.
+OperationDefinition describe propósito/versión, iniciador, entrada/salida, capacidades independientes, alcance, perfil/revisión, evidencia y mapeos de cable. OperationCatalog valida y toma copia profunda inmutable de definiciones/schemas; rechaza metadata inválida, contratos ausentes, duplicados y Execute sin Prepare. Select exige coincidencia explícita de operación, major, contrato completo, perfil/revisión y capacidades; no supone compatibilidad entre minors distintos.
 
-## Reglas del subconjunto inicial
+OperationEnvelope fija OperationId, propósito/versiones, perfil y datos JSON. PreparedOperationMessage conserva su propio JSON y bytes; Bytes devuelve una copia. Preparar no transmite: la sesión valida el envelope antes del handshake. IOperationBinding<TInput> sigue disponible para otros dominios; un record genérico no congela las colecciones de TInput.
+
+## Datos y validación
 
 | Regla | Comportamiento |
 |---|---|
-| Optional / Required / Conditional / Forbidden | Required exige presencia; nullable decide si null es válido; texto vacío depende de MinLength. Forbidden rechaza la presencia incluso si el valor es null. |
-| RequiredWhen | Igualdad ordinal de texto contra un path absoluto declarado en el schema, separado por puntos. No hay scripts, paths relativos o selectores por fila de un array. Selector ausente/null/no textual da `data.condition-unresolved`. Si la condición no se cumple el campo es opcional, no prohibido. |
-| Origin | Input, HostContext, Configuration, Generated, Fixed o Derived. En fase Input un campo gestionado no se exige; sólo puede aportarlo el consumidor si AllowOverride. Si se permite override se valida su tipo/límites, sin hacerlo obligatorio en la entrada. |
-| Prepared | Todos los campos Required y condiciones se verifican sobre el objeto completo. No verifica por sí solo la procedencia real de un valor: el binding reúne los valores confiables del host. |
-| Texto | Longitud en escalares Unicode y AllowedValues ordinal. No valida bytes/encoding de cable, fechas, unidades ni vocabularios externos. Eso requiere el binding/reglas posteriores. |
-| Números | Number admite un número JSON; Integer exige signed Int64. No hay aún límites numéricos ni unidades/precisión semántica. |
-| Objetos | Rechaza propiedades no declaradas por defecto y detecta duplicadas en el nivel validado. AllowAdditionalProperties permite contenido extra sin validar su semántica; no usarlo para ignorar requisitos de fabricante. |
-| Metadata | Kind omitido es Unspecified y falla. Restricciones JSON desconocidas se rechazan al deserializar con OperationJsonContext. Schemas incompletos, tipos inválidos, reglas sobre tipos incompatibles y ciclos se diagnostican antes de mirar datos. |
-| Diagnóstico | Código y path del schema; no reproduce valores ni nombres de propiedades desconocidas del payload. Se limita a 100 incidencias por validación y profundidad de 64 niveles. |
+| Optional / Required / Conditional / Forbidden | Presencia, nullabilidad y vacío son independientes; Forbidden rechaza incluso null. |
+| RequiredWhen | Igualdad ordinal de texto contra path absoluto declarado, separado por puntos. No scripts ni selectores relativos por fila. Selector ausente/null/no textual produce data.condition-unresolved. |
+| Origin | Input, HostContext, Configuration, Generated, Fixed y Derived. Input no exige/admite datos gestionados salvo AllowOverride; Prepared valida el objeto completo. El binding reúne valores confiables. |
+| Texto | Longitud en escalares Unicode y AllowedValues ordinal. Encoding, controles, fechas tipadas y reglas del equipo se validan en el binding. Sin máximos de cable inventados. |
+| Números/listas | Integer exige Int64; Number admite número JSON. Cardinalidades explícitas; sin vocabulario universal de unidades/precisión. |
+| Objetos | Campos desconocidos/duplicados rechazados; AdditionalProperties sólo en mapas explícitos. |
+| Metadata | Kind omitido/Unspecified, schemas incompatibles/cíclicos y reglas desconocidas fallan. Profundidad 64 y máximo 100 incidencias, sin reproducir valores sensibles. |
 
-Las colecciones de los descriptores son IReadOnlyList/IReadOnlyDictionary para consumo; eso no garantiza inmutabilidad profunda del objeto aportado por el productor. El catálogo/binding debe mantener metadata estable durante validación/uso, sin mutarla concurrentemente.
+OperationJsonContext ofrece codecs generados para catálogo, datos, envelope y snapshot. Es metadata propia, no una implementación completa de JSON Schema 2020-12. Las condiciones médicas complejas se validan en el binding y se publican mediante MedicalOperationRules.
 
-## Evidencia reproducible
+## Estado y evidencia
 
-`dotnet/tests/Astm.Tests/Operations/OperationContractTests.cs` aporta 25 casos. El fixture describe/prepara una receta térmica sintética no médica con modo, lote, setpoint y canales; no abre ni controla un horno. Comprueba consumidor tipado, revisión/contrato, condiciones, origen de campos, JSON estricto, cardinalidad/Int64, null/vacío, corrupción de schema/ciclos y ausencia de dependencias clínicas en el ensamblado. Los codecs de los DTOs de prueba también usan metadata generada.
+OperationReceipt registra identidad, propósito, estado, scope, evidencia, necesidad de canal, secuencia y código técnico. OperationTracker mantiene ledger bajo lock y snapshots inmutables. Retiene 64 terminales; capacidad configurable, 4096 entradas por defecto. Agotarla invalida cobertura y falla explícitamente: no elimina operaciones pendientes para declarar libre.
 
-Comandos:
+OperationInProgress considera todos los scopes. ChannelOperationInProgress considera operaciones que requieren canal y actividad del enlace, con cobertura suficiente. NoPendingOperations equivale a ChannelOperationInProgress == false. Unknown, pérdida o cierre nunca prueban libre; una operación física puede seguir activa sin retener canal.
 
-```powershell
-dotnet test dotnet/tests/Astm.Tests/Astm.Tests.csproj --no-restore -m:1 -v quiet --filter FullyQualifiedName~OperationContractTests
-dotnet test dotnet/Astm.slnx --no-restore -m:1 -v quiet
-ctest --test-dir PortGate/build/win-x64 -C Release --output-on-failure
-dotnet build dotnet/src/Astm.Operations/Astm.Operations.csproj -c Release --no-restore -p:AstmRequireStrongName=true -m:1 -v quiet
-```
+Transport, MessageAcknowledged, ApplicationAccepted, DeviceReported y ContentValidated son evidencias diferentes. El núcleo no interpreta tráfico ni solicita control. Los observadores médicos pertenecen a Astm.Plugins.
 
-Build Release correcto, cero errores/advertencias. DLL 0.1.0.0, Strong Name de distribución token `066190a23251f202`; **Authenticode NotSigned**, pendiente del release. Sin claves nuevas, paquetes publicados, cambios de confianza o instalación. Los resultados finales de la suite repetida y commits quedan en #416 y el changelog del host.
+## Evidencia y distribución
 
-## Traspaso: siguiente bloque concreto
+OperationContractTests aporta 25 casos no médicos (receta térmica sintética) con condiciones/origen/versiones/ciclos y ausencia de dependencias clínicas. MedicalOperationTests verifica perfiles, negociación, reglas, correlación, scopes y ETL. El self-test CLI NativeAOT ejercita codecs médicos/neutrales generados.
 
-1. Conservar este núcleo como proyecto independiente. Completar `OperationDefinition` con roles, validación/admisión y negociación real de contratos/perfiles; no considerar un descriptor prueba de capacidad. Definir snapshot de metadata/input en bindings y contratos de decoder/sesión/observación antes de ejecutar efectos.
-2. Diseñar los DTOs médicos comunes en un proyecto opcional, a partir de los modelos actuales; mantener fuera del núcleo Patient/Specimen/solicitudes/observaciones. Evitar aliases perpetuos: planificar migración de consumidores y compatibilidad de paquetes explícitamente.
-3. Construir un formato médico genérico y los pilotos ARCHITECT ASI / U-WAM sobre los mismos DTOs. Publicar campos/requisitos por operación/equipo contrastados con evidencia. Agregar límites de bytes/encoding, reglas complejas y códigos en el binding, sin anunciar soporte inexistente del validador estructural.
-4. Adaptar el estado de operaciones concurrentes y sus scopes de evidencia/canal. `AstmOperationObserver` de #414 permanece sin cambios y todavía no se deriva de este catálogo; no migrarlo por sustitución de un nombre ni confundir fin de mensaje con fin de proceso.
-5. Continuar con otros perfiles/protocolos y un adaptador médico EDC/ETL común. EDC conserva paquetes 0.3; esta biblioteca no está desplegada ni referenciada desde sus módulos.
-
-No cambiar las reglas de soft/hard ni interpretar protocolos en PortGate. #404 resuelto; firma/validación VCOM instalada sigue en #408. Mantener #416 abierto y actualizar pruebas, matriz del ecosistema, commits y changelog de cada incremento. No hay trabajo pendiente oculto en un binario o instalación local: este bloque se entrega en fuente y pruebas.
+Paquetes propios 0.6.2 y PluginApi 3; consumidores migran juntos. Sin dependencias nuevas ni cambios de confianza/bases/hardware. Strong Name no equivale a Authenticode ni a firma NuGet; firmas de release conservan su proceso. #404 sigue resuelto y firma/ensayo instalado VCOM permanece en #408.

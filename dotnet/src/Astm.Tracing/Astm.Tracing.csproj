@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.4.0</Version>
+    <Version>0.6.2</Version>
     <Description>Neutral tracing: reconstruction of real and theoretical traces from pure content, layered event stack, metrics and codec-aware anonymization.</Description>
   </PropertyGroup>
   <ItemGroup>

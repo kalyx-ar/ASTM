@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugin.Abbott.Architect;
 using Astm.Plugin.BioRad.Cfx;

@@ -1,6 +1,6 @@
 using Astm.Abstractions.Tracing;
 
-namespace Astm.Abstractions.Model;
+namespace Astm.Formats.Medical.Model;
 
 public static class CodeSystems
 {

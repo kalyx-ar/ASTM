@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Plugins.Tracing;
@@ -13,7 +13,8 @@ namespace Astm.Plugin.Sysmex.Urinalysis;
 internal static class UfBinaryInterpreter
 {
     internal const string ProfileId = "sysmex.uf.binary", VendorId = "sysmex.uf.binary";
-    internal static InstrumentTraceProfile Profile { get; } = new(ProfileId, "UF · Binario", []);
+    internal static InstrumentTraceProfile Profile { get; } = new(ProfileId, "UF · Binario",
+        ["Local binary-layout analysis: Documentacion/UF-CONTROL-Y-TIEMPOS.md; physical operation boundaries remain unproven"]);
     private static readonly BinaryFrameLayout Envelope = new(45, 41, 4, BinaryByteOrder.LittleEndian, 3)
         { RequiredBytes = [new(0, [2]), new(36, [2, 1, 0, 0, 0])] };
     private static readonly BinaryFrameLayout SubEnvelope = new(9, 5, 4, BinaryByteOrder.LittleEndian, 3)

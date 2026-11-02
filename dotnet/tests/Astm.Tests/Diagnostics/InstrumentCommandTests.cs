@@ -1,4 +1,4 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Diagnostics;
 using Astm.Plugin.Abbott.Architect;
 using Astm.Plugin.Sysmex.Urinalysis;

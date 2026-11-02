@@ -57,6 +57,13 @@ public sealed partial class ArchitectPlugin(ArchitectDialectOptions? options = n
                 "Abbott 91407-108 §4 Table 4.1: code page subset of MS-DOS 850",
             ])
         {
+            OperationRules = new()
+            {
+                PatientFields = ["id", "familyName", "givenName", "birthDate", "administrativeSex", "physician", "location"],
+                SuppressControlPatient = true, NegativeAnswer = "Q.X", ReceiverEotAcknowledges = true,
+                WireBindings = new Dictionary<string, string> { ["patient.id"] = "P.3", ["patient.name"] = "P.6", ["patient.physician"] = "P.14",
+                    ["patient.location"] = "P.26", ["specimen.identifier"] = "O.3", ["tests.code"] = "O.5.4", ["header.processing"] = "H.12=P", ["header.version"] = "H.13=1" },
+            },
             // 91407-108 §1 Physical Layer: every ASI instrument supports and defaults to 9600 baud with eight data bits; other rates depend on the model.
             Transport = new(Astm.Abstractions.Transport.TransportDirection.Bidirectional, ["Abbott 91407-108 (2012) §1 Physical Layer: Speed, Figure 1.13 character structure"])
             {

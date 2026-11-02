@@ -2,9 +2,11 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
+using Astm.Operations;
+using Astm.Formats.Medical;
 
 namespace Astm.Plugin.Sysmex.Urinalysis;
 
@@ -67,6 +69,8 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
         var messages = new List<InstrumentTraceMessage>(); var events = new List<InstrumentTraceEvent>();
         var observations = new List<InstrumentObservation>(); var findings = new List<AstmDiagnostic>();
         var timings = new List<InstrumentTraceTiming>();
+        var operations = new List<OperationReceipt>();
+        Guid OperationId(string id, string position, long sequence) => new(SHA256.HashData(Encoding.UTF8.GetBytes(traceId + ":" + id + ":" + position + ":" + sequence)).AsSpan(0, 16));
         void Finding(string code, long sequence, AstmSeverity severity = AstmSeverity.Warning) => findings.Add(new("ASTM-UC3500-" + code, severity,
             DiagnosticVocabulary.GetValueOrDefault("finding.ASTM-UC3500-" + code)?.Fallback ?? "Unknown UC-3500 record/code; original retained.", "entry:" + sequence));
         foreach (var (entry, value) in decoder.Controls)
@@ -77,7 +81,7 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
         }
         foreach (var error in decoder.Errors) Finding(error.Code, error.Sequence);
         (string Id, string Position, long Sequence)? query = null;
-        (string Id, string Position, string Strip, long Sequence)? order = null;
+        (string Id, string Position, string Strip, long Sequence, Guid OperationId)? order = null;
         foreach (var packet in decoder.Packets.OrderBy(p => p.Last))
         {
             var code = Code(packet.Text); var fields = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -145,15 +149,23 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
             {
                 if (query is not null || order is not null) Finding("PENDING", packet.Last);
                 query = (fields["sample.id"], fields["tube.position"], packet.Last); order = null;
+                operations.Add(new(OperationId(query.Value.Id, query.Value.Position, query.Value.Sequence), MedicalPurposes.ReceiveQuery,
+                    OperationState.Pending, OperationCompletionScope.ApplicationAcceptance, OperationEvidence.Transport, true, packet.Last, "uc3500.query.pending"));
             }
             else if (code == "CM00")
             {
                 if (query is not { } requested || requested.Id != fields["sample.id"] || requested.Position != fields["tube.position"]) Finding("CORRELATION", packet.Last);
                 else fields["query.sequence"] = requested.Sequence.ToString(CultureInfo.InvariantCulture);
-                order = (fields["sample.id"], fields["tube.position"], fields["strip.requested"], packet.Last);
+                order = (fields["sample.id"], fields["tube.position"], fields["strip.requested"], packet.Last,
+                    OperationId(fields["sample.id"], fields["tube.position"], query?.Sequence ?? packet.Last));
+                operations.Add(new(order.Value.OperationId, MedicalPurposes.ReceiveQuery,
+                    OperationState.Running, OperationCompletionScope.ApplicationAcceptance, OperationEvidence.Transport, true, packet.Last, "uc3500.order.response-pending"));
             }
             else if (code.StartsWith("ER", StringComparison.Ordinal))
             {
+                if (order is { } responseOrder) operations.Add(new(responseOrder.OperationId, MedicalPurposes.ReceiveQuery,
+                    code == "ER00" ? OperationState.Completed : fact is null ? OperationState.Unknown : OperationState.Failed,
+                    OperationCompletionScope.ApplicationAcceptance, OperationEvidence.ApplicationAccepted, true, packet.Last, "uc3500.order." + code));
                 if (order is null) Finding("CORRELATION", packet.Last);
                 else timings.Add(new(InstrumentTimingKind.Response, "uc3500.order-response", order.Value.Sequence, packet.Last));
                 if (fact?.FindingCode is { } findingCode) Finding(findingCode["ASTM-UC3500-".Length..], packet.Last, fact.Severity);
@@ -175,7 +187,7 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
         }
         if (query is not null || order is not null) Finding("PENDING", order?.Sequence ?? query!.Value.Sequence);
         if (order is { } pending) timings.Add(new(InstrumentTimingKind.Response, "uc3500.order-response", pending.Sequence, null));
-        return new(messages, events.OrderBy(e => e.LastSequence).ToArray(), observations, findings) { Timings = timings };
+        return new(messages, events.OrderBy(e => e.LastSequence).ToArray(), observations, findings) { Timings = timings, OperationReceipts = operations };
     }
     private static DateTimeOffset? ParseTime(string date, string time, TimeZoneInfo zone)
     {

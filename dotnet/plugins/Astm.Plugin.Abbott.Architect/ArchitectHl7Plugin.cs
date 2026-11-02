@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Hl7v2;
@@ -17,7 +17,13 @@ public sealed class ArchitectHl7Plugin(TimeSpan queryAnswerBudget, TimeSpan resp
     [new(ProfileId, "1.1.0", new UTF8Encoding(false, true), Positive(queryAnswerBudget), Positive(responseTimeout),
         ["Abbott 206797-101 (2012) §1-2 MLLP, §1-5 original ACK, §2-8/2-9 ZOS queries, §2-13 OUL^R22, §2-3 OML^O33",
          "§3-23/26 INV gives QC/calibrator identity/lot/expiry; §3-97 ZCL identifies calibration used by an OBR. R24 ED calibration reports are not decoded.",
-         "Budgets must match deployed instrument settings; this manual does not define universal timeout defaults."])];
+         "Budgets must match deployed instrument settings; this manual does not define universal timeout defaults."])
+        { OperationRules = new()
+        {
+            SuppressControlPatient = true, SingleSpecimenPerMessage = true, SingleActionPerMessage = true,
+            PatientFields = ["id", "familyName", "givenName", "birthDate", "administrativeSex"],
+            WireBindings = new Dictionary<string, string> { ["patient.id"] = "PID.3", ["patient.name"] = "PID.5", ["specimen.identifier"] = "SPM.2", ["tests.code"] = "OBR.4", ["message.controlId"] = "MSH.10", ["query.specimen"] = "QPD.3" },
+        } }];
 
     private static TimeSpan Positive(TimeSpan value) => value > TimeSpan.Zero && value.TotalMilliseconds <= uint.MaxValue - 1
         ? value : throw new ArgumentOutOfRangeException(nameof(value));

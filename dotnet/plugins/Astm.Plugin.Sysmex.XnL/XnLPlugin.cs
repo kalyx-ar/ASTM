@@ -1,5 +1,5 @@
 using System.Text;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Plugins;
 using Astm.Protocol.Lis01;
 using Astm.Protocol.Lis02;

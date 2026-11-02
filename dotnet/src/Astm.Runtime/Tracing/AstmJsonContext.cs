@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 
 namespace Astm.Runtime.Tracing;

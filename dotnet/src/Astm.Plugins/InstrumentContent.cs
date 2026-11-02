@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 
 namespace Astm.Plugins;
 

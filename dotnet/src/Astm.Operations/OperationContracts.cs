@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace Astm.Operations;
 
@@ -6,6 +7,7 @@ public enum OperationKind { Command, Query, Event, Import }
 [Flags]
 public enum OperationCapabilities { None = 0, Prepare = 1, Decode = 2, Execute = 4, Observe = 8, Cancel = 16 }
 public enum OperationCompletionScope { MessageExchange, ApplicationAcceptance, DeviceExecution, ContentImport }
+public enum OperationInitiator { Host, Instrument, Either, Content }
 public enum OperationFieldOrigin { Input, HostContext, Configuration, Generated, Fixed, Derived }
 public enum OperationFieldRequirement { Optional, Required, Conditional, Forbidden }
 public enum OperationDataKind { Unspecified, Object, Array, String, Number, Integer, Boolean }
@@ -37,8 +39,26 @@ public sealed record OperationDataSchema(OperationDataKind Kind)
 public sealed record OperationDataContract(OperationContractReference Reference, OperationDataSchema Root);
 public sealed record OperationDefinition(string Id, int Major, OperationKind Kind,
     OperationContractReference? Input, OperationContractReference? Output, OperationCapabilities Capabilities,
-    OperationCompletionScope CompletionScope, string ProfileId, string ProfileRevision, IReadOnlyList<string> Evidence);
+    OperationCompletionScope CompletionScope, string ProfileId, string ProfileRevision, IReadOnlyList<string> Evidence)
+{
+    public OperationInitiator Initiator { get; init; } = OperationInitiator.Host;
+    public IReadOnlyDictionary<string, string> WireBindings { get; init; } = new Dictionary<string, string>();
+}
 public sealed record OperationValidationIssue(string Code, string Path);
+public sealed record OperationEnvelope(Guid OperationId, string Purpose, int Major, string ProfileId, string ProfileRevision,
+    OperationContractReference Contract, JsonElement Data);
+
+/// <summary>Owned encoding of one prepared message. The session still performs the protocol handshake.</summary>
+public sealed class PreparedOperationMessage
+{
+    private readonly byte[] _bytes;
+    public OperationEnvelope Request { get; }
+    public OperationDefinition Definition { get; }
+    public string Format { get; }
+    public PreparedOperationMessage(OperationEnvelope request, OperationDefinition definition, string format, ReadOnlySpan<byte> bytes)
+    { Request = request with { Data = request.Data.Clone() }; Definition = definition; Format = format; _bytes = bytes.ToArray(); }
+    public ReadOnlyMemory<byte> Bytes => _bytes.ToArray();
+}
 public interface IOperationCatalog
 {
     IReadOnlyList<OperationDefinition> Describe(string profileId);
@@ -61,4 +81,6 @@ public interface IOperationBinding<TInput>
 [JsonSerializable(typeof(OperationDefinition))]
 [JsonSerializable(typeof(OperationDataContract))]
 [JsonSerializable(typeof(OperationValidationIssue[]))]
+[JsonSerializable(typeof(OperationEnvelope))]
+[JsonSerializable(typeof(OperationSnapshot))]
 public partial class OperationJsonContext : JsonSerializerContext;

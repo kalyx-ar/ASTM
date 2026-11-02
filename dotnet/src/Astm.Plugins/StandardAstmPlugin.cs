@@ -35,10 +35,21 @@ public sealed partial class StandardAstmPlugin : IInstrumentPlugin, IInstrumentC
             new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
             TimeSpan.FromSeconds(10),
            
-            ["CLSI LIS01-A2 default timers", "CLSI LIS02-A2 field positions"]),
+            ["CLSI LIS01-A2 default timers", "CLSI LIS02-A2 field positions"])
+        {
+            OperationRules = new()
+            {
+                PatientFields = ["id", "familyName", "givenName", "birthDate", "administrativeSex", "physician", "location"],
+                WireBindings = new Dictionary<string, string>
+                {
+                    ["patient.id"] = "P.3", ["patient.name"] = "P.6", ["patient.physician"] = "P.14",
+                    ["patient.location"] = "P.26", ["specimen.specimenId"] = "O.3", ["tests.vendor.code"] = "O.5.4",
+                },
+            },
+        },
     ];
 
     public PluginDescriptor Describe() => new(PluginId, "0.1.0", PluginApi.Version, "(any)", ["CLSI LIS01-A2 / LIS02-A2 conforming instruments"], ["CLSI LIS01-A2", "CLSI LIS02-A2"]);
 
-    public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => new StandardAstmDialect(context, Abstractions.Model.CodeSystems.Vendor(PluginId));
+    public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => new StandardAstmDialect(context, Astm.Formats.Medical.Model.CodeSystems.Vendor(PluginId));
 }

@@ -1,11 +1,13 @@
 using System.Threading.Channels;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Lis01;
 using Astm.Protocol.Lis02;
+using Astm.Formats.Medical;
+using Astm.Operations;
 
 namespace Astm.Runtime.Sessions;
 
@@ -60,6 +62,7 @@ public sealed class AstmInstrumentSession
     private long? _receptionStart;
     private long _lastReceivedSequence = -1;
     private volatile bool _channelEnded;
+    public IMedicalOperations Operations { get; }
 
     public AstmInstrumentSession(
         Stream transport,
@@ -79,6 +82,7 @@ public sealed class AstmInstrumentSession
         _options = options;
         _clock = clock ?? TimeProvider.System;
         _link = new Lis01Link(options.Role, profile.Link);
+        Operations = MedicalOperationAdapters.ForAstm(profile, dialect, new(instrument, _clock));
         _processor = new(dialect, profile, host, instrument, trace, options.Diagnostics);
     }
 
@@ -126,9 +130,15 @@ public sealed class AstmInstrumentSession
 
     /// <summary>Downloads orders without a prior query and waits for the low-level outcome.</summary>
     public Task<Lis01SendCompleted> SendOrdersAsync(IReadOnlyList<WorkOrder> orders, CancellationToken cancellationToken) =>
-        _options.TransmitHostMessages
-            ? SendRecordsAsync(_dialect.BuildOrders(orders), cancellationToken)
-            : throw new InvalidOperationException("This session does not transmit host messages.");
+        SendOperationAsync(MedicalRequests.Orders(Operations, orders, Guid.CreateVersion7()), cancellationToken);
+
+    public Task<Lis01SendCompleted> SendOperationAsync(OperationEnvelope request, CancellationToken cancellationToken)
+    {
+        if (!_options.TransmitHostMessages) throw new InvalidOperationException("This session does not transmit host messages.");
+        var prepared = Operations.Prepare(request);
+        var records = Lis02Codec.Parse(prepared.Bytes.Span, _profile.Encoding).Messages.SelectMany(m => m.Records).ToArray();
+        return SendRecordsAsync(records, cancellationToken);
+    }
 
     public Task<Lis01SendCompleted> SendCommandAsync(IInstrumentCommandPlugin plugin, InstrumentCommandRequest request, CancellationToken cancellationToken)
     {

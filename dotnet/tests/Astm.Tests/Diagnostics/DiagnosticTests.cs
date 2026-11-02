@@ -3,7 +3,7 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Diagnostics;
 using Astm.Plugin.BioRad.Cfx;
@@ -183,10 +183,10 @@ public class DiagnosticTests
         using var storage = new MemoryStream(); using var journal = new ProtectedCaseJournal(storage, Protector, header);
         var trace = new DiagnosticTraceSink(header, journal); var host = new DiagnosticWorkflowHost(trace);
         var batch = new InstrumentObservationBatch(Guid.NewGuid(), new("SYN-I"), [], TraceRef.None);
-        Assert.Equal(Astm.Abstractions.Hosting.IngestState.Accepted, (await host.IngestAsync(batch, CancellationToken.None)).State);
+        Assert.Equal(Astm.Formats.Medical.Hosting.IngestState.Accepted, (await host.IngestAsync(batch, CancellationToken.None)).State);
         Assert.Single(trace.Batches());
         Assert.Throws<InvalidOperationException>(() => new DiagnosticTraceSink(header).StoreBatch(batch));
-        Assert.Equal(Astm.Abstractions.Hosting.QueryAnswerState.NoInformation, (await host.AnswerQueryAsync(new(Guid.NewGuid(), new("SYN-I"), [], "ALL", TraceRef.None), CancellationToken.None)).State);
+        Assert.Equal(Astm.Formats.Medical.Hosting.QueryAnswerState.NoInformation, (await host.AnswerQueryAsync(new(Guid.NewGuid(), new("SYN-I"), [], "ALL", TraceRef.None), CancellationToken.None)).State);
     }
 
     [Fact]

@@ -1,5 +1,5 @@
 using System.Text;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Diagnostics;
 using Astm.Plugin.Sysmex.Urinalysis;
 using Astm.Plugins;

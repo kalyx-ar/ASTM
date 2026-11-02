@@ -1,4 +1,4 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Protocol.Lis02;
 
 namespace Astm.Plugins;
@@ -35,6 +35,9 @@ public static class AstmOrderCommands
             .Select(t => CodeSet.Of(new(t, null, CodeSystems.Vendor(plugin.Describe().Id)))).ToArray();
         if (tests.Length == 0) throw new ArgumentException("ASTM-COMMAND-PARAMETER: tests");
         var sample = request.Parameters["sample"].Trim();
-        return plugin.CreateDialect(plugin.Profiles.Single(p => p.Id == profileId), context).BuildOrders([new(Guid.CreateVersion7().ToString(), new(sample), null, tests)]);
+        var operations = MedicalOperationAdapters.Create(plugin, profileId, new(context.Instrument, context.Clock));
+        var prepared = operations.Prepare(Astm.Formats.Medical.MedicalRequests.Orders(operations,
+            [new(Guid.CreateVersion7().ToString(), new(sample), null, tests)], Guid.CreateVersion7()));
+        return Astm.Protocol.Lis02.Lis02Codec.Parse(prepared.Bytes.Span, plugin.Profiles.Single(p => p.Id == profileId).Encoding).Messages.SelectMany(m => m.Records).ToArray();
     }
 }

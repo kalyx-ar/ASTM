@@ -1,8 +1,8 @@
 using System.Text;
 using Astm.Abstractions.Transport;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Protocol.Lis01;
 using Astm.Protocol.Lis02;
@@ -33,6 +33,7 @@ public sealed record AstmProfile(
     TimeSpan QueryAnswerBudget,
     IReadOnlyList<string> Evidence)
 {
+    public Astm.Formats.Medical.MedicalOperationRules OperationRules { get; init; } = new();
     /// <summary>How the host frames the messages it sends. Most instruments expect one record per ETX-terminated frame chain.</summary>
     /// <summary>Theoretical transport of the instrument (serial settings, network role) with its evidence; never an open connection.</summary>
     public TransportKnowledge? Transport { get; init; }
@@ -79,7 +80,7 @@ public interface IAstmDialect
     IReadOnlyList<Lis02Record> BuildOrders(IReadOnlyList<WorkOrder> orders);
 }
 
-public interface IInstrumentPlugin
+public interface IInstrumentPlugin : IMedicalInstrumentPlugin
 {
     PluginDescriptor Describe();
 
@@ -90,5 +91,5 @@ public interface IInstrumentPlugin
 
 public static class PluginApi
 {
-    public const int Version = 2;
+    public const int Version = 3;
 }

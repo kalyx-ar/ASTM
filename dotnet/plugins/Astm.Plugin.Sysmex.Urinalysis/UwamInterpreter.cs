@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Plugins.Tracing;
@@ -54,7 +54,11 @@ internal sealed partial class UwamInterpreter(IInstrumentKnowledge knowledge) : 
         Encoding.Latin1,
         new HashSet<AstmWorkflow> { AstmWorkflow.UnsolicitedResults, AstmWorkflow.HostQuery, AstmWorkflow.OrderDownload },
         budget,
-        Evidence) { Transport = Transport };
+        Evidence) { Transport = Transport, OperationRules = new()
+        {
+            QuerySpecimen = "Q.3", NegativeAnswer = "O.empty", OrderActions = [OrderAction.New, OrderAction.Add, OrderAction.Cancel],
+            WireBindings = new Dictionary<string, string> { ["patient.id"] = "P.3", ["specimen.identifier"] = "O.3", ["order.id"] = "O.19", ["tests.code"] = "O.5.4", ["query.specimen"] = "Q.3", ["answer.reportType"] = "O.26=O" },
+        } };
 
     /// <summary>R315168 rev. 22 §5.1.1 and Appendix A: only TCP/IP; the host is the server and U-WAM the client, port 6001 by default (two ports possible).</summary>
     private static readonly Astm.Abstractions.Transport.TransportKnowledge Transport = new(Astm.Abstractions.Transport.TransportDirection.Bidirectional, ["Sysmex R315168 U-WAM Host Interface Specifications rev. 22 §5.1.1 and Appendix A"])

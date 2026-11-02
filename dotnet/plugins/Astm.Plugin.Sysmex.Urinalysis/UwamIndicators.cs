@@ -1,4 +1,4 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 
 namespace Astm.Plugin.Sysmex.Urinalysis;
 

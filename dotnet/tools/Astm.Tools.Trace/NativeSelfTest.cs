@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Diagnostics;
 using Astm.Plugin.BioRad.Cfx;
@@ -8,6 +8,9 @@ using Astm.Plugin.Sysmex.Urinalysis;
 using Astm.Runtime.Tracing;
 using Astm.Runtime.Sessions;
 using Astm.Testing;
+using Astm.Formats.Medical;
+using Astm.Operations;
+using System.Text.Json;
 
 namespace Astm.Tools.Trace;
 
@@ -35,6 +38,16 @@ internal static class NativeSelfTest
         var stored = read.Batches!.Single().Observations.Single();
         if (!read.IsComplete || stored.Value.Numeric != 23.4m || stored.Quality!.Statistics.Count != 2 || catalog.Profiles.Count != 15)
             throw new InvalidDataException("Native self-test mismatch.");
+        var medical = ((IMedicalOperationProvider)new CfxPlugin()).CreateOperations(CfxPlugin.CsvProfileId,
+            new(new("SYN"), TimeProvider.System));
+        var decoded = medical.Decode(data, TraceRef.None, TimeZoneInfo.Utc);
+        var payload = JsonSerializer.SerializeToElement(decoded, MedicalJsonContext.Default.MedicalDecoded);
+        if (OperationDataValidator.Validate(medical.Resolve(MedicalDataContracts.Decoded), payload, OperationValidationPhase.Prepared).Count != 0)
+            throw new InvalidDataException("Native medical contract mismatch.");
+        var definition = medical.Describe(CfxPlugin.CsvProfileId).Single();
+        var serialized = JsonSerializer.Serialize(definition, OperationJsonContext.Default.OperationDefinition);
+        if (JsonSerializer.Deserialize(serialized, OperationJsonContext.Default.OperationDefinition)?.Id != MedicalPurposes.ImportContent)
+            throw new InvalidDataException("Native operation metadata mismatch.");
         using var text = new StringWriter(); TraceFile.Write(text, input.Header, input.Entries);
         if (TraceFile.Read(new StringReader(text.ToString())).Entries.Count != 1) throw new InvalidDataException("Native trace JSON mismatch.");
         var selected = catalog.Resolve("abbott.architect.asi-rs232"); var host = new InMemoryLabHost();

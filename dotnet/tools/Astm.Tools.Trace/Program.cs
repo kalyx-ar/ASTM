@@ -2,7 +2,7 @@ using Astm.Tools.Trace;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugin.Abbott.Architect;
 using Astm.Plugin.Abbott.CellDynRuby;

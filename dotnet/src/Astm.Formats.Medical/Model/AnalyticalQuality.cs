@@ -1,4 +1,4 @@
-namespace Astm.Abstractions.Model;
+namespace Astm.Formats.Medical.Model;
 
 public enum QualityMaterialKind { Unknown, Control, Calibrator, Standard, NoTemplateControl, NoReverseTranscriptaseControl, PositiveControl, NegativeControl }
 public enum StatisticScope { Well, ReplicateGroup, StandardCurve }

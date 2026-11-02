@@ -1,8 +1,12 @@
 # Continuación del trabajo
 
-Retomar #416 desde [OPERACIONES-NUCLEO](OPERACIONES-NUCLEO.md), primer bloque implementado 2026-11-01: proyecto independiente Astm.Operations 0.1.0 y 25 pruebas Operations/OperationContractTests. No rehacer la base ni asumir que los plugins ya la consumen. Siguiente: validación/negociación de OperationDefinition y bindings con snapshot, DTOs médicos opcionales, formato genérico + pilotos ARCHITECT/U-WAM, observación concurrente y adaptación EDC/ETL. El documento lista los límites reales del validador. Mantener el issue abierto; no tocar modificaciones ajenas ni instalar drivers.
+#416 implementado integralmente por solicitud humana de terminar el trabajo sin traspaso: núcleo neutral, contratos médicos opcionales, todos los perfiles incluidos, observadores y adaptación EDC/ETL coordinados en 0.6.2 / PluginApi 3. Leer [OPERACIONES-Y-CONTRATOS](OPERACIONES-Y-CONTRATOS.md), [OPERACIONES-NUCLEO](OPERACIONES-NUCLEO.md) y [OPERACION-OBSERVADA](OPERACION-OBSERVADA.md). No retomar las instrucciones históricas de una fase parcial como pendientes vigentes.
 
-EDC #416, análisis 2026-11-01: leer [OPERACIONES-Y-CONTRATOS](OPERACIONES-Y-CONTRATOS.md) antes de extender #414. Se propone operación neutral con contrato consultable de datos/validación y especialización médica opcional; los plugins publican restricciones/fronteras reales. Fases sugeridas: contratos + medicina común, pilotos ARCHITECT/U-WAM, demás formatos/equipos e integración ETL del host. Pendiente implementación; no universalizar un perfil de resultados ni añadir tipos EDC al core. #408 sigue abierto para validación instalada.
+DTOs médicos/host en Astm.Formats.Medical.Model/.Hosting; no conservar aliases de Astm.Abstractions.Model/.Hosting. Interfaces comunes IMedicalOperationProvider/IMedicalOperations/IMedicalOperationObserver; capacidades/restricciones se consultan por perfil. No confundir ACK, aceptación y ejecución física; UC/UF informan Unknown donde no está probada la frontera. EDC usa paquetes 0.6.2 y un adaptador común.
+
+Sin nuevas dependencias, permisos, DB/spool, timers ni instalación de drivers. Repetir suites .NET/CTest antes de commits, según AGENTS. Validación instalada/firma VCOM continúa en #408 por decisión humana; #404 permanece resuelto.
+
+## Historial y otras líneas de trabajo
 
 EDC #414, 2026-11-01: estado pasivo por traza implementado en `Astm.Tracing.AstmOperationObserver`. Leer `Current.NoPendingOperations`; Unknown no equivale a libre. Elegir alcance con `IInstrumentOperationPolicyProvider`, crear política por traza, alimentar ambos sentidos y notificar lifecycle. Perfil inicial de resultados explícito; políticas de queries por equipo y frontend/IA no homologados aquí. [Uso y extensión](OPERACION-OBSERVADA.md). PortGate/VCOM no interpreta protocolos; #408 sigue abierto.
 
@@ -14,7 +18,7 @@ EDC #404 (2026-11-01): backend COM virtual Windows 10/11 x64 y retiro al finaliz
 
 Guía para retomar ASTM desde otra sesión o agente. Estado al 27 de octubre de 2026, `main` en `github.com/kalyx-ar/ASTM`. Lo implementado y verificado está en [ESTADO](ESTADO.md); las reglas de trabajo, en [AGENTS.md](../AGENTS.md).
 
-Nombre vigente: **ASTM**; proyectos/paquetes `Astm.*` 0.3.0 y salidas `astm-diagnostics`/`astm-trace`. Corrección completa Alpha, sin aliases ni lectores de formatos anteriores. [Alcance y nombres](RENOMBRADO-ASTM.md). Las referencias de entrega 0.2.0 siguientes son evidencia anterior al renombrado.
+Nombre vigente: **ASTM**; proyectos/paquetes `Astm.*` 0.6.2 y salidas `astm-diagnostics`/`astm-trace`. Corrección completa Alpha, sin aliases ni lectores de formatos anteriores. [Alcance y nombres](RENOMBRADO-ASTM.md). Las referencias de entrega 0.2.0 siguientes son evidencia anterior al renombrado.
 
 Incremento de transporte/diagnóstico: COM de prueba propio de PortGate, sin driver; escenarios derivados de trazas con orden del plugin → interpretación del instrumento simulado → resultado y verificación de tiempos. GUI: Probar PortGate, COM local y opciones PortGate; catálogo de acciones opcional del plugin. [Uso y límites](PRUEBAS-SERIE.md). API/paquetes 0.2.0 para EDC. No equiparar este ensayo con validación del driver COM o del hardware.
 

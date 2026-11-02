@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugin.Testing.Synthetic;
 using Astm.Plugins;

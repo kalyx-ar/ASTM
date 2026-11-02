@@ -1,5 +1,5 @@
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 
 namespace Astm.Plugins;
@@ -24,6 +24,7 @@ public sealed record TraceInterpretation(IReadOnlyList<InstrumentTraceMessage> M
     IReadOnlyList<AstmDiagnostic> Diagnostics)
 {
     public IReadOnlyList<InstrumentTraceTiming> Timings { get; init; } = [];
+    public IReadOnlyList<Astm.Operations.OperationReceipt> OperationReceipts { get; init; } = [];
 }
 
 public enum InstrumentTimingKind { Response, OperationTotal, OperationProcessing }
@@ -32,7 +33,7 @@ public sealed record InstrumentTraceTiming(InstrumentTimingKind Kind, string Cod
     ProtocolExplanation? Explanation = null);
 
 /// <summary>Manufacturer-owned detection and reconstruction, independent of a recorder's file format.</summary>
-public interface IInstrumentTracePlugin : IInstrumentDiagnosticVocabulary
+public interface IInstrumentTracePlugin : IInstrumentDiagnosticVocabulary, IMedicalInstrumentPlugin
 {
     PluginDescriptor Describe();
     IReadOnlyList<InstrumentTraceProfile> Profiles { get; }

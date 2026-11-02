@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Hl7v2;
 using Astm.Protocol.Mllp;
+using Astm.Formats.Medical;
+using Astm.Operations;
 
 namespace Astm.Runtime.Sessions;
 
@@ -23,6 +25,7 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
     private int _started;
     public Action<AstmDiagnostic>? Diagnostics { get; init; }
     public int MaxMessageBytes { get; init; } = 1024 * 1024;
+    public IMedicalOperations Operations { get; } = MedicalOperationAdapters.ForHl7(profile, dialect, new(instrument, TimeProvider.System));
 
     public async Task RunAsync(CancellationToken token)
     {
@@ -56,8 +59,9 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
                         {
                             var ack = Hl7Acknowledgements.Read(message);
                             if (ack is not null && ack.Phase == Hl7AcknowledgementPhase.Application
-                                && message.Header.Text(12) == profile.Hl7Version && message.Header.Text(9, 3) == "ORL_O34"
-                                && _pending.TryGetValue(ack.ControlId, out var waiting) && message.Type == waiting.Type && message.Trigger == waiting.Trigger)
+                                && message.Header.Text(12) == profile.Hl7Version
+                                && _pending.TryGetValue(ack.ControlId, out var waiting) && message.Header.Text(9, 3) == waiting.Structure
+                                && message.Type == waiting.Type && message.Trigger == waiting.Trigger)
                                 waiting.Completion.TrySetResult(new(ack.Accepted ? OrderDeliveryState.Sent : OrderDeliveryState.Rejected, ack.Code));
                             else Report("ASTM-HL7-UNMATCHED-ACK");
                             continue;
@@ -87,8 +91,15 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
 
     public async Task<Hl7SendOutcome> SendOrdersAsync(IReadOnlyList<WorkOrder> orders, CancellationToken token = default)
     {
-        var message = dialect.BuildOrders(orders, Guid.CreateVersion7().ToString());
-        var waiting = new Pending("ORL", "O34", new(TaskCreationOptions.RunContinuationsAsynchronously));
+        return await SendOperationAsync(MedicalRequests.Orders(Operations, orders, Guid.CreateVersion7()), token).ConfigureAwait(false);
+    }
+    public async Task<Hl7SendOutcome> SendOperationAsync(OperationEnvelope request, CancellationToken token = default)
+    {
+        var prepared = Operations.Prepare(request);
+        var message = Hl7Codec.Parse(profile.Encoding.GetString(prepared.Bytes.Span)).Message!;
+        var waiting = request.Purpose == MedicalPurposes.AnswerWorklist
+            ? new Pending("ACK", message.Trigger, "ACK", new(TaskCreationOptions.RunContinuationsAsynchronously))
+            : new Pending("ORL", "O34", "ORL_O34", new(TaskCreationOptions.RunContinuationsAsynchronously));
         if (!_running) throw new InvalidOperationException("ASTM-HL7-SESSION-NOT-RUNNING");
         if (!_pending.TryAdd(message.ControlId, waiting)) throw new InvalidOperationException("ASTM-HL7-DUPLICATE-CONTROL-ID");
         try
@@ -124,6 +135,6 @@ public sealed class Hl7InstrumentSession(Stream transport, IHl7Dialect dialect, 
         trace.Write(TraceDirection.Event, [], code);
         Diagnostics?.Invoke(new(code, AstmSeverity.Warning, "HL7 transport diagnostic; inspect the protected trace."));
     }
-    private sealed record Pending(string Type, string Trigger, TaskCompletionSource<Hl7SendOutcome> Completion);
+    private sealed record Pending(string Type, string Trigger, string Structure, TaskCompletionSource<Hl7SendOutcome> Completion);
     private sealed class ChannelWriteException(Exception? cause = null) : IOException(SessionCodes.WriteNotCompleted, cause);
 }

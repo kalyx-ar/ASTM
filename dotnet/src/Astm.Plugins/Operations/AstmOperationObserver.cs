@@ -15,6 +15,7 @@ public sealed class AstmOperationObserver
     private readonly Encoding _encoding;
     private readonly IAstmOperationPolicy? _policy;
     private readonly int _maxTransmissionBytes;
+    private readonly bool _receiverEotAcknowledges;
     private Lis01Observer _link = new() { ValidateRestrictedCharacters = true };
     private TraceOperationSnapshot _current;
     private TraceOperationState _operation = TraceOperationState.Unknown;
@@ -28,13 +29,14 @@ public sealed class AstmOperationObserver
     private Lis01Role? _sender;
 
     public AstmOperationObserver(Guid traceId, Encoding encoding, IAstmOperationPolicy? policy = null,
-        int maxTransmissionBytes = 1024 * 1024)
+        int maxTransmissionBytes = 1024 * 1024, bool receiverEotAcknowledges = false)
     {
         if (traceId == Guid.Empty) throw new ArgumentException("A trace identity is required.", nameof(traceId));
         ArgumentNullException.ThrowIfNull(encoding);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTransmissionBytes);
         _traceId = traceId; _encoding = (Encoding)encoding.Clone(); _policy = policy;
         _maxTransmissionBytes = maxTransmissionBytes;
+        _receiverEotAcknowledges = receiverEotAcknowledges;
         _current = Snapshot();
     }
 
@@ -139,7 +141,9 @@ public sealed class AstmOperationObserver
             case Lis01ObservationKind.AlteredByRecorder:
             case Lis01ObservationKind.ImplicitAcknowledge:
             case Lis01ObservationKind.ReceiverInterrupt:
-                Poison("ASTM-OP-UNRELIABLE-EXCHANGE"); break;
+                if (observation.Kind != Lis01ObservationKind.ReceiverInterrupt || !_receiverEotAcknowledges)
+                    Poison("ASTM-OP-UNRELIABLE-EXCHANGE");
+                break;
             case Lis01ObservationKind.Noise:
                 // The general recorder reports the ACK of a duplicate accepted frame as noise. In this stricter
                 // monitor it is expected only while that duplicate is outstanding and from the receiver.

@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
 using Astm.Abstractions.Diagnostics;
-using Astm.Abstractions.Hosting;
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Hosting;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 using Astm.Plugins;
 using Astm.Protocol.Lis01;
@@ -39,6 +39,11 @@ public sealed partial class CellDynRubyPlugin : IInstrumentPlugin, IInstrumentHe
             ])
         {
             InstrumentFraming = AstmFraming.FramePerMessage,
+            OperationRules = new()
+            {
+                AllSpecimensQuery = true, OrderActions = [OrderAction.New, OrderAction.Cancel],
+                WireBindings = new Dictionary<string, string> { ["patient.id"] = "P.3", ["specimen.identifier"] = "O.3", ["tests.code"] = "O.5.4", ["query.specimen"] = "Q.3.2 or ALL" },
+            },
             HostFraming = AstmFraming.FramePerMessage,
         },
     ];

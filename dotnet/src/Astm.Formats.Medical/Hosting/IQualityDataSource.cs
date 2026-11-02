@@ -1,7 +1,7 @@
-using Astm.Abstractions.Model;
+using Astm.Formats.Medical.Model;
 using Astm.Abstractions.Tracing;
 
-namespace Astm.Abstractions.Hosting;
+namespace Astm.Formats.Medical.Hosting;
 
 /// <summary>Read selection only: filters never assert suitability for a QC statistical series.
 /// Null filters mean unspecified; date limits exclude observations without a result timestamp.</summary>
