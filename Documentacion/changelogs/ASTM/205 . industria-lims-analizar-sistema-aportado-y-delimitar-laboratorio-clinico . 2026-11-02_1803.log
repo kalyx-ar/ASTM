@@ -1,0 +1,48 @@
+Issue: EDC #205, incremento de inspección estructural en Diagnostics.
+Autorización humana: solicitud del usuario del 2026-11-02, permitir que los plugins
+analicen mensajes de paciente y resultado y que el técnico coteje los datos.
+Alcance registrado antes de editar:
+https://github.com/kalyx-ar/EDC/issues/205#issuecomment-6587860425
+Commit fuente/release: 3ef9529f91d94850dbd7ebdad1e9c45941c127e2
+Mensaje: feat: inspeccionar pacientes y resultados desde los plugins (#205)
+Consumidor/feed EDC: 0206c7b83dcc41e799cd3615b7a54fafc83df40d
+Tipo: feature, diagnóstico local de sólo lectura, documentación y distribución 0.6.6.
+
+Rutas: Astm.Plugins/InstrumentMessageInspection y StandardMessageInspection;
+MessageInspection de ARCHITECT ASI/HL7, CELL-DYN Ruby, CS-2500, XN-L, U-WAM
+(ambas configuraciones) y QWALYS; DiagnosticCatalog/Text, MessageInspectionPresentation;
+detalle Mensajes MAUI, selección real de fila en self-test y pruebas de estructura/Lang;
+versiones propias, INSPECCION-DE-MENSAJES, usabilidad, índice, estado y continuación.
+
+Decisiones: mapa semántico por plugin; lector neutral de delimitadores, campos,
+repeticiones, componentes/subcomponentes y escapes. Original íntegro; raw y decodificado
+separados y datos sin traducir. Asociación por posición real del registro, independiente
+de secuencias repetidas; no heredar solicitud de otro paciente/muestra/mensaje.
+Resultados huérfanos, desconocidos y evidencia explícitos. Ruby conserva hipótesis de
+trazas; no inventar mapa demográfico XN-L o campos no usados CS-2500. Nueve perfiles
+contando CLSI; UC/UF y CFX conservan sus lectores. Sin importación/validación clínica,
+transporte nuevo, nuevas dependencias, permisos, persistencia, derivación o confianza.
+
+Verificación final:
+- Suite .NET Release/Strong Name repetida: 578 correctas, una omitida por traza privada;
+  duraciones 13/12 s. Catorce casos nuevos de inspección, con comparación contra los
+  resultados del mismo dialecto, RX/TX, varios pacientes/órdenes, delimitadores,
+  vacíos, escapes, HL7 MSH y subcomponentes, QC sin PID, huérfanos e incompletos.
+- Lang real: una correcta, 343 ms. Una pasada inicial detectó reemplazo del seed común;
+  corregido registrando vocabulario común y campos en el mismo grupo por ensamblado.
+- CTest repetido: 2/2, 9,23/9,81 s; no se modificó código nativo.
+- CLI win-x64 NativeAOT publicado, self-test correcto.
+- MAUI autónomo publicado y self-test correcto: selección real de Mensajes muestra
+  paciente/resultado/jerarquía tanto interpretado como original. Primera pasada produjo
+  reintentos de copia al iniciar la prueba antes de terminar publish; publicación final
+  y pruebas repetidas en secuencia, sin reintentos. Auditoría de publicación correcta.
+- GUI ProductVersion: 0.6.6+3ef9529f91d94850dbd7ebdad1e9c45941c127e2.
+- Paquetes propios: 22, metadata repository commit 3ef9529, dependencias propias 0.6.6;
+  22 DLL versión 0.6.6.0/token 066190a23251f202. NuGet sin firma, Authenticode NotSigned.
+  Cinco CS8002 de MAUI oficial sin Strong Name siguen visibles; firma de release pendiente.
+- Consumidor EDC: 28 correctas, 51 s. Primer intento se detuvo en CS0106/CS1513 de
+  LimsService.cs modificado por trabajo simultáneo; tras cambiar su contenido por ese
+  trabajo, la repetición pasó. Ese archivo no se editó ni incluyó en los commits propios.
+
+Estado: incremento terminado y entregado localmente; #205 global permanece abierto.
+Sin push, ZIP, homologación física ni cambios sobre datos reales o archivos ajenos.
