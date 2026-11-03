@@ -48,6 +48,8 @@ obj/
 TestResults/
 *.nupkg
 *.snupkg
+__pycache__/
+*.pyc
 
 # C++ / CMake / ESP-IDF
 build/

@@ -1,5 +1,32 @@
 # Estado de la implementación
 
+2026-11-03: [servicio neutral local](SERVICIO-NEUTRAL.md) implementado, contrato
+`astm-service/1.0`. `Astm.Service` reutiliza motores y contratos; `astm-service`
+compone 14 perfiles, sin dependencia de un LIS, Diagnostics o Python.NET.
+Sesiones con tenencia exclusiva entre procesos, COM/TCP/PortGate, contenido
+completo, operaciones FIFO/cancelación/estado y observadores. Callbacks de
+consultas, ingestión íntegra y custodia confirmada por entrada; sin DB/spool ni
+reenvío automático de operaciones inciertas. Decimal exacto como texto y
+proyección de schemas IPC explícita. UC/UF incorporan lectura incremental
+acotada en su plugin. Negocio, cola durable y reconciliación siguen en el host.
+
+Evidencia local final: **601 correctas y una omitida** por traza privada,
+repetidas (13/13 s), incluyendo 23 casos nuevos. CTest **2/2** repetido
+(8,28/7,97 s). NativeAOT win-x64 ejecutado realmente con Python 3.12.14:
+descubrimiento/descripción de los 14 perfiles, inventario canónico, `Deferred`
+con AE y parada ordenada; carga sintética de 10.000 mensajes en una sesión
+(16,915 s para el recorrido del consumidor y parada). Es una prueba corta sin
+SLO de rendimiento ni custodia durable. Verificaciones privadas conservadas
+fuera de Git. Compilación sin advertencias; dos ensamblados nuevos con token
+066190a23251f202. Ejecutable **Authenticode NotSigned**; sin paquetes/release,
+push, instalación ni nuevas dependencias. SHA del NativeAOT y alcance exacto
+en el changelog de esta tarea.
+
+Pendientes operativos explícitos: Linux real, COM/hardware por instrumento,
+ensayo de varios días con presupuestos/recursos medidos y firma de release.
+La persistencia protegida/transaccional del anfitrión y su integración se
+validan en ese anfitrión; la demostración usa únicamente memoria y sintéticos.
+
 Incremento #205, 2026-11-02, 0.6.6: [inspección de pacientes y resultados](INSPECCION-DE-MENSAJES.md) en el detalle de Mensajes. Contrato opcional por plugin; nueve perfiles LIS02/HL7 con campos originales/decodificados, fuentes, desconocidos y contexto estructural independiente entre pacientes/muestras/mensajes. Sin importar pacientes, aceptar resultados o inferir demografía sin mapa. UC/UF y CFX conservan sus lectores propios. Evidencia final de pruebas y salidas reales en el changelog de este incremento.
 
 Validación 0.6.6: 578 correctas/una omitida por traza privada, repetidas (13/12 s); Lang real una correcta (343 ms), incluyendo nuevas etiquetas y conservación del catálogo común; CTest repetido 2/2 (9,23/9,81 s). NativeAOT CLI/self-test y GUI MAUI autónoma/self-test de selección de Mensajes correctos, con auditoría de publicación. Fuente/paquetes desde `3ef9529f91d94850dbd7ebdad1e9c45941c127e2`; GUI `0.6.6+3ef9529f91d94850dbd7ebdad1e9c45941c127e2`. Veintidós paquetes/DLL propios con versión 0.6.6.0/token 066190a23251f202, NuGet sin firma/Authenticode NotSigned. Cinco CS8002 de MAUI oficial conservadas sin cambios de confianza.

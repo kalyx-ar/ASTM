@@ -6,6 +6,8 @@ Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](
 
 Aplicación gráfica MAUI (entrega Windows autónoma): [diagnóstico de mantenimiento](Documentacion/DIAGNOSTICO-MANTENIMIENTO.md), con catálogo integrado, lectura de logs/exportaciones y captura TCP/SerialTunnel. Incluye Bio-Rad CFX (CSV/RDML), Sysmex U-WAM/XN-L/CS-2500, QWALYS y Abbott; cada perfil declara su evidencia y límites, sin atribuir homologación en hardware.
 
+Servicio local neutral .NET, consumible desde Python u otros procesos: [contrato, configuración y ejemplos](Documentacion/SERVICIO-NEUTRAL.md). Aloja el runtime y conserva en el anfitrión la custodia, recepción durable y lógica de negocio.
+
 ## Layout
 
 ```text

@@ -14,6 +14,9 @@ namespace Astm.Runtime.Sessions;
 public sealed record AstmSessionOptions(Lis01Role Role = Lis01Role.Host)
 {
     public int ReadBufferBytes { get; init; } = 4096;
+    public int MaxPendingInputs { get; init; } = 256;
+    public int MaxPendingReceptions { get; init; } = 32;
+    public int MaxReceptionBytes { get; init; } = 1024 * 1024;
 
     /// <summary>
     /// False for diagnostic replay: a recorded instrument cannot react, so host messages (query answers, orders) are
@@ -55,12 +58,13 @@ public sealed class AstmInstrumentSession
     private readonly TimeProvider _clock;
     private readonly Lis01Link _link;
     private readonly AstmMessageProcessor _processor;
-    private readonly Channel<Input> _inputs = Channel.CreateUnbounded<Input>(new UnboundedChannelOptions { SingleReader = true });
-    private readonly Channel<Reception> _receptions = Channel.CreateUnbounded<Reception>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<Input> _inputs;
+    private readonly Channel<Reception> _receptions;
     private readonly Dictionary<long, TaskCompletionSource<Lis01SendCompleted>> _pendingSends = [];
     private InstrumentRef _instrument;
     private long? _receptionStart;
     private long _lastReceivedSequence = -1;
+    private long _receptionBytes;
     private volatile bool _channelEnded;
     public IMedicalOperations Operations { get; }
 
@@ -80,6 +84,10 @@ public sealed class AstmInstrumentSession
         _instrument = instrument;
         _trace = trace;
         _options = options;
+        if (options.ReadBufferBytes is < 1 or > 65536 || options.MaxPendingInputs < 1 || options.MaxPendingReceptions < 1 || options.MaxReceptionBytes < 1)
+            throw new ArgumentOutOfRangeException(nameof(options));
+        _inputs = Channel.CreateBounded<Input>(new BoundedChannelOptions(options.MaxPendingInputs) { SingleReader = true });
+        _receptions = Channel.CreateBounded<Reception>(new BoundedChannelOptions(options.MaxPendingReceptions) { SingleReader = true });
         _clock = clock ?? TimeProvider.System;
         _link = new Lis01Link(options.Role, profile.Link);
         Operations = MedicalOperationAdapters.ForAstm(profile, dialect, new(instrument, _clock));
@@ -149,15 +157,15 @@ public sealed class AstmInstrumentSession
         return SendRecordsAsync(records, cancellationToken);
     }
 
-    private Task<Lis01SendCompleted> SendRecordsAsync(IReadOnlyList<Lis02Record> records, CancellationToken cancellationToken)
+    private async Task<Lis01SendCompleted> SendRecordsAsync(IReadOnlyList<Lis02Record> records, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_channelEnded) return Task.FromResult(new Lis01SendCompleted(0, Lis01SendResult.Failed, 0, 0, "ASTM-CH-CLOSED"));
+        if (_channelEnded) return new Lis01SendCompleted(0, Lis01SendResult.Failed, 0, 0, "ASTM-CH-CLOSED");
         var completion = new TaskCompletionSource<Lis01SendCompleted>(TaskCreationOptions.RunContinuationsAsynchronously);
         var bytes = _profile.Frame(records, _profile.HostFraming);
-        if (!_inputs.Writer.TryWrite(new Input(InputKind.Send, null, -1, bytes, completion) { Cancellation = cancellationToken }))
-            completion.TrySetCanceled(cancellationToken);
-        return completion.Task.WaitAsync(cancellationToken);
+        try { await _inputs.Writer.WriteAsync(new Input(InputKind.Send, null, -1, bytes, completion) { Cancellation = cancellationToken }, cancellationToken).ConfigureAwait(false); }
+        catch (ChannelClosedException) { return new(0, Lis01SendResult.Failed, 0, 0, "ASTM-CH-CLOSED"); }
+        return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task LinkLoopAsync(long start, ITimer timer, CancellationToken cancellationToken)
@@ -171,6 +179,8 @@ public sealed class AstmInstrumentSession
             {
                 case InputKind.Bytes:
                     var wasReceiving = _link.State == Lis01State.Receiving;
+                    _receptionBytes = (wasReceiving ? _receptionBytes : 0) + input.Data!.Length;
+                    if (_receptionBytes > _options.MaxReceptionBytes) throw new IOException("ASTM-RT-RECEPTION-LIMIT");
                     _lastReceivedSequence = input.Sequence;
                     _link.OnBytes(input.Data!, now, actions);
                     if (!wasReceiving && (_link.State == Lis01State.Receiving || actions.Any(a => a is Lis01Received)))
@@ -205,6 +215,7 @@ public sealed class AstmInstrumentSession
 
             foreach (var action in actions)
                 await ExecuteAsync(action, cancellationToken).ConfigureAwait(false);
+            if (_link.State != Lis01State.Receiving) _receptionBytes = 0;
 
             if (_link.NextDeadline is { } deadline)
             {
@@ -238,7 +249,8 @@ public sealed class AstmInstrumentSession
             case Lis01Received received:
                 var trace = new TraceRef(_trace.TraceId, _receptionStart ?? _lastReceivedSequence, _lastReceivedSequence);
                 _receptionStart = null;
-                _receptions.Writer.TryWrite(new Reception(received, trace));
+                if (!_receptions.Writer.TryWrite(new Reception(received, trace)))
+                    throw new IOException("ASTM-RT-RECEPTION-CAPACITY");
                 break;
             case Lis01SendCompleted completed:
                 if (completed.Result != Lis01SendResult.Delivered)
@@ -270,7 +282,7 @@ public sealed class AstmInstrumentSession
                 {
                     var data = buffer.AsSpan(0, count).ToArray();
                     var sequence = _trace.Write(TraceDirection.Received, data);
-                    _inputs.Writer.TryWrite(new Input(InputKind.Bytes, data, sequence, null, null));
+                    await _inputs.Writer.WriteAsync(new Input(InputKind.Bytes, data, sequence, null, null), cancellationToken).ConfigureAwait(false);
                 }
                 if (count == 0)
                     break;
@@ -278,7 +290,8 @@ public sealed class AstmInstrumentSession
         }
         finally
         {
-            _inputs.Writer.TryWrite(Input.End);
+            if (!cancellationToken.IsCancellationRequested)
+                await _inputs.Writer.WriteAsync(Input.End, cancellationToken).ConfigureAwait(false);
         }
     }
 

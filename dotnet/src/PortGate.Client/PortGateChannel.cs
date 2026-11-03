@@ -15,6 +15,8 @@ public sealed record PortGateOptions(string ControllerId, string PortId)
     public TimeSpan HandshakeTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     public int MaxUnitBytes { get; init; } = 64 * 1024;
+    public int MaxBufferedUnits { get; init; } = 256;
+    public int MaxBufferedEvents { get; init; } = 256;
 
     /// <summary>Answer of this owner to a cooperative handover request; null keeps the port (spec/admin-v1.md).</summary>
     public Func<PortGateHandoverRequest, bool>? HandoverDecision { get; init; }
@@ -55,10 +57,10 @@ public sealed class PortGateChannel : IAsyncDisposable
     private readonly PortGateOptions _options;
     private readonly ushort _port;
     private readonly SemaphoreSlim _sendGate = new(1, 1);
-    private readonly Channel<PortGateEvent> _events = Channel.CreateUnbounded<PortGateEvent>();
-    private readonly Channel<PortGateAuditEvent> _securityEvents = Channel.CreateUnbounded<PortGateAuditEvent>();
-    private readonly Channel<PortGatePortState> _portStates = Channel.CreateUnbounded<PortGatePortState>();
-    private readonly Channel<PortGateObservation> _observations = Channel.CreateUnbounded<PortGateObservation>();
+    private readonly Channel<PortGateEvent> _events;
+    private readonly Channel<PortGateAuditEvent> _securityEvents;
+    private readonly Channel<PortGatePortState> _portStates;
+    private readonly Channel<PortGateObservation> _observations;
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _controlReplies = new();
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> _writeReplies = new();
     private readonly CancellationTokenSource _stop = new();
@@ -75,6 +77,12 @@ public sealed class PortGateChannel : IAsyncDisposable
     {
         _stream = stream;
         _options = options;
+        if (options.MaxBufferedUnits is < 1 or > 65536 || options.MaxBufferedEvents is < 1 or > 65536)
+            throw new ArgumentOutOfRangeException(nameof(options));
+        _events = Channel.CreateBounded<PortGateEvent>(options.MaxBufferedEvents);
+        _securityEvents = Channel.CreateBounded<PortGateAuditEvent>(options.MaxBufferedEvents);
+        _portStates = Channel.CreateBounded<PortGatePortState>(options.MaxBufferedEvents);
+        _observations = Channel.CreateBounded<PortGateObservation>(options.MaxBufferedUnits);
         _port = port;
         AgentEpoch = agentEpoch;
         Port = info;
@@ -362,13 +370,13 @@ public sealed class PortGateChannel : IAsyncDisposable
         if (unit.Type == LinkType.SerialData)
         {
             if (unit.Channel == _port && unit.SerialPayload() is { } data && _tenure is { } tenure && data.Generation == tenure.Lease.Generation)
-                tenure.Received.Writer.TryWrite(data.Data);
+                Enqueue(tenure.Received, data.Data);
             return;
         }
         if (unit.Type == LinkType.ObservedData)
         {
             if (unit.Channel == _port && unit.ObservedPayload() is { } observed)
-                _observations.Writer.TryWrite(new PortGateObservation(observed.Sequence, observed.Offset, observed.Generation, observed.Direction, observed.Data));
+                Enqueue(_observations, new PortGateObservation(observed.Sequence, observed.Offset, observed.Generation, observed.Direction, observed.Data));
             return;
         }
         var map = unit.Map();
@@ -417,13 +425,13 @@ public sealed class PortGateChannel : IAsyncDisposable
                     .ContinueWith(_ => { }, TaskScheduler.Default);
                 break;
             case LinkType.PortState when unit.Channel == _port:
-                _portStates.Writer.TryWrite(new PortGatePortState(map.GetValueOrDefault(0UL) is true, map.GetValueOrDefault(1UL) as string,
+                Enqueue(_portStates, new PortGatePortState(map.GetValueOrDefault(0UL) is true, map.GetValueOrDefault(1UL) as string,
                     (uint)(map.GetValueOrDefault(2UL) as ulong? ?? 0), (int)(map.GetValueOrDefault(3UL) as ulong? ?? 0), map.GetValueOrDefault(4UL) is true,
                     map.GetValueOrDefault(5UL) is true, map.GetValueOrDefault(6UL) is true)
                     { NextObservationSequence = map.GetValueOrDefault(8UL) as ulong? ?? 0 });
                 break;
             case LinkType.SecurityEvent when unit.Channel == _port:
-                _securityEvents.Writer.TryWrite(new PortGateAuditEvent(requestId,
+                Enqueue(_securityEvents, new PortGateAuditEvent(requestId,
                     DateTimeOffset.FromUnixTimeMilliseconds((long)(map.GetValueOrDefault(9UL) as ulong? ?? 0)), map.GetValueOrDefault(1UL) as string ?? "",
                     map.GetValueOrDefault(2UL) as string, map.GetValueOrDefault(3UL) as string, map.GetValueOrDefault(4UL) as string,
                     (uint)(map.GetValueOrDefault(5UL) as ulong? ?? 0), map.GetValueOrDefault(6UL) as string,
@@ -486,7 +494,15 @@ public sealed class PortGateChannel : IAsyncDisposable
         }
     }
 
-    private void Publish(PortGateEventKind kind, string? code, string? detail) => _events.Writer.TryWrite(new PortGateEvent(kind, DateTimeOffset.UtcNow, code, detail));
+    private static void Enqueue<T>(Channel<T> channel, T value)
+    {
+        if (!channel.Writer.TryWrite(value)) throw new PortGateException("PORTGATE-CH-BUFFER-LIMIT", "consumer did not drain the bounded channel");
+    }
+    private void Publish(PortGateEventKind kind, string? code, string? detail)
+    {
+        if (!_events.Writer.TryWrite(new PortGateEvent(kind, DateTimeOffset.UtcNow, code, detail)) && !_closed)
+            throw new PortGateException("PORTGATE-CH-BUFFER-LIMIT", "consumer did not drain the bounded event channel");
+    }
 
     private TaskCompletionSource<SortedDictionary<ulong, object?>> Register(ConcurrentDictionary<ulong, TaskCompletionSource<SortedDictionary<ulong, object?>>> replies, ulong id)
     {
@@ -545,6 +561,7 @@ public sealed class PortGateChannel : IAsyncDisposable
     {
         public Tenure(PortGateChannel channel, PortGateLease lease, byte[] transferId)
         {
+            Received = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(channel._options.MaxBufferedUnits) { SingleReader = true });
             Lease = lease;
             TransferId = transferId;
             Stream = new TenureStream(channel, this);
@@ -552,7 +569,7 @@ public sealed class PortGateChannel : IAsyncDisposable
 
         public PortGateLease Lease { get; }
         public byte[] TransferId { get; }
-        public Channel<ReadOnlyMemory<byte>> Received { get; } = Channel.CreateUnbounded<ReadOnlyMemory<byte>>(new UnboundedChannelOptions { SingleReader = true });
+        public Channel<ReadOnlyMemory<byte>> Received { get; }
         public Stream Stream { get; }
         public volatile bool Ended;
         public string? EndCode;

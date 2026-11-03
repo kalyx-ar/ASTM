@@ -1,5 +1,20 @@
 # Continuación del trabajo
 
+2026-11-03: servicio neutral implementado localmente. Leer
+[SERVICIO-NEUTRAL](SERVICIO-NEUTRAL.md) para contrato `astm-service/1.0`, arranque,
+parada, configuración y consumidor Python. Catálogo completo, motores/sesiones
+existentes, operaciones, tenencia y callbacks confirmados; la aplicación conserva
+custodia, cola durable, deduplicación y decisiones de negocio. No se creó un
+spool ni un pump de órdenes de negocio en ASTM. Los 14 perfiles son descubribles,
+incluidos R24/inventario ARCHITECT y lectores pasivos incrementales UC/UF.
+
+Validado: suites .NET repetidas 601 correctas/una omitida por traza privada
+(13/13 s), CTest repetido 2/2, NativeAOT Windows real con Python y carga sintética
+de 10.000 mensajes. Fuentes/casos de seguridad específicos permanecen fuera de
+Git. Continuar con validación operativa Linux, COM físico, varios días y firma
+de release; la adaptación/persistencia del consumidor pertenece a su repositorio.
+La tarea autorizada no incluye crear issues/PR, push o instalar servicios/drivers.
+
 Incremento #205, 2026-11-02, 0.6.6: [inspección de mensajes](INSPECCION-DE-MENSAJES.md) implementada para nueve perfiles LIS02/HL7. En Mensajes, seleccionar una fila para comparar campos originales/decodificados y contexto paciente/solicitud/resultado. Los mapas viven en los plugins; conservar desconocidos y la hipótesis Ruby. No convertir esta inspección en importación/validación clínica ni aplicar P/O/R a UC/UF/CFX.
 
 Incremento #205, 2026-11-02, 0.6.5: [conocimiento por perfil](CONOCIMIENTO-POR-PERFIL.md) enumerable, fuentes/estado/canal, CLI `knowledge`, detalle Diagnostics y descubrimiento EDC. CS-2500 1.2.0 incorpora máscaras de resultado sin error ampliado y R.3.11. Las oportunidades documentadas no se anuncian como operaciones ejecutables.

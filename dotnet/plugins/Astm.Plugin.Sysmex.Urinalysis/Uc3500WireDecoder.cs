@@ -12,6 +12,8 @@ internal sealed record UcPacket(long First, long Last, TimeSpan Elapsed, TraceDi
 /// Manual 0.0.5 §6.1.1.3-.5; the sum of Table 6-17 field widths is 446, despite the stated 441-byte limit.</summary>
 internal sealed class Uc3500WireDecoder(Uc3500CheckMode mode)
 {
+    private Uc3500CheckMode _mode = mode;
+    internal void UseMode(Uc3500CheckMode selected) => _mode = selected;
     private sealed class Buffer
     {
         public readonly List<byte> Payload = [];
@@ -46,7 +48,7 @@ internal sealed class Uc3500WireDecoder(Uc3500CheckMode mode)
     {
         if (b.Ended)
         {
-            if (mode == Uc3500CheckMode.Auto)
+            if (_mode == Uc3500CheckMode.Auto)
             {
                 if (b.Check.Count == 0 && value == 2 && Xor(b.Payload) != 2 && Sum(b.Payload) != 2)
                     Emit(b, entry.Direction); // Delimited frame without checksum, followed by another frame.
@@ -56,7 +58,7 @@ internal sealed class Uc3500WireDecoder(Uc3500CheckMode mode)
             if (b.Ended)
             {
                 b.Check.Add(value); b.Last = entry.Sequence; b.Elapsed = entry.Elapsed;
-                var expected = mode == Uc3500CheckMode.Sum2 || mode == Uc3500CheckMode.Auto ? 2 : 1;
+                var expected = _mode == Uc3500CheckMode.Sum2 || _mode == Uc3500CheckMode.Auto ? 2 : 1;
                 if (b.Check.Count >= expected) Emit(b, entry.Direction);
                 return;
             }
@@ -72,7 +74,7 @@ internal sealed class Uc3500WireDecoder(Uc3500CheckMode mode)
         if (!b.Framed && b.Payload.Count == 0) b.First = entry.Sequence;
         b.Last = entry.Sequence; b.Elapsed = entry.Elapsed;
         if (b.Framed && value == 3)
-        { b.Ended = true; if (mode == Uc3500CheckMode.None) Emit(b, entry.Direction); return; }
+        { b.Ended = true; if (_mode == Uc3500CheckMode.None) Emit(b, entry.Direction); return; }
         if (!b.Framed && value == 10 && b.Cr)
         { b.Payload.RemoveAt(b.Payload.Count - 1); Emit(b, entry.Direction); return; }
         b.Cr = value == 13;
@@ -91,10 +93,10 @@ internal sealed class Uc3500WireDecoder(Uc3500CheckMode mode)
         var check = b.Check.ToArray();
         var kind = !b.Framed ? "CRLF" : check.Length switch
         {
-            0 when mode is Uc3500CheckMode.None or Uc3500CheckMode.Auto => "NONE",
-            1 when check[0] == Xor(b.Payload) && mode is Uc3500CheckMode.Bcc or Uc3500CheckMode.Auto => "BCC",
-            1 when check[0] == Sum(b.Payload) && mode is Uc3500CheckMode.Sum or Uc3500CheckMode.Auto => "SUM",
-            2 when Encoding.ASCII.GetString(check) == Sum(b.Payload).ToString("X2") && mode is Uc3500CheckMode.Sum2 or Uc3500CheckMode.Auto => "SUM2",
+            0 when _mode is Uc3500CheckMode.None or Uc3500CheckMode.Auto => "NONE",
+            1 when check[0] == Xor(b.Payload) && _mode is Uc3500CheckMode.Bcc or Uc3500CheckMode.Auto => "BCC",
+            1 when check[0] == Sum(b.Payload) && _mode is Uc3500CheckMode.Sum or Uc3500CheckMode.Auto => "SUM",
+            2 when Encoding.ASCII.GetString(check) == Sum(b.Payload).ToString("X2") && _mode is Uc3500CheckMode.Sum2 or Uc3500CheckMode.Auto => "SUM2",
             _ => "INVALID",
         };
         Packets.Add(new(b.First, b.Last, b.Elapsed, direction, Encoding.Latin1.GetString(b.Payload.ToArray()), kind, !b.Invalid && kind != "INVALID"));

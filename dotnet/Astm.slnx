@@ -11,6 +11,7 @@
     <Project Path="plugins/Astm.Plugin.Testing.Synthetic/Astm.Plugin.Testing.Synthetic.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Astm.Service/Astm.Service.csproj" />
     <Project Path="src/Astm.Operations/Astm.Operations.csproj" />
     <Project Path="src/Astm.Formats.Medical/Astm.Formats.Medical.csproj" />
     <Project Path="src/Astm.Abstractions/Astm.Abstractions.csproj" />
@@ -29,6 +30,7 @@
     <Project Path="tests/Astm.Tests/Astm.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Astm.Service.Host/Astm.Service.Host.csproj" />
     <Project Path="tools/Astm.Diagnostics.Core/Astm.Diagnostics.Core.csproj" />
     <Project Path="tools/Astm.Tools.Trace/Astm.Tools.Trace.csproj" />
   </Folder>

@@ -44,7 +44,7 @@ internal static class UfBinaryInterpreter
         internal int FirstByteOffset { get; init; }
         internal IReadOnlyList<InstrumentTraceField> BinaryFields { get; init; } = [];
     }
-    internal static IReadOnlyList<Block> Decode(IReadOnlyList<TraceEntry> entries)
+    internal static IReadOnlyList<Block> Decode(IReadOnlyList<TraceEntry> entries, bool streaming = false)
     {
         var blocks = new List<Block>();
         var buffers = new Dictionary<TraceDirection, (MemoryStream Data, List<(int Offset, TraceEntry Entry)> Reads)>();
@@ -56,6 +56,24 @@ internal static class UfBinaryInterpreter
                 TraceEntry At(int offset) { var i = Array.BinarySearch(starts, offset); return value.Reads[i < 0 ? ~i - 1 : i].Entry; }
                 for (var i = 0; i < data.Length; i++)
                 {
+                    if (streaming && data[i] == 2)
+                    {
+                        var remaining = data.Length - i;
+                        // Preserve a possible partial header. Do not decode its embedded sub-envelope early.
+                        if (remaining < 9) break;
+                        if (data.AsSpan(i, 5).SequenceEqual(new byte[] { 2, 1, 0, 0, 0 }))
+                        {
+                            var declared = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(i + 5, 4));
+                            if (declared <= SubEnvelope.MaxPayloadBytes && declared + 10 > remaining) break;
+                        }
+                        else if (remaining < 45) break;
+                        else if (data.AsSpan(i + 36, 5).SequenceEqual(new byte[] { 2, 1, 0, 0, 0 })
+                            && CString(data.AsSpan(i + 1, 20)) is { Length: > 0 } && CString(data.AsSpan(i + 21, 12)) is { Length: > 0 })
+                        {
+                            var declared = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(i + 41, 4));
+                            if (declared <= Envelope.MaxPayloadBytes && declared + 46 > remaining) break;
+                        }
+                    }
                     var length = 0; var kind = ""; var fields = new Dictionary<string, string>(); var notices = new List<Notice>();
                     var binaryFields = new List<InstrumentTraceField>();
                     // Fixed outer header and a length-delimited sub-envelope. ETX inside the payload is data.
@@ -144,11 +162,13 @@ internal static class UfBinaryInterpreter
     internal static bool Recognizes(IReadOnlyList<TraceSegment> segments) => Decode(segments.Select((s, i) =>
         new TraceEntry(i, TimeSpan.Zero, s.Timestamp ?? DateTimeOffset.UnixEpoch, s.Direction, s.Data)).ToArray()).Any(b => b.Fields.ContainsKey("device.identifier") || b.Notices.Count > 0);
     internal static TraceInterpretation Interpret(IReadOnlyList<TraceEntry> entries, InstrumentRef instrument, Guid traceId)
+        => InterpretBlocks(entries, Decode(entries), instrument, traceId);
+    internal static TraceInterpretation InterpretBlocks(IReadOnlyList<TraceEntry> entries, IReadOnlyList<Block> blocks, InstrumentRef instrument, Guid traceId)
     {
         var messages = new List<InstrumentTraceMessage>(); var events = new List<InstrumentTraceEvent>(); var observations = new List<InstrumentObservation>(); var diagnostics = new List<AstmDiagnostic>();
         var source = entries.ToDictionary(e => e.Sequence);
         var identifiers = new Dictionary<TraceDirection, string>();
-        foreach (var block in Decode(entries))
+        foreach (var block in blocks)
         {
             var text = block.Notices.Count == 1 ? Meaning(block.Notices[0]) : block.Notices.Count > 1
                 ? new ProtocolExplanation(Vocabulary["uf.notice"], [string.Join(" · ", block.Notices.Select(n => n.Label))])

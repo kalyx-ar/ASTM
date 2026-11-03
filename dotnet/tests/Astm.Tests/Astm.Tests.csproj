@@ -10,6 +10,7 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../tools/Astm.Service.Host/Astm.Service.Host.csproj" />
     <ProjectReference Include="..\..\src\Astm.Operations\Astm.Operations.csproj" />
   </ItemGroup>
   <ItemGroup>

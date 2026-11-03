@@ -36,6 +36,7 @@ flowchart LR
 
 | Documento | Contenido |
 |---|---|
+| [SERVICIO-NEUTRAL](SERVICIO-NEUTRAL.md) | Servicio residente, IPC local versionado, callbacks confirmados, sesiones, operaciones, configuración y consumidor Python sintético |
 | [ESTANDARES](ESTANDARES.md) | Normas por capa, ediciones aceptadas y evidencia de manuales/trazas |
 | [ARQUITECTURA](ARQUITECTURA.md) | Responsabilidades, despliegues, plataformas, TLS, latencia |
 | [CONTRATOS](CONTRATOS.md) | Identidades, arbitraje, generaciones, transferencia de control, estados |

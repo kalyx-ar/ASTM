@@ -42,3 +42,16 @@ public interface IInstrumentTracePlugin : IInstrumentDiagnosticVocabulary, IMedi
     TraceInterpretation Interpret(InstrumentTraceProfile profile, IReadOnlyList<TraceEntry> entries,
         InstrumentRef instrument, Guid traceId, TimeZoneInfo timeZone);
 }
+
+/// <summary>Optional bounded incremental decoder. Feed never treats a read boundary as EOF.
+/// Complete is called only at the end of the actual source. Output contains new facts only.</summary>
+public interface IInstrumentTraceReader
+{
+    TraceInterpretation Feed(TraceEntry entry);
+    TraceInterpretation Complete();
+}
+public interface IInstrumentTraceStreamPlugin : IInstrumentTracePlugin
+{
+    IInstrumentTraceReader CreateReader(InstrumentTraceProfile profile, InstrumentRef instrument, Guid traceId,
+        TimeZoneInfo timeZone, int maxBufferedBytes);
+}

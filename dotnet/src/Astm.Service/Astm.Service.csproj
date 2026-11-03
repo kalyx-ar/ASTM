@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><Description>Neutral local IPC hosting for instrument sessions and acknowledged workflow/trace callbacks.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Astm.Runtime/Astm.Runtime.csproj" />
+    <ProjectReference Include="../Astm.Transport/Astm.Transport.csproj" />
+    <ProjectReference Include="../PortGate.Client/PortGate.Client.csproj" />
+  </ItemGroup>
+</Project>

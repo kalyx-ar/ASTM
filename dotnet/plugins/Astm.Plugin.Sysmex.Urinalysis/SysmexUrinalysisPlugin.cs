@@ -7,7 +7,7 @@ using Astm.Abstractions.Diagnostics;
 namespace Astm.Plugin.Sysmex.Urinalysis;
 
 /// <summary>One equipment-family plugin, with shared knowledge and separate protocol decoders.</summary>
-public sealed partial class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTracePlugin, ITraceLogAdapterProvider, IInstrumentKnowledge, IInstrumentValueKnowledge, IInstrumentHeaderProbe, IInstrumentMessageKnowledge, IInstrumentFlagKnowledge, IInstrumentCommandPlugin
+public sealed partial class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrumentTraceStreamPlugin, ITraceLogAdapterProvider, IInstrumentKnowledge, IInstrumentValueKnowledge, IInstrumentHeaderProbe, IInstrumentMessageKnowledge, IInstrumentFlagKnowledge, IInstrumentCommandPlugin
 {
     public IReadOnlyList<InstrumentCommandDescriptor> Commands(string profileId) => AstmOrderCommands.Describe(this, profileId);
     public IReadOnlyList<Lis02Record> BuildAstmCommand(string profileId, InstrumentCommandRequest request, DialectContext context) => AstmOrderCommands.Build(this, profileId, request, context);
@@ -19,13 +19,18 @@ public sealed partial class SysmexUrinalysisPlugin : IInstrumentPlugin, IInstrum
     private readonly UwamInterpreter astm;
     private readonly UrinalysisKnowledge knowledge = new();
     private readonly Uc3500Interpreter serial;
-    public SysmexUrinalysisPlugin(Uc3500CheckMode check = Uc3500CheckMode.Auto) { astm = new(knowledge); serial = new(check, knowledge); }
+    private readonly Uc3500CheckMode _checkMode;
+    public SysmexUrinalysisPlugin(Uc3500CheckMode check = Uc3500CheckMode.Auto) { _checkMode = check; astm = new(knowledge); serial = new(check, knowledge); }
     public PluginDescriptor Describe() => new(PluginId, "0.1.0", PluginApi.Version, "Sysmex",
         ["U-WAM (UF-3000/3000x/4000/5000, UC-1000/3500, UD-10)"], [.. astm.Describe().Evidence, .. serial.Describe().Evidence]);
     public IReadOnlyList<AstmProfile> Profiles => astm.Profiles;
     public IReadOnlyList<InstrumentTraceProfile> TraceProfiles => [.. serial.Profiles, UfBinaryInterpreter.Profile];
     IReadOnlyList<InstrumentTraceProfile> IInstrumentTracePlugin.Profiles => TraceProfiles;
     public IReadOnlyList<ITraceLogAdapter> LogAdapters => astm.LogAdapters;
+    public IInstrumentTraceReader CreateReader(InstrumentTraceProfile profile, InstrumentRef instrument, Guid traceId, TimeZoneInfo zone, int maxBufferedBytes) =>
+        profile.Id == Uc3500Profile ? new Uc3500StreamReader(serial, _checkMode, instrument, traceId, zone)
+        : profile.Id == UfBinaryProfile ? new UfStreamReader(instrument, traceId, maxBufferedBytes)
+        : throw new ArgumentException("Unknown trace profile.", nameof(profile));
     public IReadOnlyDictionary<string, ProtocolText> DiagnosticVocabulary => knowledge.Vocabulary;
     public IAstmDialect CreateDialect(AstmProfile profile, DialectContext context) => astm.CreateDialect(profile, context);
     public bool Recognizes(InstrumentTraceProfile profile, IReadOnlyList<TraceSegment> segments) => profile.Id == UfBinaryProfile

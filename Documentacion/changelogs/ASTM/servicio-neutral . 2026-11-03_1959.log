@@ -1,0 +1,61 @@
+Tarea: servicio .NET neutral de comunicaciones, autorizado por el usuario el 2026-11-03.
+Autorización: implementar dentro de ASTM, agnóstico; el anfitrión conserva su orquestador
+de negocio y persistencia. Alcance registrado antes de editar en SERVICIO-NEUTRAL.md.
+Sin issue ASTM nuevo por orden expresa de no crear issues/PR ni hacer push.
+Commit: el que incorpora este registro, feat: alojar comunicaciones neutrales mediante IPC local.
+Base comprobada limpia: main, 5d5e67b6e151d7b0b3b978532d4f5fe86c78b7a0, bibliotecas 0.6.6.
+Rama local: codex/servicio-neutral. No es un release ni una publicación NuGet.
+
+Rutas: dotnet/src/Astm.Service; dotnet/tools/Astm.Service.Host; solución/tests;
+lectores incrementales y estado UC/UF del plugin Sysmex; observador médico;
+colas acotadas de AstmInstrumentSession y PortGateChannel; documentación/ejemplos.
+No se modificó código EDC, Aclimu, Identidades ni funciones protegidas.
+
+Contrato astm-service/1.0: IPC OS local, versionado, multiplexado y acotado;
+catálogo/contratos/conocimiento completos, sesiones de larga vida, exclusión entre
+procesos, COM/TCP/PortGate y contenido completo del anfitrión; operaciones FIFO,
+cancelación/estado, correlaciones y observación. Consultas con plazo, ingestión
+canónica íntegra, preparación de trazas antes del transporte y confirmación de
+cada entrada. Decimal exacto como cadena y schemas de salida IPC separados.
+Sin spool, DB, ORM, carpetas/watchers ni reglas clínicas. No repetir operaciones
+inciertas; cierre de canal ante pérdida/cancelación en curso, recuperación en el host.
+ARCHITECT mantiene R24, INR/U06 e INU/U05 con sus límites; no inicia calibración
+ni consulta curvas históricas. Todos los perfiles se descubren sin consumidor.
+
+Verificaciones realmente ejecutadas, Windows, .NET SDK 10.0.402 / runtime 10.0.13:
+- dotnet test dotnet/Astm.slnx, pasada final: 601 correctas, 0 fallidas, una omitida,
+  13 s informados por el runner. Repetición --no-build --no-restore: mismo resultado,
+  13 s. Omisión prevista por traza privada; no se accedió a trazas/manuales externos.
+  Son 23 nuevos casos de servicio/lectura incremental; además corren los existentes.
+- CTest Release win-x64 repetido: 2/2, 8,28 y 7,97 s reales; sin omisiones ni timeouts.
+- Publish NativeAOT win-x64 con AstmRequireStrongName=true: correcto, sin advertencias.
+- Ejecución real de publish/astm-service.exe con consumidor Python 3.12.14 por pipe:
+  catálogo y descripción de 14 perfiles/contratos, inventario sintético conservado,
+  Deferred -> AE, proceso independiente y stop ordenado con código 0.
+- Carga acotada del mismo ejecutable: 10.000 mensajes sintéticos secuenciales en
+  una sesión, 16,915 s del recorrido del consumidor y parada; sin datos reales.
+  El sink de demostración es memoria; no acredita custodia durable, carga extrema,
+  desempeño de equipos físicos ni estabilidad de varios días. No se fija un SLO.
+- Comprobaciones privadas locales adicionales correctas, fuentes/resultados
+  específicos conservados en artifacts ignorado, sin incorporarlos a Git.
+- Python demo: sintaxis y ejecución comprobadas. Ejemplo sin SDK/negocio y sin
+  paquetes Python externos; E/S solapada Win32 mediante ctypes / AF_UNIX en POSIX.
+- git diff --check correcto. Sin nuevas dependencias externas ni cambios de
+  versión de paquetes; no se silenciaron advertencias ni se cambió confianza.
+
+Salida local NativeAOT, previa al commit (no distribución publicada):
+dotnet/tools/Astm.Service.Host/bin/Release/net10.0/win-x64/publish/astm-service.exe
+SHA-256 A36C89B9D6A996CC5A5C2D93D6675625978B9D3A0870A6E96730E1C81BE9FDA8
+Astm.Service.dll y astm-service.dll administradas: 0.6.6.0, token 066190a23251f202.
+Token inspeccionado; la compilación exige la SNK de distribución existente, fuera
+del repositorio. No se generó/copió una clave de firma. Ejecutable Authenticode:
+NotSigned. No se crearon paquetes NuGet ni firmas de release.
+
+Límites: ejecución Linux y COM/hardware no realizadas; tampoco ensayo de varios
+días ni homologación. Custodia durable, outbox/inbox de negocio, deduplicación,
+reconciliación y aceptación clínica se implementan/validan en cada anfitrión.
+La prueba privada no se presenta como auditoría completa o aprobación productiva.
+No se instalaron servicios, drivers ni certificados; no se cambió Secure Boot,
+test signing o confianza. Sin push, issue/PR nuevo, ZIP ni cambios a otros repositorios.
+Estado final: implementación local funcional, pruebas y contrato completos para
+revisión; validaciones operativas y firma de release expresamente pendientes.

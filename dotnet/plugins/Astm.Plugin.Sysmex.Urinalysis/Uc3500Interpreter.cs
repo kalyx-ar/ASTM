@@ -66,6 +66,16 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
     {
         if (profile.Id != ProfileId) throw new ArgumentException("Unknown UC-3500 profile.", nameof(profile));
         var decoder = Decode(entries, checkMode);
+        return InterpretDecoded(decoder, new(), instrument, traceId, timeZone);
+    }
+    internal sealed class InterpretationState
+    {
+        public (string Id, string Position, long Sequence)? Query;
+        public (string Id, string Position, string Strip, long Sequence, Guid OperationId)? Order;
+    }
+    internal TraceInterpretation InterpretDecoded(Uc3500WireDecoder decoder, InterpretationState state,
+        InstrumentRef instrument, Guid traceId, TimeZoneInfo timeZone)
+    {
         var messages = new List<InstrumentTraceMessage>(); var events = new List<InstrumentTraceEvent>();
         var observations = new List<InstrumentObservation>(); var findings = new List<AstmDiagnostic>();
         var timings = new List<InstrumentTraceTiming>();
@@ -80,8 +90,8 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
                 new(knowledge.Lookup(new(ProfileId, "control", "code"), code)!.Text, [])));
         }
         foreach (var error in decoder.Errors) Finding(error.Code, error.Sequence);
-        (string Id, string Position, long Sequence)? query = null;
-        (string Id, string Position, string Strip, long Sequence, Guid OperationId)? order = null;
+        var query = state.Query;
+        var order = state.Order;
         foreach (var packet in decoder.Packets.OrderBy(p => p.Last))
         {
             var code = Code(packet.Text); var fields = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -187,6 +197,7 @@ internal sealed partial class Uc3500Interpreter(Uc3500CheckMode checkMode, IInst
         }
         if (query is not null || order is not null) Finding("PENDING", order?.Sequence ?? query!.Value.Sequence);
         if (order is { } pending) timings.Add(new(InstrumentTimingKind.Response, "uc3500.order-response", pending.Sequence, null));
+        state.Query = query; state.Order = order;
         return new(messages, events.OrderBy(e => e.LastSequence).ToArray(), observations, findings) { Timings = timings, OperationReceipts = operations };
     }
     private static DateTimeOffset? ParseTime(string date, string time, TimeZoneInfo zone)

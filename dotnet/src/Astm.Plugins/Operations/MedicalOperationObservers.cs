@@ -218,11 +218,18 @@ public static class MedicalOperationObservers
         private readonly List<TraceEntry> _entries = [];
         private readonly HashSet<string> _applied = new(StringComparer.Ordinal);
         private int _bytes;
+        private IInstrumentTraceReader? _reader;
         public ContentObserver(IMedicalOperations adapter, IInstrumentTracePlugin? plugin, MedicalOperationContext context, Guid traceId) : base(traceId)
-        { _adapter = adapter; _plugin = plugin; _context = context; }
-        protected override void Reset() { _entries.Clear(); _applied.Clear(); _bytes = 0; }
+        { _adapter = adapter; _plugin = plugin; _context = context; Reset(); }
+        protected override void Reset()
+        {
+            _entries.Clear(); _applied.Clear(); _bytes = 0;
+            _reader = _plugin is IInstrumentTraceStreamPlugin streaming ? streaming.CreateReader(streaming.Profiles.Single(p => p.Id == _adapter.Profile.Id),
+                _context.Instrument, TraceId, TimeZoneInfo.Utc, 1024 * 1024) : null;
+        }
         protected override void OnEntry(TraceEntry entry)
         {
+            if (_reader is not null) { Apply(_reader.Feed(entry), entry.Sequence); return; }
             _bytes += entry.Data.Length;
             if (_bytes > 16 * 1024 * 1024) { Invalidate(); return; }
             _entries.Add(entry with { Data = entry.Data.ToArray() });
@@ -230,18 +237,23 @@ public static class MedicalOperationObservers
             { Record(Key(TraceId, "import"), MedicalPurposes.ImportContent, OperationState.Running, entry.Sequence, "medical.import.reading", OperationEvidence.Transport, false, OperationCompletionScope.ContentImport); return; }
             var profile = _plugin!.Profiles.Single(p => p.Id == _adapter.Profile.Id);
             var decoded = _plugin.Interpret(profile, _entries, _context.Instrument, TraceId, TimeZoneInfo.Utc);
+            Apply(decoded, entry.Sequence);
+        }
+        private void Apply(TraceInterpretation decoded, long sequence)
+        {
             foreach (var receipt in decoded.OperationReceipts)
-                if (_applied.Add(receipt.OperationId + ":" + receipt.Sequence + ":" + receipt.State)) Tracker.Record(receipt);
+                if (_reader is not null || _applied.Add(receipt.OperationId + ":" + receipt.Sequence + ":" + receipt.State)) Tracker.Record(receipt);
             Tracker.SetLink(decoded.Diagnostics.Any(d => d.Code.EndsWith("INCOMPLETE", StringComparison.Ordinal)));
             foreach (var message in decoded.Messages.Where(m => m.Fields.GetValueOrDefault("record.valid") == "True"))
                 Record(Key(TraceId, "record:" + message.FirstSequence + ":" + message.Code), MedicalPurposes.ObserveMessages,
                     OperationState.Completed, message.LastSequence, "medical.record.received", OperationEvidence.Transport);
             // A proprietary message boundary/ER response does not establish physical or channel-idle semantics.
-            Record(Key(TraceId, "unknown-boundary"), MedicalPurposes.ObserveMessages, OperationState.Unknown, entry.Sequence,
+            Record(Key(TraceId, "unknown-boundary"), MedicalPurposes.ObserveMessages, OperationState.Unknown, sequence,
                 "medical.protocol.operation-boundary-unproven", OperationEvidence.None);
         }
         protected override void OnEnd()
         {
+            if (_reader is not null) { _reader.Complete(); return; }
             if (_adapter.Profile.Format != "content" || _entries.Count == 0 || Invalid) return;
             var result = _adapter.Decode(_entries.SelectMany(e => e.Data.ToArray()).ToArray(), new(TraceId, _entries[0].Sequence, _entries[^1].Sequence), TimeZoneInfo.Utc);
             Record(Key(TraceId, "import"), MedicalPurposes.ImportContent,
