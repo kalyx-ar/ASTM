@@ -1,7 +1,5 @@
 # ASTM
 
-Nombre vigente en Alpha: ASTM, paquetes `Astm.*` 0.3.0. [Rutas, formatos y alcance del renombrado](Documentacion/RENOMBRADO-ASTM.md).
-
 Neutral integration of clinical laboratory instruments: PortGate (a protocol-agnostic serial ↔ TCP agent, administered by ASTM), a generic engine for the laboratory protocols (CLSI LIS01-A2 / LIS02-A2, a.k.a. ASTM E1381 / E1394; HL7 v2 MLLP) and vendor plugins. Any LIS/LIMS hosts it by implementing one port, `ILabWorkflowHost`.
 
 Agents: [AGENTS.md](AGENTS.md) · pending work: [Documentacion/CONTINUACION.md](Documentacion/CONTINUACION.md) · documentation (Spanish): [Documentacion/README.md](Documentacion/README.md) · status: [Documentacion/ESTADO.md](Documentacion/ESTADO.md) · wire protocol: [spec/link-v1.md](spec/link-v1.md).
