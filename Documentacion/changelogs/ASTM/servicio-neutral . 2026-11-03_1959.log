@@ -9,7 +9,7 @@ Rama local: codex/servicio-neutral. No es un release ni una publicación NuGet.
 Rutas: dotnet/src/Astm.Service; dotnet/tools/Astm.Service.Host; solución/tests;
 lectores incrementales y estado UC/UF del plugin Sysmex; observador médico;
 colas acotadas de AstmInstrumentSession y PortGateChannel; documentación/ejemplos.
-No se modificó código EDC, Aclimu, Identidades ni funciones protegidas.
+No se modificó código EDC, de otros anfitriones, Identidades ni funciones protegidas.
 
 Contrato astm-service/1.0: IPC OS local, versionado, multiplexado y acotado;
 catálogo/contratos/conocimiento completos, sesiones de larga vida, exclusión entre

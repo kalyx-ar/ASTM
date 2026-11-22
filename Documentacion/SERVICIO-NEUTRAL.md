@@ -10,7 +10,7 @@ anfitrión. No se crean issues/PR ni se hace push (AGENTS ASTM, regla 6).
 Se alojan los perfiles compilados, motores, sesiones, transportes y observadores
 existentes. El anfitrión conserva negocio, persistencia, custodia protegida,
 deduplicación, cola durable y reconciliación. No se agrega un spool ni una base.
-No se toca EDC, Aclimu, funciones de Identidades, claves, equipos ni datos reales.
+No se toca EDC, otros anfitriones, funciones de Identidades, claves, equipos ni datos reales.
 Sin dependencias nuevas: BCL y proyectos existentes de esta solución.
 
 Verificaciones requeridas: contrato IPC y callbacks con simuladores, preparación
