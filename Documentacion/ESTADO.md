@@ -1,5 +1,26 @@
 # Estado de la implementación
 
+2026-11-22, rama `feat/servicio-administracion` (sin push): el servicio neutral
+suma, de forma aditiva dentro de `astm-service/1.0`, `gateways.list` (agentes
+PortGate y sus puertos, parámetros serie anunciados, semáforo si se observa e
+instrumentos que los usan; nunca adquiere ni configura) y la configuración
+autenticada: `admin.challenge`/`admin.authenticate` (firma ECDSA P-256 de un
+principal declarado en el archivo local), `instruments.list/put/remove` y
+`gateways.put/remove` con revisión, validación contra perfiles y transportes,
+verificación contra PortGate sin `SetConfig`, auditoría JSON Lines y escritura
+atómica del archivo de configuración. `PortGate.Client` agrega
+`PortGateDiscovery`. Diseño: [ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md).
+Análisis sin implementar: [IDENTIFICACION-ASISTIDA](IDENTIFICACION-ASISTIDA.md).
+
+Evidencia local: `dotnet test dotnet/Astm.slnx` **625 correctas y una omitida**
+(traza privada), repetida (14/13 s), con 21 casos nuevos, incluidos los de
+PortGate real (`PORTGATE_EXE` del build del checkout principal, mismo C++ que
+`be737c4`). CTest 2/2 repetido (7,67/7,73 s). **NativeAOT no verificado:** la
+publicación falla antes de compilar porque la auditoría NuGet trata como error
+el aviso alto GHSA-p3jp-9v83-76w9 de `Microsoft.DotNet.ILCompiler` 10.0.13
+(NU1903); actualizar el SDK/ILCompiler requiere aprobación humana. Sin
+dependencias nuevas, sin cambios en PortGate C++, sin datos reales.
+
 2026-11-03: [servicio neutral local](SERVICIO-NEUTRAL.md) implementado, contrato
 `astm-service/1.0`. `Astm.Service` reutiliza motores y contratos; `astm-service`
 compone 14 perfiles, sin dependencia de un LIS, Diagnostics o Python.NET.

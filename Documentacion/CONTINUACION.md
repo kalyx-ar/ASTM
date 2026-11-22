@@ -1,5 +1,18 @@
 # Continuación del trabajo
 
+2026-11-22: listado de PortGate y administración autenticada del servicio
+implementados en la rama `feat/servicio-administracion`, sin push ni PR. Leer
+[ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md). Pendientes:
+
+- Publicar paquetes con versión nueva (sugerida 0.7.0: API pública nueva en
+  `Astm.Service` y `PortGate.Client`) cuando el responsable lo pida.
+- Verificar NativeAOT de `astm-service` cuando se apruebe actualizar el SDK o
+  `Microsoft.DotNet.ILCompiler` (hoy NU1903 por GHSA-p3jp-9v83-76w9).
+- Consumidor: el anfitrión genera el par de claves del principal, guarda la
+  privada en su custodia y se da de alta la pública en `administration`.
+- Identificación asistida: propuesta `profiles.suggest` en
+  [IDENTIFICACION-ASISTIDA](IDENTIFICACION-ASISTIDA.md); requiere aprobación.
+
 2026-11-03: servicio neutral implementado localmente. Leer
 [SERVICIO-NEUTRAL](SERVICIO-NEUTRAL.md) para contrato `astm-service/1.0`, arranque,
 parada, configuración y consumidor Python. Catálogo completo, motores/sesiones
