@@ -27,6 +27,8 @@ ensayo de varios días con presupuestos/recursos medidos y firma de release.
 La persistencia protegida/transaccional del anfitrión y su integración se
 validan en ese anfitrión; la demostración usa únicamente memoria y sintéticos.
 
+0.6.7, 2026-11-22: `Lis02Record` y `Hl7Segment` parten cada campo en repeticiones una sola vez y reutilizan el resultado; leer todas las repeticiones de un campo cuesta lo mismo que el campo. Veintidós paquetes 0.6.7 firmados con la clave de la distribución, compilados en Debug.
+
 Incremento #205, 2026-11-02, 0.6.6: [inspección de pacientes y resultados](INSPECCION-DE-MENSAJES.md) en el detalle de Mensajes. Contrato opcional por plugin; nueve perfiles LIS02/HL7 con campos originales/decodificados, fuentes, desconocidos y contexto estructural independiente entre pacientes/muestras/mensajes. Sin importar pacientes, aceptar resultados o inferir demografía sin mapa. UC/UF y CFX conservan sus lectores propios. Evidencia final de pruebas y salidas reales en el changelog de este incremento.
 
 Validación 0.6.6: 578 correctas/una omitida por traza privada, repetidas (13/12 s); Lang real una correcta (343 ms), incluyendo nuevas etiquetas y conservación del catálogo común; CTest repetido 2/2 (9,23/9,81 s). NativeAOT CLI/self-test y GUI MAUI autónoma/self-test de selección de Mensajes correctos, con auditoría de publicación. Fuente/paquetes desde `3ef9529f91d94850dbd7ebdad1e9c45941c127e2`; GUI `0.6.6+3ef9529f91d94850dbd7ebdad1e9c45941c127e2`. Veintidós paquetes/DLL propios con versión 0.6.6.0/token 066190a23251f202, NuGet sin firma/Authenticode NotSigned. Cinco CS8002 de MAUI oficial conservadas sin cambios de confianza.
