@@ -527,13 +527,13 @@ public sealed class PortGateChannel : IAsyncDisposable
         }
     }
 
-    private static async Task WriteAsync(Stream stream, LinkUnit unit, CancellationToken cancellationToken)
+    internal static async Task WriteAsync(Stream stream, LinkUnit unit, CancellationToken cancellationToken)
     {
         await stream.WriteAsync(unit.Encode(), cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<LinkUnit> ReceiveAsync(Stream stream, LinkDecoder decoder, List<LinkUnit> units, LinkType type, CancellationToken cancellationToken)
+    internal static async Task<LinkUnit> ReceiveAsync(Stream stream, LinkDecoder decoder, List<LinkUnit> units, LinkType type, CancellationToken cancellationToken)
     {
         var buffer = new byte[4096];
         while (true)
