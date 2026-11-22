@@ -1,5 +1,14 @@
 # Estado de la implementación
 
+0.7.0, 2026-11-22: listado de agentes y puertos PortGate y administración
+autenticada del servicio neutral ([ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md)),
+extensión aditiva de `astm-service/1.0`. Veintitrés paquetes 0.7.0 en Release,
+Strong Name con la clave de la distribución (token `066190a23251f202`): los
+veintidós de siempre más `Astm.Service`, que contiene la API nueva. NuGet sin
+firma y DLL Authenticode NotSigned. SHA-256 de paquetes y DLL en
+`verification-0.7.0.json` junto a los paquetes del feed local. Suite repetida
+625 correctas/una omitida (14/15 s) y CTest 2/2 (9,91/9,61 s) con la versión 0.7.0.
+
 2026-11-22, rama `feat/servicio-administracion` (sin push): el servicio neutral
 suma, de forma aditiva dentro de `astm-service/1.0`, `gateways.list` (agentes
 PortGate y sus puertos, parámetros serie anunciados, semáforo si se observa e

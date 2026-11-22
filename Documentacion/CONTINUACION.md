@@ -4,8 +4,8 @@
 implementados en la rama `feat/servicio-administracion`, sin push ni PR. Leer
 [ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md). Pendientes:
 
-- Publicar paquetes con versión nueva (sugerida 0.7.0: API pública nueva en
-  `Astm.Service` y `PortGate.Client`) cuando el responsable lo pida.
+- Paquetes 0.7.0 generados (API pública nueva en
+  `Astm.Service` y `PortGate.Client`); ver ESTADO.
 - Verificar NativeAOT de `astm-service` cuando se apruebe actualizar el SDK o
   `Microsoft.DotNet.ILCompiler` (hoy NU1903 por GHSA-p3jp-9v83-76w9).
 - Consumidor: el anfitrión genera el par de claves del principal, guarda la

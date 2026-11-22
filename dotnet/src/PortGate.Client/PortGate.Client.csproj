@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.6.7</Version>
+    <Version>0.7.0</Version>
     <Description>PortGate client: Link (semaphore, handover, kill switch, contest), administration, and an Astm.Transport provider that hands an ASTM session the Stream of a port behind the tunnel with the same serial settings as a local COM.</Description>
   </PropertyGroup>
   <ItemGroup>
