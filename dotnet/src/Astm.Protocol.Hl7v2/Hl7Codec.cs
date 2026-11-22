@@ -45,10 +45,12 @@ public sealed record Hl7Delimiters(char Field = '|', char Component = '^', char 
 public sealed class Hl7Segment
 {
     private readonly string[] _fields;
+    private readonly IReadOnlyList<string>?[] _repetitions;
     public Hl7Segment(string raw, Hl7Delimiters delimiters)
     {
         Raw = raw; Delimiters = delimiters; _fields = raw.Split(delimiters.Field);
         Name = _fields[0];
+        _repetitions = new IReadOnlyList<string>?[_fields.Length];
     }
     public string Name { get; }
     public string Raw { get; }
@@ -61,12 +63,19 @@ public sealed class Hl7Segment
         return index < _fields.Length ? _fields[index] : string.Empty;
     }
     public bool IsNull(int number) => Field(number) == "\"\"";
-    public IReadOnlyList<string> Repetitions(int number) => Field(number).Split(Delimiters.Repeat);
+    /// <summary>Repetitions of a field. Each field is split once and reused, so reading every repetition stays linear in the field length.</summary>
+    public IReadOnlyList<string> Repetitions(int number)
+    {
+        if (number < 1) throw new ArgumentOutOfRangeException(nameof(number));
+        var index = Name == "MSH" ? number - 1 : number;
+        if ((Name == "MSH" && number == 1) || index >= _fields.Length) return Field(number).Split(Delimiters.Repeat);
+        return _repetitions[index] ??= Array.AsReadOnly(_fields[index].Split(Delimiters.Repeat));
+    }
     public string Text(int field, int component = 1, int repetition = 1, int subcomponent = 0)
     {
         if (component < 1 || repetition < 1 || subcomponent < 0) throw new ArgumentOutOfRangeException(nameof(component));
-        var repeats = Field(field).Split(Delimiters.Repeat);
-        var components = (repetition <= repeats.Length ? repeats[repetition - 1] : string.Empty).Split(Delimiters.Component);
+        var repeats = Repetitions(field);
+        var components = (repetition <= repeats.Count ? repeats[repetition - 1] : string.Empty).Split(Delimiters.Component);
         var value = component <= components.Length ? components[component - 1] : string.Empty;
         if (subcomponent > 0)
         {

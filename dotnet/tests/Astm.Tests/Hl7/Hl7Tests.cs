@@ -37,6 +37,21 @@ public class Hl7Tests
     }
 
     [Fact]
+    public void Splits_each_field_once_when_reading_every_repetition()
+    {
+        const int count = 4000;
+        var segment = new Hl7Segment("INV|" + string.Join('~', Enumerable.Range(0, count).Select(i => "C" + i + "^T" + i)), Hl7Delimiters.Default);
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var codes = segment.Repetitions(1).Select((_, i) => segment.Text(1, 2, repetition: i + 1)).ToList();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(count, codes.Count);
+        Assert.Equal("T3999", codes[^1]);
+        Assert.True(allocated < 8 * 1024 * 1024, $"{allocated} bytes");
+    }
+
+    [Fact]
     public void Escapes_preserve_unknown_extensions_and_do_not_inject_segments()
     {
         var d = Hl7Delimiters.Default;
