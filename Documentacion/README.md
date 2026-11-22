@@ -37,6 +37,8 @@ flowchart LR
 | Documento | Contenido |
 |---|---|
 | [SERVICIO-NEUTRAL](SERVICIO-NEUTRAL.md) | Servicio residente, IPC local versionado, callbacks confirmados, sesiones, operaciones, configuración y consumidor Python sintético |
+| [ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md) | Listado de agentes y puertos PortGate por IPC; alta, edición y baja autenticada de instrumentos y agentes, con auditoría y escritura atómica |
+| [IDENTIFICACION-ASISTIDA](IDENTIFICACION-ASISTIDA.md) | Análisis (sin implementar): sugerir el perfil de un equipo a partir del H de ASTM/LIS2 o el MSH de HL7 |
 | [ESTANDARES](ESTANDARES.md) | Normas por capa, ediciones aceptadas y evidencia de manuales/trazas |
 | [ARQUITECTURA](ARQUITECTURA.md) | Responsabilidades, despliegues, plataformas, TLS, latencia |
 | [CONTRATOS](CONTRATOS.md) | Identidades, arbitraje, generaciones, transferencia de control, estados |

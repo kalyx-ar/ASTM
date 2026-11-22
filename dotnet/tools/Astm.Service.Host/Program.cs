@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using Astm.Service;
 using Astm.Service.Host;
 using System.IO.Pipes;
@@ -43,10 +42,10 @@ using var term = !OperatingSystem.IsWindows() ? PosixSignalRegistration.Create(P
 { context.Cancel = true; stop.Cancel(); }) : null;
 try
 {
-    await using var input = File.OpenRead(args[1]);
-    var configuration = await JsonSerializer.DeserializeAsync(input, ServiceJson.Type<ServiceConfiguration>(), stop.Token)
-        ?? throw new ServiceException("configuration.required");
-    await using var service = new CommunicationService(configuration, BundledServiceProfiles.Create());
+    // The same file receives the authenticated IPC changes (atomic replace), when `administration` is configured.
+    var store = new FileServiceConfigurationStore(args[1]);
+    var configuration = store.Load();
+    await using var service = new CommunicationService(configuration, BundledServiceProfiles.Create(), store: store);
     using var shutdown = service.Stopping.Register(stop.Cancel);
     await using var listener = new LocalIpcListener(configuration.Endpoint, configuration.OwnershipDirectory);
     var clients = new List<Task>();

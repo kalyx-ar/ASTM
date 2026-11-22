@@ -372,6 +372,10 @@ public sealed class ServiceTests
             {
                 Ok value => ServiceJson.Element(value), ProfileRequest value => ServiceJson.Element(value), OpenSessionRequest value => ServiceJson.Element(value),
                 ContentRequest value => ServiceJson.Element(value), OperationEnvelope value => ServiceJson.Element(value), OperationKey value => ServiceJson.Element(value),
+                GatewayListRequest value => ServiceJson.Element(value), AdminAuthenticateRequest value => ServiceJson.Element(value),
+                InstrumentPutRequest value => ServiceJson.Element(value), InstrumentRemoveRequest value => ServiceJson.Element(value),
+                GatewayPutRequest value => ServiceJson.Element(value), GatewayRemoveRequest value => ServiceJson.Element(value),
+                JsonElement value => value,
                 _ => throw new NotSupportedException(),
             };
             var id = Guid.NewGuid(); var completion = new TaskCompletionSource<IpcEnvelope>(TaskCreationOptions.RunContinuationsAsynchronously);

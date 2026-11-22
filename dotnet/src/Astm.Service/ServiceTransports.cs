@@ -111,7 +111,7 @@ public sealed class ServiceTransportFactory : IServiceTransportFactory
             finally { await second.DisposeAsync().ConfigureAwait(false); }
         }
     }
-    private static TlsOptions? Tls(TransportConfiguration target)
+    internal static TlsOptions? Tls(TransportConfiguration target)
     {
         if (!target.Tls)
         {

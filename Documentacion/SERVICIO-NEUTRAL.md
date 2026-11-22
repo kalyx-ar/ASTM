@@ -114,6 +114,17 @@ ni Python.NET.
 | `operations.cancel` | `operationId` | Cancelación de cola; si ya está en curso, detiene la sesión y conserva incertidumbre |
 | `operations.forget` | `operationId` | Retira un registro terminal después de que el anfitrión lo haya persistido; el ID queda retirado para el consumidor |
 | `requests.cancel` | `requestId` | Cancela una petición pendiente de esta conexión; no equivale a cancelar una intención física ya admitida |
+| `instruments.list` | `{}` | Revisión, instrumentos y agentes PortGate configurados |
+| `gateways.list` | `{}` o `gatewayIds` | Agentes PortGate y sus puertos: dispositivo, parámetros serie anunciados, semáforo si se observa e instrumentos que los usan. No adquiere ni configura |
+| `admin.challenge`, `admin.authenticate` | `{}`; `principalId`, `signature` | Autenticación de un principal por firma ECDSA P-256 sobre un nonce de un solo uso. Sólo con `administration` |
+| `instruments.put`, `instruments.remove` | `revision` y el instrumento o su ID | Alta, edición y baja validadas, verificadas contra PortGate, auditadas y persistidas de forma atómica. Derecho `instruments` |
+| `gateways.put`, `gateways.remove` | `revision` y el agente o su ID | Alta, edición y baja de agentes PortGate. Derecho `gateways` |
+
+Las seis últimas filas son una extensión aditiva del 2026-11-22: `v` y `protocol`
+no cambian; el cliente usa un método sólo si `service.hello` lo anuncia en
+`methods` (los de administración, sólo si está habilitada). Un método desconocido
+responde `method.unsupported`. Diseño, validaciones, auditoría y riesgos:
+[ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md).
 
 El estado de sesión es `Opening`, `Running`, `Ended`, `Stopped`, `Faulted` o
 `Closed`. `LastProgressUtc`/`LastTraceSequence` avanzan cuando la custodia confirma
@@ -246,10 +257,16 @@ Los diagnósticos genéricos sólo contienen códigos/tipos de error, sin payloa
 ### Transportes configurados
 
 `transport.kind` admite `messages`, `serial`, `tcp`, `tcp-listen` y `portgate`.
-Los parámetros de conexión sólo se leen de la configuración local, nunca de una
-petición IPC arbitraria. `serial` usa `portName` y `serial` (o valores documentados
+Los parámetros de conexión sólo se leen de la configuración local del servicio,
+nunca de una petición IPC arbitraria. Desde el 2026-11-22 esa configuración local
+también puede cambiarla un principal autenticado y autorizado con
+`instruments.put`/`gateways.put`, que la validan, la auditan y la escriben de forma
+atómica en el mismo archivo ([ADMINISTRACION-SERVICIO](ADMINISTRACION-SERVICIO.md));
+`sessions.open` sigue eligiendo sólo un instrumento ya configurado.
+`serial` usa `portName` y `serial` (o valores documentados
 del perfil). TCP usa `host`/`port`; el listener requiere dirección IP numérica.
-PortGate agrega `portId`, configura su controller como `astm-service/<instrumentId>`
+PortGate agrega `portId` y `host`/`port` o `gatewayId` (un agente de `gateways`),
+configura su controller como `astm-service/<instrumentId>`
 y comprueba la configuración serial anunciada. Un desacuerdo falla: no ejecuta
 `SetConfig` ni modifica silenciosamente el agente.
 

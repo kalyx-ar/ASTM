@@ -37,7 +37,28 @@ public sealed record ServiceLimits
 public sealed record ServiceConfiguration(string Endpoint, string OwnershipDirectory, IReadOnlyList<InstrumentConfiguration> Instruments)
 {
     public ServiceLimits Limits { get; set; } = new();
+    /// <summary>Incremented by every IPC change (optimistic concurrency of the administration methods).</summary>
+    public long Revision { get; init; }
+    public IReadOnlyList<GatewayConfiguration> Gateways { get; init; } = [];
+    /// <summary>Without it there is no IPC write access. Principals and rights are only granted in this local file.</summary>
+    public AdministrationConfiguration? Administration { get; init; }
 }
+/// <summary>A PortGate agent (Link endpoint). Instruments reference it by <see cref="TransportConfiguration.GatewayId"/>.</summary>
+public sealed record GatewayConfiguration(string Id, string Host, int Port)
+{
+    public bool Tls { get; init; }
+    public string? CertificateSha256 { get; init; }
+    public string? TlsTargetHost { get; init; }
+    public string? ClientCertificatePath { get; init; }
+    /// <summary>Controller id used to inspect the agent; sessions keep <c>astm-service/&lt;instrumentId&gt;</c>.</summary>
+    public string ControllerId { get; init; } = "astm-service/discovery";
+    /// <summary>Ask for the semaphore of every port when listing (needs the observe right; the agent records it).</summary>
+    public bool Observe { get; init; }
+    public int ConnectTimeoutMs { get; init; } = 10000;
+}
+public sealed record AdministrationConfiguration(string AuditPath, IReadOnlyList<AdminPrincipal> Principals);
+/// <summary>ECDSA P-256 public key (SubjectPublicKeyInfo, Base64); the private key stays with the host.</summary>
+public sealed record AdminPrincipal(string Id, string PublicKey, IReadOnlyList<string> Rights);
 public sealed record InstrumentConfiguration(string Id, string ProfileId, TransportConfiguration Transport)
 {
     public int? QueryBudgetMs { get; init; }
@@ -51,6 +72,8 @@ public sealed record TransportConfiguration(string Kind)
     public string? Host { get; init; }
     public int Port { get; init; }
     public string? PortId { get; init; }
+    /// <summary>PortGate agent of <see cref="ServiceConfiguration.Gateways"/>; excludes Host/Port/TLS fields.</summary>
+    public string? GatewayId { get; init; }
     public string? TlsTargetHost { get; init; }
     public string? CertificateSha256 { get; init; }
     public string? ClientCertificatePath { get; init; }
@@ -104,6 +127,55 @@ public sealed record TraceAppendReply(Guid TraceId, long Sequence, bool Stored);
 public sealed record CancelRequest(Guid RequestId);
 public sealed record Ok(bool Success = true);
 
+// Additive methods of astm-service/1.0 (Documentacion/ADMINISTRACION-SERVICIO.md); announced in service.hello methods.
+public sealed record GatewayListRequest(IReadOnlyList<string>? GatewayIds = null);
+public sealed record GatewayListing(long Revision, IReadOnlyList<GatewayView> Gateways);
+public sealed record GatewayView(string Id, string Host, int Port, bool Tls, bool Implicit, bool Reachable)
+{
+    public string? Code { get; init; }
+    public string? AgentId { get; init; }
+    public Guid? AgentEpoch { get; init; }
+    public string? Platform { get; init; }
+    public bool? ObserverSoftKill { get; init; }
+    public IReadOnlyList<GatewayPortView> Ports { get; init; } = [];
+}
+public sealed record GatewayPortView(string PortId, string? InstrumentId, string Ownership, string TraceCapture, int MaxWriteBytes,
+    bool QueuedAcquisition, PortGate.Client.PortGateAnnouncedDevice? Device, IReadOnlyList<GatewayPortInstrument> Instruments)
+{
+    public string? VirtualCom { get; init; }
+    public PortGate.Client.PortGatePortState? State { get; init; }
+    public string? StateCode { get; init; }
+}
+public sealed record GatewayPortInstrument(string InstrumentId, bool InSession, bool? SettingsMatch);
+public sealed record AdminChallenge(string Nonce, Guid InstanceId, DateTimeOffset ExpiresUtc, string Algorithm = ServiceAdministration.Algorithm);
+public sealed record AdminAuthenticateRequest(string PrincipalId, string Signature);
+public sealed record AdminIdentity(string PrincipalId, IReadOnlyList<string> Rights);
+public sealed record ConfigurationView(long Revision, IReadOnlyList<InstrumentConfiguration> Instruments, IReadOnlyList<GatewayConfiguration> Gateways);
+public sealed record InstrumentPutRequest(long Revision, InstrumentConfiguration Instrument)
+{
+    public bool DryRun { get; init; }
+    public bool AllowUnreachableGateway { get; init; }
+}
+public sealed record InstrumentPutResult(long Revision, InstrumentConfiguration Instrument, string Verification);
+public sealed record InstrumentRemoveRequest(long Revision, string InstrumentId);
+public sealed record GatewayPutRequest(long Revision, GatewayConfiguration Gateway)
+{
+    public bool DryRun { get; init; }
+}
+public sealed record GatewayPutResult(long Revision, GatewayConfiguration Gateway);
+public sealed record GatewayRemoveRequest(long Revision, string GatewayId);
+public sealed record RevisionResult(long Revision);
+/// <summary>One line of the administration audit (JSON Lines). Configuration holds no secrets nor patient data.</summary>
+public sealed record ServiceAuditRecord(DateTimeOffset TimeUtc, Guid InstanceId, Guid ConnectionId, string? PrincipalId, string Action,
+    string? Target, string Outcome)
+{
+    public string? Code { get; init; }
+    public long? RevisionBefore { get; init; }
+    public long? RevisionAfter { get; init; }
+    public string? BeforeSha256 { get; init; }
+    public JsonElement? After { get; init; }
+}
+
 public sealed class ServiceException(string code) : IOException(code)
 {
     public string Code { get; } = code;
@@ -120,7 +192,13 @@ public static class ServiceJson
         string[] required = typeof(T) == typeof(IngestOutcome) ? ["state"]
             : typeof(T) == typeof(OrderQueryAnswer) ? ["state", "orders"]
             : typeof(T) == typeof(TraceReadyReply) ? ["traceId", "ready"]
-            : typeof(T) == typeof(TraceAppendReply) ? ["traceId", "sequence", "stored"] : [];
+            : typeof(T) == typeof(TraceAppendReply) ? ["traceId", "sequence", "stored"]
+            // An absent revision must not silently become 0 on configuration writes.
+            : typeof(T) == typeof(InstrumentPutRequest) ? ["revision", "instrument"]
+            : typeof(T) == typeof(InstrumentRemoveRequest) ? ["revision", "instrumentId"]
+            : typeof(T) == typeof(GatewayPutRequest) ? ["revision", "gateway"]
+            : typeof(T) == typeof(GatewayRemoveRequest) ? ["revision", "gatewayId"]
+            : typeof(T) == typeof(AdminAuthenticateRequest) ? ["principalId", "signature"] : [];
         if (required.Length > 0 && (data.ValueKind != JsonValueKind.Object || required.Any(field => !data.TryGetProperty(field, out _))))
             throw new JsonException("callback.field.required");
         return data.Deserialize(Type<T>()) ?? throw new ServiceException("ipc.data.required");
@@ -158,6 +236,22 @@ public static class ServiceJson
 [JsonSerializable(typeof(PortGate.Client.PortGateObservation))]
 [JsonSerializable(typeof(CancelRequest))]
 [JsonSerializable(typeof(Ok))]
+[JsonSerializable(typeof(GatewayConfiguration))]
+[JsonSerializable(typeof(InstrumentConfiguration))]
+[JsonSerializable(typeof(GatewayListRequest))]
+[JsonSerializable(typeof(GatewayListing))]
+[JsonSerializable(typeof(AdminChallenge))]
+[JsonSerializable(typeof(AdminAuthenticateRequest))]
+[JsonSerializable(typeof(AdminIdentity))]
+[JsonSerializable(typeof(ConfigurationView))]
+[JsonSerializable(typeof(InstrumentPutRequest))]
+[JsonSerializable(typeof(InstrumentPutResult))]
+[JsonSerializable(typeof(InstrumentRemoveRequest))]
+[JsonSerializable(typeof(GatewayPutRequest))]
+[JsonSerializable(typeof(GatewayPutResult))]
+[JsonSerializable(typeof(GatewayRemoveRequest))]
+[JsonSerializable(typeof(RevisionResult))]
+[JsonSerializable(typeof(ServiceAuditRecord))]
 public partial class ServiceJsonContext : JsonSerializerContext;
 
 /// <summary>Exact invariant decimal strings on the IPC boundary; raw instrument text is also preserved.</summary>
