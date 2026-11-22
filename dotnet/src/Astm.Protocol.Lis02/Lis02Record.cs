@@ -8,6 +8,7 @@ namespace Astm.Protocol.Lis02;
 public sealed class Lis02Record
 {
     private readonly string[] _fields;
+    private readonly IReadOnlyList<string>?[] _repeats;
 
     public Lis02Record(string raw, Lis02Delimiters delimiters)
     {
@@ -16,6 +17,7 @@ public sealed class Lis02Record
         Delimiters = delimiters;
         Type = char.ToUpperInvariant(raw[0]);
         _fields = raw.Split(delimiters.Field);
+        _repeats = new IReadOnlyList<string>?[_fields.Length];
     }
 
     public string Raw { get; }
@@ -33,12 +35,15 @@ public sealed class Lis02Record
         return number <= _fields.Length ? _fields[number - 1] : string.Empty;
     }
 
+    /// <summary>Repeats of a field. Each field is split once and reused, so reading every repeat stays linear in the field length.</summary>
     public IReadOnlyList<string> Repeats(int field)
     {
-        var value = Field(field);
-        if (IsDelimiterDefinition(field))
-            return [value];
-        return value.Split(Delimiters.Repeat);
+        ArgumentOutOfRangeException.ThrowIfLessThan(field, 1);
+        if (field > _fields.Length)
+            return [string.Empty];
+        return _repeats[field - 1] ??= IsDelimiterDefinition(field)
+            ? Array.AsReadOnly(new[] { _fields[field - 1] })
+            : Array.AsReadOnly(_fields[field - 1].Split(Delimiters.Repeat));
     }
 
     public string Component(int field, int component, int repeat = 1)

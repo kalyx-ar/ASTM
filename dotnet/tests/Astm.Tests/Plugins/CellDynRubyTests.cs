@@ -56,6 +56,29 @@ public class CellDynRubyTests
     }
 
     [Fact]
+    public void Query_with_many_repeats_respects_its_allocation_limit()
+    {
+        const int count = 4000;
+        var query = "Q|1|" + string.Join('\\', Enumerable.Range(0, count).Select(i => "^SID-" + i));
+        var message = Assert.Single(Lis02Codec.Parse("H|\\^&|||  00000XX^CDRuby\r" + query + "\rL|1|N\r").Messages);
+        var standard = new StandardAstmPlugin();
+        var dialects = new[]
+        {
+            Dialect(),
+            standard.CreateDialect(standard.Profiles[0], new DialectContext(new InstrumentRef("clsi"), TimeProvider.System)),
+        };
+
+        foreach (var dialect in dialects)
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var interpretation = dialect.Interpret(message, TraceRef.None);
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.Equal(count, interpretation.Queries.Single().Specimens.Count);
+            Assert.True(allocated < 8 * 1024 * 1024, $"{allocated} bytes");
+        }
+    }
+    [Fact]
     public void Parsing_error_answer_is_reported_as_a_rejection()
     {
         var message = Assert.Single(Lis02Codec.Parse("H|\\^&|||  00000XX^CDRuby\rC|1|I|Parsing Error^RecordID|G\rL|1|E\r").Messages);

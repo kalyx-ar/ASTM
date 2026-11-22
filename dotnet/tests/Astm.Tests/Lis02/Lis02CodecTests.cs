@@ -125,4 +125,21 @@ public class Lis02CodecTests
 
         Assert.All(bytes, b => Assert.Equal((byte)'\r', b.Span[^1]));
     }
+
+    [Fact]
+    public void Splits_each_field_once_when_reading_every_repeat()
+    {
+        const int count = 4000;
+        var raw = "Q|1|" + string.Join('\\', Enumerable.Range(0, count).Select(i => "P" + i + "^S" + i));
+        var record = Lis02Codec.Parse("H|\\^&\r" + raw + "\rL|1\r").Messages[0].OfType('Q').Single();
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var specimens = Enumerable.Range(1, record.Repeats(3).Count).Select(r => record.Text(3, 2, r)).ToList();
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(count, specimens.Count);
+        Assert.Equal("S3999", specimens[^1]);
+        Assert.Same(record.Repeats(3), record.Repeats(3));
+        Assert.True(allocated < 8 * 1024 * 1024, $"{allocated} bytes");
+    }
 }
